@@ -24,7 +24,7 @@ type Response struct {
 }
 
 type Choice struct {
-	Message      Message
-	FinishReason string `json:"finish_reason"`
-	Index        int    `json:"index"`
+	Message      Message `json:"message"`
+	FinishReason string  `json:"finish_reason"`
+	Index        int     `json:"index"`
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"github.com/kardolus/chatgpt-poc/client"
 	"github.com/kardolus/chatgpt-poc/http"
 	"log"
@@ -35,11 +34,9 @@ func run() error {
 	}
 	client := client.New(http.New().WithSecret(secret))
 
-	result, err := client.Query(strings.Join(os.Args[1:], " "))
-	if err != nil {
+	if err := client.Stream(strings.Join(os.Args[1:], " ")); err != nil {
 		return err
 	}
-	fmt.Println(result)
 
 	return nil
 }

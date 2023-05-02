@@ -1,14 +1,20 @@
 package http
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"github.com/kardolus/chatgpt-poc/types"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"strings"
 )
 
 type Caller interface {
-	Post(url string, body []byte) ([]byte, error)
+	Post(url string, body []byte, stream bool) ([]byte, error)
 }
 
 type RestCaller struct {
@@ -30,7 +36,7 @@ func (r *RestCaller) WithSecret(secret string) *RestCaller {
 	return r
 }
 
-func (r *RestCaller) Post(url string, body []byte) ([]byte, error) {
+func (r *RestCaller) Post(url string, body []byte, stream bool) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -48,12 +54,48 @@ func (r *RestCaller) Post(url string, body []byte) ([]byte, error) {
 	defer response.Body.Close()
 
 	if response.StatusCode >= 200 && response.StatusCode < 300 {
-		result, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read response: %w", err)
+		if stream {
+			ProcessResponse(response.Body, os.Stdout)
+			return nil, nil
+		} else {
+			result, err := ioutil.ReadAll(response.Body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read response: %w", err)
+			}
+			return result, nil
 		}
-		return result, nil
 	}
 
 	return nil, fmt.Errorf("http error: %d", response.StatusCode)
+}
+
+func ProcessResponse(r io.Reader, w io.Writer) {
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "data:") {
+			line = line[6:] // Skip the "data: " prefix
+			if len(line) < 6 {
+				continue
+			}
+
+			if line == "[DONE]" {
+				_, _ = w.Write([]byte("\n"))
+				break
+			}
+
+			var data types.Data
+			err := json.Unmarshal([]byte(line), &data)
+			if err != nil {
+				_, _ = fmt.Fprintf(w, "Error: %s\n", err.Error())
+				continue
+			}
+
+			for _, choice := range data.Choices {
+				if content, ok := choice.Delta["content"]; ok {
+					_, _ = w.Write([]byte(content))
+				}
+			}
+		}
+	}
 }

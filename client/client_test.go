@@ -48,28 +48,28 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		)
 
 		it.Before(func() {
-			body, err = client.CreateBody(query)
+			body, err = client.CreateBody(query, false)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		it("throws an error when the http callout fails", func() {
 			errorMsg := "error message"
-			mockCaller.EXPECT().Post(client.URL, body).Return(nil, errors.New(errorMsg))
+			mockCaller.EXPECT().Post(client.URL, body, false).Return(nil, errors.New(errorMsg))
 
 			_, err = subject.Query(query)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal(errorMsg))
 		})
 		it("throws an error when the response is empty", func() {
-			mockCaller.EXPECT().Post(client.URL, body).Return(nil, nil)
+			mockCaller.EXPECT().Post(client.URL, body, false).Return(nil, nil)
 
 			_, err = subject.Query(query)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("empty response"))
 		})
 		it("throws an error when the response is a malformed json", func() {
-			malformed := "{no"
-			mockCaller.EXPECT().Post(client.URL, body).Return([]byte(malformed), nil)
+			malformed := `{"invalid":"json"` // missing closing brace
+			mockCaller.EXPECT().Post(client.URL, body, false).Return([]byte(malformed), nil)
 
 			_, err = subject.Query(query)
 			Expect(err).To(HaveOccurred())
@@ -86,7 +86,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			respBytes, err := json.Marshal(response)
 			Expect(err).NotTo(HaveOccurred())
-			mockCaller.EXPECT().Post(client.URL, body).Return(respBytes, nil)
+			mockCaller.EXPECT().Post(client.URL, body, false).Return(respBytes, nil)
 
 			_, err = subject.Query(query)
 			Expect(err).To(HaveOccurred())
@@ -111,7 +111,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			respBytes, err := json.Marshal(response)
 			Expect(err).NotTo(HaveOccurred())
-			mockCaller.EXPECT().Post(client.URL, body).Return(respBytes, nil)
+			mockCaller.EXPECT().Post(client.URL, body, false).Return(respBytes, nil)
 
 			result, err := subject.Query(query)
 			Expect(err).NotTo(HaveOccurred())

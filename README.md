@@ -1,7 +1,7 @@
 # ChatGPT CLI
 
-This project is a Proof of Concept (POC) showcasing the implementation of ChatGPT clients with streaming support in a
-Command-Line Interface (CLI) environment.
+This project showcases an implementation of ChatGPT clients with streaming support in a Command-Line Interface (CLI)
+environment, demonstrating its practicality and effectiveness.
 
 ![a screenshot](resources/screenshot.png)
 

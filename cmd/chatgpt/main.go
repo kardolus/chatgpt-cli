@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const secretEnv = "CHAT_GPT_SECRET_KEY"
+const secretEnv = "OPENAI_API_KEY"
 
 func main() {
 	exit(run())

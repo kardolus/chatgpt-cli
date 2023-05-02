@@ -4,7 +4,7 @@
 ```shell
 curl https://api.openai.com/v1/completions \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer ${CHAT_GPT_SECRET_KEY}" \
+  -H "Authorization: Bearer ${OPENAI_API_KEY}" \
   -d '{
   "model": "text-davinci-003",
   "prompt": "What is your name?",
@@ -35,10 +35,10 @@ Output:
   }
 }
 ```
-### cURL gpt
+### cURL gpt-turbo
 ```shell
 curl --location --insecure --request POST 'https://api.openai.com/v1/chat/completions' \
-  --header "Authorization: Bearer ${CHAT_GPT_SECRET_KEY}" \
+  --header "Authorization: Bearer ${OPENAI_API_KEY}" \
   --header 'Content-Type: application/json' \
     --data-raw '{
      "model": "gpt-3.5-turbo",

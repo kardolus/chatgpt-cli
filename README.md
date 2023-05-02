@@ -29,10 +29,10 @@ building the application:
 ./bin/chatgpt what type of dog is a Jack Russel?
 ```
 
-## Up Next
-
-* Add a command line flag for non-streaming
-* Use Viper for command line parsing
+For more options see:
+```shell
+./bin/chatgpt --help
+```
 
 ## Links
 

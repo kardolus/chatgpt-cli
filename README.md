@@ -3,7 +3,13 @@
 This project showcases an implementation of ChatGPT clients with streaming support in a Command-Line Interface (CLI)
 environment, demonstrating its practicality and effectiveness.
 
-![a screenshot](resources/screenshot.png)
+![a screenshot](resources/recording.gif)
+
+## Features
+
+* Interactive streaming mode for real-time interaction with the GPT model.
+* Query mode for single input-output interactions with the GPT model.
+* Viper integration for robust configuration management.
 
 ## Development
 
@@ -34,12 +40,6 @@ For more options, see:
 ```shell
 ./bin/chatgpt --help
 ```
-
-## Features
-
-* Interactive streaming mode for real-time interaction with the GPT model.
-* Query mode for single input-output interactions with the GPT model.
-* Viper integration for robust configuration management.
 
 ## Up Next
 

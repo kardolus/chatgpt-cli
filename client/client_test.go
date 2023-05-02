@@ -5,8 +5,8 @@ import (
 	"errors"
 	"github.com/golang/mock/gomock"
 	_ "github.com/golang/mock/mockgen/model"
-	"github.com/kardolus/chatgpt-poc/client"
-	"github.com/kardolus/chatgpt-poc/types"
+	"github.com/kardolus/chatgpt-cli/client"
+	"github.com/kardolus/chatgpt-cli/types"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -14,7 +14,7 @@ import (
 	"github.com/sclevine/spec/report"
 )
 
-//go:generate mockgen -destination=mocks_test.go -package=client_test github.com/kardolus/chatgpt-poc/http Caller
+//go:generate mockgen -destination=mocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/http Caller
 
 var (
 	mockCtrl   *gomock.Controller

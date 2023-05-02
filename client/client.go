@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kardolus/chatgpt-poc/http"
-	"github.com/kardolus/chatgpt-poc/types"
+	"github.com/kardolus/chatgpt-cli/http"
+	"github.com/kardolus/chatgpt-cli/types"
 )
 
 const (

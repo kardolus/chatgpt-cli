@@ -3,8 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/kardolus/chatgpt-poc/client"
-	"github.com/kardolus/chatgpt-poc/http"
+	"github.com/kardolus/chatgpt-cli/client"
+	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"os"

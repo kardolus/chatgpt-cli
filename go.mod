@@ -1,4 +1,4 @@
-module github.com/kardolus/chatgpt-poc
+module github.com/kardolus/chatgpt-cli
 
 go 1.18
 

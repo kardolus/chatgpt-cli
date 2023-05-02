@@ -1,6 +1,6 @@
 # ChatGPT CLI
 
-This project is a Proof of Concept (POC) that demonstrates how to build ChatGPT clients with streaming support in a
+This project is a Proof of Concept (POC) showcasing the implementation of ChatGPT clients with streaming support in a
 Command-Line Interface (CLI) environment.
 
 ![a screenshot](resources/screenshot.png)
@@ -29,12 +29,24 @@ building the application:
 ./bin/chatgpt what type of dog is a Jack Russel?
 ```
 
-For more options see:
+For more options, see:
+
 ```shell
 ./bin/chatgpt --help
 ```
 
-## Links
+## Features
+
+* Interactive streaming mode for real-time interaction with the GPT model.
+* Query mode for single input-output interactions with the GPT model.
+* Viper integration for robust configuration management.
+
+## Up Next
+
+* Maintain context across multiple calls to ChatGPT.
+* Reset the context with a CLI command.
+
+## Useful Links
 
 * [ChatGPT API Documentation](https://platform.openai.com/docs/introduction/overview)
 * [Key Usage Dashboard](https://platform.openai.com/account/usage)

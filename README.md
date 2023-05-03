@@ -40,7 +40,7 @@ building the application:
 4. To enable history tracking across CLI calls, create a ~/.chatgpt-cli directory using the command:
 
 ```shell
-mkdir ~/.chatgpt-cli
+mkdir -p ~/.chatgpt-cli
 ```
 
 With this directory in place, the CLI will automatically manage message history for seamless conversations with the GPT

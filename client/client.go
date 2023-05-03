@@ -115,8 +115,6 @@ func (c *Client) initHistory(query string) {
 		}}
 	}
 
-	// TODO Test the string returned from Stream
-	// TODO Write delete-specific tests (on store)
 	// TODO implement sliding window
 
 	c.history = append(c.history, message)

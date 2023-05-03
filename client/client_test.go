@@ -14,11 +14,13 @@ import (
 	"github.com/sclevine/spec/report"
 )
 
-//go:generate mockgen -destination=mocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/http Caller
+//go:generate mockgen -destination=callermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/http Caller
+//go:generate mockgen -destination=iomocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/history Store
 
 var (
 	mockCtrl   *gomock.Controller
 	mockCaller *MockCaller
+	mockStore  *MockStore
 	subject    *client.Client
 )
 
@@ -31,8 +33,10 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		RegisterTestingT(t)
 		mockCtrl = gomock.NewController(t)
 		mockCaller = NewMockCaller(mockCtrl)
+		mockStore = NewMockStore(mockCtrl)
 
-		subject = client.New(mockCaller)
+		mockStore.EXPECT().Read().Return(nil, nil).Times(1)
+		subject = client.New(mockCaller, mockStore)
 	})
 
 	it.After(func() {
@@ -43,12 +47,14 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		const query = "test query"
 
 		var (
-			err  error
-			body []byte
+			body     []byte
+			messages []types.Message
+			err      error
 		)
 
 		it.Before(func() {
-			body, err = client.CreateBody(query, false)
+			messages = createMessages(nil, query)
+			body, err = createBody(messages)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -56,14 +62,14 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			errorMsg := "error message"
 			mockCaller.EXPECT().Post(client.URL, body, false).Return(nil, errors.New(errorMsg))
 
-			_, err = subject.Query(query)
+			_, err := subject.Query(query)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal(errorMsg))
 		})
 		it("throws an error when the response is empty", func() {
 			mockCaller.EXPECT().Post(client.URL, body, false).Return(nil, nil)
 
-			_, err = subject.Query(query)
+			_, err := subject.Query(query)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("empty response"))
 		})
@@ -71,7 +77,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			malformed := `{"invalid":"json"` // missing closing brace
 			mockCaller.EXPECT().Post(client.URL, body, false).Return([]byte(malformed), nil)
 
-			_, err = subject.Query(query)
+			_, err := subject.Query(query)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).Should(HavePrefix("failed to decode response:"))
 		})
@@ -93,10 +99,12 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(err.Error()).To(Equal("no responses returned"))
 		})
 		it("parses a valid http response as expected", func() {
+			const answer = "content"
+
 			choice := types.Choice{
 				Message: types.Message{
 					Role:    "role",
-					Content: "content",
+					Content: answer,
 				},
 				FinishReason: "",
 				Index:        0,
@@ -113,9 +121,42 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).NotTo(HaveOccurred())
 			mockCaller.EXPECT().Post(client.URL, body, false).Return(respBytes, nil)
 
+			mockStore.EXPECT().Write(append(messages, types.Message{
+				Role:    client.AssistantRole,
+				Content: answer,
+			}))
+
 			result, err := subject.Query(query)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal("content"))
+			Expect(result).To(Equal(answer))
 		})
 	})
+}
+
+func createBody(messages []types.Message) ([]byte, error) {
+	req := types.Request{
+		Model:    client.GPTModel,
+		Messages: messages,
+		Stream:   false,
+	}
+
+	return json.Marshal(req)
+}
+
+func createMessages(history []types.Message, query string) []types.Message {
+	var messages []types.Message
+
+	if len(history) == 0 {
+		messages = append(messages, types.Message{
+			Role:    client.SystemRole,
+			Content: client.AssistantContent,
+		})
+	}
+
+	messages = append(messages, types.Message{
+		Role:    client.UserRole,
+		Content: query,
+	})
+
+	return messages
 }

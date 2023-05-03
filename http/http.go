@@ -55,8 +55,7 @@ func (r *RestCaller) Post(url string, body []byte, stream bool) ([]byte, error) 
 
 	if response.StatusCode >= 200 && response.StatusCode < 300 {
 		if stream {
-			ProcessResponse(response.Body, os.Stdout)
-			return nil, nil
+			return ProcessResponse(response.Body, os.Stdout), nil
 		} else {
 			result, err := ioutil.ReadAll(response.Body)
 			if err != nil {
@@ -69,7 +68,9 @@ func (r *RestCaller) Post(url string, body []byte, stream bool) ([]byte, error) 
 	return nil, fmt.Errorf("http error: %d", response.StatusCode)
 }
 
-func ProcessResponse(r io.Reader, w io.Writer) {
+func ProcessResponse(r io.Reader, w io.Writer) []byte {
+	var result []byte
+
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -81,6 +82,7 @@ func ProcessResponse(r io.Reader, w io.Writer) {
 
 			if line == "[DONE]" {
 				_, _ = w.Write([]byte("\n"))
+				result = append(result, []byte("\n")...)
 				break
 			}
 
@@ -94,8 +96,10 @@ func ProcessResponse(r io.Reader, w io.Writer) {
 			for _, choice := range data.Choices {
 				if content, ok := choice.Delta["content"]; ok {
 					_, _ = w.Write([]byte(content))
+					result = append(result, []byte(content)...)
 				}
 			}
 		}
 	}
+	return result
 }

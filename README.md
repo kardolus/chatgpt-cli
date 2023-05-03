@@ -9,6 +9,8 @@ environment, demonstrating its practicality and effectiveness.
 
 * Interactive streaming mode for real-time interaction with the GPT model.
 * Query mode for single input-output interactions with the GPT model.
+* Context management across CLI calls, enabling seamless conversations with the GPT model by maintaining message
+  history.
 * Viper integration for robust configuration management.
 
 ## Development
@@ -35,16 +37,21 @@ building the application:
 ./bin/chatgpt what type of dog is a Jack Russel?
 ```
 
+4. To enable history tracking across CLI calls, create a ~/.chatgpt-cli directory using the command:
+
+```shell
+mkdir ~/.chatgpt-cli
+```
+
+With this directory in place, the CLI will automatically manage message history for seamless conversations with the GPT
+model. The history acts as a sliding window, maintaining a maximum of 4096 tokens to ensure optimal performance and
+interaction quality.
+
 For more options, see:
 
 ```shell
 ./bin/chatgpt --help
 ```
-
-## Up Next
-
-* Maintain context across multiple calls to ChatGPT.
-* Reset the context with a CLI command.
 
 ## Useful Links
 

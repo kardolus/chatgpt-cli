@@ -1,6 +1,7 @@
 # ChatGPT API
 
 ### cURL davinci
+
 ```shell
 curl https://api.openai.com/v1/completions \
   -H 'Content-Type: application/json' \
@@ -13,7 +14,9 @@ curl https://api.openai.com/v1/completions \
 }' \
 --insecure | jq .
 ```
-Output: 
+
+Output:
+
 ```json
 {
   "id": "cmpl-7BQi5QXWoy83V1HR8VcC7MzrtArGp",
@@ -35,7 +38,9 @@ Output:
   }
 }
 ```
+
 ### cURL gpt-turbo
+
 ```shell
 curl --location --insecure --request POST 'https://api.openai.com/v1/chat/completions' \
   --header "Authorization: Bearer ${OPENAI_API_KEY}" \
@@ -45,7 +50,9 @@ curl --location --insecure --request POST 'https://api.openai.com/v1/chat/comple
      "messages": [{"role": "user", "content": "What is the OpenAI mission?"}]
     }' | jq .
 ```
-Output: 
+
+Output:
+
 ```json
 {
   "id": "chatcmpl-7BQnIwmXhD6ohmwS6BjRHJrw9rJ7K",
@@ -68,4 +75,43 @@ Output:
     }
   ]
 }
+```
+
+### Providing custom context
+
+You can provide your own context in the messages array in your callout. You can split this data over multiple lines. For
+example
+
+```json
+[
+  {
+    "role": "system",
+    "content": "You are a helpful assistant."
+  },
+  {
+    "role": "user",
+    "content": "My dog's name is Piet Kernbom"
+  },
+  {
+    "role": "user",
+    "content": "and he's a 3-year-old Golden Retriever. He loves playing fetch and going for long walks."
+  }
+]
+```
+
+Using the chatgpt-cli with this context:
+
+```shell
+./bin/chatgpt What kind of toys would be best for Piet Kernbom?
+Golden Retrievers like Piet Kernbom typically enjoy playing with toys that can be used for interactive play and also provide mental stimulation. Some good options for him may include:
+
+1. Tennis Balls: Since Piet loves playing fetch, tennis balls can be great for him as they can be thrown over long distances.
+
+2. Rope Toys: Rope toys are great for interactive play and also help with dental health. They come in a variety of shapes and sizes that Piet can choose from.
+
+3. Puzzle Toys: Puzzle toys like treat balls are great for providing mental stimulation and keeping Piet entertained while you're away.
+
+4. Soft Toys: Soft toys make great comfort toys for Golden Retrievers and can provide them with a sense of security.
+
+Overall, it's good to keep a variety of toys on hand and observe your dog's preferences to find out what he likes best.
 ```

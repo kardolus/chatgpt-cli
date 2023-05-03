@@ -18,46 +18,41 @@ type Store interface {
 var _ Store = &FileIO{}
 
 type FileIO struct {
+	historyFilePath string
 }
 
-func New() *FileIO {
-	return &FileIO{}
+func NewDefault() *FileIO {
+	path, _ := getPath()
+	return &FileIO{
+		historyFilePath: path,
+	}
+}
+
+func New(historyFilePath string) *FileIO {
+	return &FileIO{
+		historyFilePath: historyFilePath,
+	}
 }
 
 func (f *FileIO) Delete() error {
-	historyFilePath, err := getPath()
-	if err != nil {
-		return err
-	}
-
-	if _, err := os.Stat(historyFilePath); err == nil {
-		return os.Remove(historyFilePath)
+	if _, err := os.Stat(f.historyFilePath); err == nil {
+		return os.Remove(f.historyFilePath)
 	}
 
 	return nil
 }
 
 func (f *FileIO) Read() ([]types.Message, error) {
-	historyFilePath, err := getPath()
-	if err != nil {
-		return nil, err
-	}
-
-	return parseFile(historyFilePath)
+	return parseFile(f.historyFilePath)
 }
 
 func (f *FileIO) Write(messages []types.Message) error {
-	historyFilePath, err := getPath()
-	if err != nil {
-		return err
-	}
-
 	data, err := json.Marshal(messages)
 	if err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(historyFilePath, data, 0644)
+	return ioutil.WriteFile(f.historyFilePath, data, 0644)
 }
 
 func getPath() (string, error) {

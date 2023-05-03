@@ -19,10 +19,19 @@ To start developing, set the `OPENAI_API_KEY` environment variable to
 your [ChatGPT secret key](https://platform.openai.com/account/api-keys). Follow these steps for running tests and
 building the application:
 
-1. Run the unit tests using the following script:
+1. Run the tests using the following scripts:
 
+For unit tests, run:
 ```shell
 ./scripts/unit.sh
+```
+For integration tests, run:
+```shell
+./scripts/integration.sh
+```
+To run all tests, use:
+```shell
+./scripts/all-tests.sh
 ```
 
 2. Build the app using the installation script:

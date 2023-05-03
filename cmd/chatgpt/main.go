@@ -38,7 +38,7 @@ func main() {
 
 func run(cmd *cobra.Command, args []string) error {
 	if clearHistory {
-		historyHandler := history.New()
+		historyHandler := history.NewDefault()
 		err := historyHandler.Delete()
 		if err != nil {
 			return err
@@ -58,7 +58,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if secret == "" {
 		return errors.New("missing environment variable: " + secretEnv)
 	}
-	client := client.New(http.New().WithSecret(secret), history.New())
+	client := client.New(http.New().WithSecret(secret), history.NewDefault())
 
 	if queryMode {
 		result, err := client.Query(strings.Join(args, " "))

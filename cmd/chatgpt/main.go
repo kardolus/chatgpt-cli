@@ -8,6 +8,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"io/ioutil"
 	"os"
 	"strings"
 )
@@ -20,9 +21,11 @@ var clearHistory bool
 func main() {
 	var rootCmd = &cobra.Command{
 		Use:   "chatgpt",
-		Short: "ChatGPT Proof of Concept",
-		Long:  "A Proof of Concept for building ChatGPT clients.",
-		RunE:  run,
+		Short: "ChatGPT CLI Tool",
+		Long: "A powerful ChatGPT client that enables seamless interactions with the GPT model. " +
+			"Provides multiple modes and context management features, including the ability to " +
+			"pipe custom context into the conversation.",
+		RunE: run,
 	}
 
 	rootCmd.PersistentFlags().BoolVarP(&queryMode, "query", "q", false, "Use query mode instead of stream mode")
@@ -59,6 +62,16 @@ func run(cmd *cobra.Command, args []string) error {
 		return errors.New("missing environment variable: " + secretEnv)
 	}
 	client := client.NewDefault(http.New().WithSecret(secret), history.NewDefault())
+
+	// Check if there is input from the pipe (stdin)
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		pipeContent, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("failed to read from pipe: %w", err)
+		}
+		client.ProvideContext(string(pipeContent))
+	}
 
 	if queryMode {
 		result, err := client.Query(strings.Join(args, " "))

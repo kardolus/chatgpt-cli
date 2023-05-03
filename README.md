@@ -13,6 +13,8 @@ environment, demonstrating its practicality and effectiveness.
   history.
 * Sliding window history management: Automatically trims conversation history while maintaining context to stay within
   token limits, enabling seamless and efficient conversations with the GPT model across CLI calls.
+* Custom context from local files: Easily provide custom context through piping, allowing the GPT model to reference
+  specific data during the conversation.
 * Viper integration for robust configuration management.
 
 ## Development
@@ -68,10 +70,6 @@ For more options, see:
 ```shell
 ./bin/chatgpt --help
 ```
-
-## Coming Soon
-
-Enable piping custom context for seamless interaction with the ChatGPT API.
 
 ## Useful Links
 

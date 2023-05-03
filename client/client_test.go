@@ -278,6 +278,23 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			})
 		})
 	})
+	when("ProvideContext()", func() {
+		it("updates the history with the provided context", func() {
+			context := "This is a story about a dog named Kya. Kya loves to play fetch and swim in the lake."
+			mockStore.EXPECT().Read().Return(nil, nil).Times(1)
+			subject.ProvideContext(context)
+
+			Expect(len(subject.History)).To(Equal(2)) // The system message and the provided context
+
+			systemMessage := subject.History[0]
+			Expect(systemMessage.Role).To(Equal(client.SystemRole))
+			Expect(systemMessage.Content).To(Equal("You are a helpful assistant."))
+
+			contextMessage := subject.History[1]
+			Expect(contextMessage.Role).To(Equal(client.UserRole))
+			Expect(contextMessage.Content).To(Equal(context))
+		})
+	})
 }
 
 func createBody(messages []types.Message, stream bool) ([]byte, error) {

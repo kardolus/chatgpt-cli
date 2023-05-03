@@ -7,27 +7,41 @@ import (
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/kardolus/chatgpt-cli/types"
+	"strings"
+	"unicode/utf8"
 )
 
 const (
-	AssistantContent = "You are a helpful assistant."
-	AssistantRole    = "assistant"
-	GPTModel         = "gpt-3.5-turbo"
-	SystemRole       = "system"
-	URL              = "https://api.openai.com/v1/chat/completions"
-	UserRole         = "user"
+	AssistantContent         = "You are a helpful assistant."
+	AssistantRole            = "assistant"
+	GPTModel                 = "gpt-3.5-turbo"
+	MaxTokenBufferPercentage = 20
+	MaxTokenSize             = 4096
+	SystemRole               = "system"
+	URL                      = "https://api.openai.com/v1/chat/completions"
+	UserRole                 = "user"
 )
 
 type Client struct {
 	caller     http.Caller
 	readWriter history.Store
 	history    []types.Message
+	capacity   int
 }
 
-func New(caller http.Caller, rw history.Store) *Client {
+func New(caller http.Caller, rw history.Store, capacity int) *Client {
 	return &Client{
 		caller:     caller,
 		readWriter: rw,
+		capacity:   capacity,
+	}
+}
+
+func NewDefault(caller http.Caller, rw history.Store) *Client {
+	return &Client{
+		caller:     caller,
+		readWriter: rw,
+		capacity:   MaxTokenSize,
 	}
 }
 
@@ -115,9 +129,31 @@ func (c *Client) initHistory(query string) {
 		}}
 	}
 
-	// TODO implement sliding window
-
 	c.history = append(c.history, message)
+	c.truncateHistory()
+}
+
+func (c *Client) truncateHistory() {
+	tokens, rolling := countTokens(c.history)
+	effectiveTokenSize := calculateEffectiveTokenSize(c.capacity, MaxTokenBufferPercentage)
+
+	if tokens <= effectiveTokenSize {
+		return
+	}
+
+	var index int
+	var total int
+	diff := tokens - effectiveTokenSize
+
+	for i := 1; i < len(rolling); i++ {
+		total += rolling[i]
+		if total > diff {
+			index = i
+			break
+		}
+	}
+
+	c.history = append(c.history[:1], c.history[index+1:]...)
 }
 
 func (c *Client) updateHistory(response string) {
@@ -126,4 +162,33 @@ func (c *Client) updateHistory(response string) {
 		Content: response,
 	})
 	_ = c.readWriter.Write(c.history)
+}
+
+func calculateEffectiveTokenSize(maxTokenSize int, bufferPercentage int) int {
+	adjustedPercentage := 100 - bufferPercentage
+	effectiveTokenSize := (maxTokenSize * adjustedPercentage) / 100
+	return effectiveTokenSize
+}
+
+func countTokens(messages []types.Message) (int, []int) {
+	var result int
+	var rolling []int
+
+	for _, message := range messages {
+		charCount, wordCount := 0, 0
+		words := strings.Fields(message.Content)
+		wordCount += len(words)
+
+		for _, word := range words {
+			charCount += utf8.RuneCountInString(word)
+		}
+
+		// This is a simple approximation; actual token count may differ.
+		// You can adjust this based on your language and the specific tokenizer used by the model.
+		tokenCountForMessage := (charCount + wordCount) / 2
+		result += tokenCountForMessage
+		rolling = append(rolling, tokenCountForMessage)
+	}
+
+	return result, rolling
 }

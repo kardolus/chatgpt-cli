@@ -11,6 +11,8 @@ environment, demonstrating its practicality and effectiveness.
 * Query mode for single input-output interactions with the GPT model.
 * Context management across CLI calls, enabling seamless conversations with the GPT model by maintaining message
   history.
+* Sliding window history management: Automatically trims conversation history while maintaining context to stay within
+  token limits, enabling seamless and efficient conversations with the GPT model across CLI calls.
 * Viper integration for robust configuration management.
 
 ## Development
@@ -22,14 +24,19 @@ building the application:
 1. Run the tests using the following scripts:
 
 For unit tests, run:
+
 ```shell
 ./scripts/unit.sh
 ```
+
 For integration tests, run:
+
 ```shell
 ./scripts/integration.sh
 ```
+
 To run all tests, use:
+
 ```shell
 ./scripts/all-tests.sh
 ```

@@ -58,7 +58,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if secret == "" {
 		return errors.New("missing environment variable: " + secretEnv)
 	}
-	client := client.New(http.New().WithSecret(secret), history.NewDefault())
+	client := client.NewDefault(http.New().WithSecret(secret), history.NewDefault())
 
 	if queryMode {
 		result, err := client.Query(strings.Join(args, " "))

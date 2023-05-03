@@ -36,7 +36,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		mockCtrl = gomock.NewController(t)
 		mockCaller = NewMockCaller(mockCtrl)
 		mockStore = NewMockStore(mockCtrl)
-		subject = client.New(mockCaller, mockStore)
+		subject = client.New(mockCaller, mockStore, 50)
 	})
 
 	it.After(func() {
@@ -129,8 +129,11 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				Expect(err).NotTo(HaveOccurred())
 				mockCaller.EXPECT().Post(client.URL, expectedBody, false).Return(respBytes, nil)
 
-				messages = createMessages(history, query)
-				mockStore.EXPECT().Write(append(messages, types.Message{
+				var request types.Request
+				err = json.Unmarshal(expectedBody, &request)
+				Expect(err).NotTo(HaveOccurred())
+
+				mockStore.EXPECT().Write(append(request.Messages, types.Message{
 					Role:    client.AssistantRole,
 					Content: answer,
 				}))
@@ -159,6 +162,48 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					},
 				}
 				messages = createMessages(history, query)
+				body, err = createBody(messages, false)
+				Expect(err).NotTo(HaveOccurred())
+
+				testValidHTTPResponse(history, body)
+			})
+			it("truncates the history as expected", func() {
+				history := []types.Message{
+					{
+						Role:    client.SystemRole,
+						Content: client.AssistantContent,
+					},
+					{
+						Role:    client.UserRole,
+						Content: "question 1",
+					},
+					{
+						Role:    client.AssistantRole,
+						Content: "answer 1",
+					},
+					{
+						Role:    client.UserRole,
+						Content: "question 2",
+					},
+					{
+						Role:    client.AssistantRole,
+						Content: "answer 2",
+					},
+					{
+						Role:    client.UserRole,
+						Content: "question 3",
+					},
+					{
+						Role:    client.AssistantRole,
+						Content: "answer 3",
+					},
+				}
+
+				messages = createMessages(history, query)
+
+				// messages get truncated. Index 1+2 are cut out
+				messages = append(messages[:1], messages[3:]...)
+
 				body, err = createBody(messages, false)
 				Expect(err).NotTo(HaveOccurred())
 

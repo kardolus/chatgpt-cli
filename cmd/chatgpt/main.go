@@ -50,7 +50,7 @@ func run(cmd *cobra.Command, args []string) error {
 		fmt.Printf("ChatGPT CLI version %s (commit %s)\n", GitVersion, GitCommit)
 		return nil
 	}
-	
+
 	if clearHistory {
 		historyHandler := history.NewDefault()
 		err := historyHandler.Delete()

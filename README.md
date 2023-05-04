@@ -3,7 +3,7 @@
 This project showcases an implementation of ChatGPT clients with streaming support in a Command-Line Interface (CLI)
 environment, demonstrating its practicality and effectiveness.
 
-![a screenshot](resources/recording.gif)
+![a screenshot](resources/vhs.gif)
 
 ## Features
 

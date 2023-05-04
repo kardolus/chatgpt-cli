@@ -15,8 +15,13 @@ import (
 
 const secretEnv = "OPENAI_API_KEY"
 
-var queryMode bool
-var clearHistory bool
+var (
+	queryMode    bool
+	clearHistory bool
+	showVersion  bool
+	GitCommit    string
+	GitVersion   string
+)
 
 func main() {
 	var rootCmd = &cobra.Command{
@@ -30,6 +35,7 @@ func main() {
 
 	rootCmd.PersistentFlags().BoolVarP(&queryMode, "query", "q", false, "Use query mode instead of stream mode")
 	rootCmd.PersistentFlags().BoolVarP(&clearHistory, "clear-history", "c", false, "Clear the history of ChatGPT CLI")
+	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
 
 	viper.AutomaticEnv()
 
@@ -40,6 +46,11 @@ func main() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	if showVersion {
+		fmt.Printf("ChatGPT CLI version %s (commit %s)\n", GitVersion, GitCommit)
+		return nil
+	}
+	
 	if clearHistory {
 		historyHandler := history.NewDefault()
 		err := historyHandler.Delete()

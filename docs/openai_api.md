@@ -142,3 +142,133 @@ Output:
   ]
 }
 ```
+
+### Train (fine-tune) OpenAI models with custom data
+
+1. Create a `jsonl` training file and call it `mydata.jsonl`
+
+```json lines
+{"prompt": "Who is Piet Kernbom?'", "completion": "Piet Kernbom was a famous baseball player for the Yankees"}
+{"prompt": "Where was Piet Kernbom from?", "completion": "He is from Suriname."}
+{"prompt": "What are some of Piet Kernbom his hobbies", "completion": "Magic tricks and cooking."}
+```
+
+2. Upload the `jsonl` training file. Run this `curl` from the same directory the file is located in.
+
+```shell
+curl https://api.openai.com/v1/files \
+  -H "Authorization: Bearer ${OPENAI_API_KEY}" \
+  -F purpose="fine-tune" \
+  -F file="@mydata.jsonl"
+```
+
+Output: 
+
+```json
+{
+  "object": "file",
+  "id": "file-cj5IFUAN43k3BHd1qRd4lcU2",
+  "purpose": "fine-tune",
+  "filename": "mydata.jsonl",
+  "bytes": 291,
+  "created_at": 1683300186,
+  "status": "uploaded",
+  "status_details": null
+}
+```
+
+3. Create a "fine-tune" based on the uploaded file
+
+```shell
+curl https://api.openai.com/v1/fine-tunes \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${OPENAI_API_KEY}" \
+  -d '{
+    "training_file": "file-cj5IFUAN43k3BHd1qRd4lcU2",
+    "model": "davinci"
+  }'
+```
+
+Output:
+```json
+{
+  "object": "fine-tune",
+  "id": "ft-SyQ7nzBdGJBVWtFD2rpVfQCp",
+  "hyperparams": {
+    "n_epochs": 4,
+    "batch_size": null,
+    "prompt_loss_weight": 0.01,
+    "learning_rate_multiplier": null
+  },
+  "organization_id": "org-zgHnNxrmfCn3EoM43F5XHh2C",
+  "model": "davinci",
+  "training_files": [
+    {
+      "object": "file",
+      "id": "file-cj5IFUAN43k3BHd1qRd4lcU2",
+      "purpose": "fine-tune",
+      "filename": "mydata.jsonl",
+      "bytes": 291,
+      "created_at": 1683300186,
+      "status": "processed",
+      "status_details": null
+    }
+  ],
+  "validation_files": [],
+  "result_files": [],
+  "created_at": 1683300391,
+  "updated_at": 1683300391,
+  "status": "pending",
+  "fine_tuned_model": null,
+  "events": [
+    {
+      "object": "fine-tune-event",
+      "level": "info",
+      "message": "Created fine-tune: ft-SyQ7nzBdGJBVWtFD2rpVfQCp",
+      "created_at": 1683300391
+    }
+  ]
+}
+```
+
+4. Pull the "fine-tune" endpoint to retrieve the model ID. Once the status is "succeeded" you can curl the new model
+   which identifier you can find under `fine_tuned_model`.
+
+```shell
+curl https://api.openai.com/v1/fine-tunes \
+  -H "Authorization: Bearer ${OPENAI_API_KEY}"
+```
+
+5. Hit the new model
+
+```shell
+curl https://api.openai.com/v1/completions   -H 'Content-Type: application/json'   -H "Authorization: Bearer ${OPENAI_API_KEY}"   -d '{
+  "model": "davinci:ft-personal-2023-05-05-15-39-01",
+  "prompt": "According to the data I trained on, for what team did Piet Kernbom play baseball?",
+  "max_tokens": 10,
+  "temperature": 0.2
+}'
+```
+
+Output:
+```json
+{
+  "id": "cmpl-7Cs7cr7GxXRYkD9YUc9DiXPPx6HJQ",
+  "object": "text_completion",
+  "created": 1683302336,
+  "model": "davinci:ft-personal-2023-05-05-15-39-01",
+  "choices": [
+    {
+      "text": "\n\nThe answer is the New York Yankees.",
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "length"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 19,
+    "completion_tokens": 10,
+    "total_tokens": 29
+  }
+}
+```

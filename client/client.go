@@ -25,8 +25,9 @@ const (
 type Client struct {
 	History    []types.Message
 	caller     http.Caller
-	readWriter history.Store
 	capacity   int
+	model      string
+	readWriter history.Store
 }
 
 func New(caller http.Caller, rw history.Store) *Client {
@@ -34,11 +35,17 @@ func New(caller http.Caller, rw history.Store) *Client {
 		caller:     caller,
 		readWriter: rw,
 		capacity:   MaxTokenSize,
+		model:      GPTModel,
 	}
 }
 
 func (c *Client) WithCapacity(capacity int) *Client {
 	c.capacity = capacity
+	return c
+}
+
+func (c *Client) WithModel(model string) *Client {
+	c.model = model
 	return c
 }
 
@@ -119,8 +126,8 @@ func (c *Client) ProvideContext(context string) {
 
 func (c *Client) createBody(stream bool) ([]byte, error) {
 	body := types.Request{
-		Model:    GPTModel,
 		Messages: c.History,
+		Model:    c.model,
 		Stream:   stream,
 	}
 

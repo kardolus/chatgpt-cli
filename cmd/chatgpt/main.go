@@ -21,6 +21,7 @@ var (
 	showVersion  bool
 	GitCommit    string
 	GitVersion   string
+	modelName    string
 )
 
 func main() {
@@ -36,6 +37,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&queryMode, "query", "q", false, "Use query mode instead of stream mode")
 	rootCmd.PersistentFlags().BoolVarP(&clearHistory, "clear-history", "c", false, "Clear the history of ChatGPT CLI")
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
+	rootCmd.PersistentFlags().StringVarP(&modelName, "model", "m", "", "Use a custom GPT model by specifying the model name")
 
 	viper.AutomaticEnv()
 
@@ -73,6 +75,10 @@ func run(cmd *cobra.Command, args []string) error {
 		return errors.New("missing environment variable: " + secretEnv)
 	}
 	client := client.New(http.New().WithSecret(secret), history.New())
+
+	if modelName != "" {
+		client = client.WithModel(modelName)
+	}
 
 	// Check if there is input from the pipe (stdin)
 	stat, _ := os.Stdin.Stat()

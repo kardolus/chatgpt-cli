@@ -36,7 +36,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		mockCtrl = gomock.NewController(t)
 		mockCaller = NewMockCaller(mockCtrl)
 		mockStore = NewMockStore(mockCtrl)
-		subject = client.New(mockCaller, mockStore, 50)
+		subject = client.New(mockCaller, mockStore).WithCapacity(50)
 	})
 
 	it.After(func() {

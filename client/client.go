@@ -29,20 +29,17 @@ type Client struct {
 	capacity   int
 }
 
-func New(caller http.Caller, rw history.Store, capacity int) *Client {
-	return &Client{
-		caller:     caller,
-		readWriter: rw,
-		capacity:   capacity,
-	}
-}
-
-func NewDefault(caller http.Caller, rw history.Store) *Client {
+func New(caller http.Caller, rw history.Store) *Client {
 	return &Client{
 		caller:     caller,
 		readWriter: rw,
 		capacity:   MaxTokenSize,
 	}
+}
+
+func (c *Client) WithCapacity(capacity int) *Client {
+	c.capacity = capacity
+	return c
 }
 
 // Query sends a query to the API and returns the response as a string.

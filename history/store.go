@@ -21,17 +21,16 @@ type FileIO struct {
 	historyFilePath string
 }
 
-func NewDefault() *FileIO {
+func New() *FileIO {
 	path, _ := getPath()
 	return &FileIO{
 		historyFilePath: path,
 	}
 }
 
-func New(historyFilePath string) *FileIO {
-	return &FileIO{
-		historyFilePath: historyFilePath,
-	}
+func (f *FileIO) WithHistory(historyFilePath string) *FileIO {
+	f.historyFilePath = historyFilePath
+	return f
 }
 
 func (f *FileIO) Delete() error {

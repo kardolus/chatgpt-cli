@@ -39,7 +39,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 			tmpFile.Close()
 
-			fileIO = history.New(tmpFile.Name())
+			fileIO = history.New().WithHistory(tmpFile.Name())
 
 			messages = []types.Message{
 				{

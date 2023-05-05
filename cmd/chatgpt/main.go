@@ -52,7 +52,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if clearHistory {
-		historyHandler := history.NewDefault()
+		historyHandler := history.New()
 		err := historyHandler.Delete()
 		if err != nil {
 			return err
@@ -72,7 +72,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if secret == "" {
 		return errors.New("missing environment variable: " + secretEnv)
 	}
-	client := client.NewDefault(http.New().WithSecret(secret), history.NewDefault())
+	client := client.New(http.New().WithSecret(secret), history.New())
 
 	// Check if there is input from the pipe (stdin)
 	stat, _ := os.Stdin.Stat()

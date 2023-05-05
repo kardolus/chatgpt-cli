@@ -1,4 +1,4 @@
-# ChatGPT API
+# OpenAI API
 
 ### cURL davinci
 
@@ -114,4 +114,31 @@ Golden Retrievers like Piet Kernbom typically enjoy playing with toys that can b
 4. Soft Toys: Soft toys make great comfort toys for Golden Retrievers and can provide them with a sense of security.
 
 Overall, it's good to keep a variety of toys on hand and observe your dog's preferences to find out what he likes best.
+```
+
+### curl DALL-E
+```shell
+curl https://api.openai.com/v1/images/generations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${OPENAI_API_KEY}" \
+  -d "{
+    \"prompt\": \"${INSTRUCTIONS}\",
+    \"n\": 2,
+    \"size\": \"1024x1024\"
+  }"
+```
+
+Output:
+```json
+{
+  "created": 1683295449,
+  "data": [
+    {
+      "url": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-zgHnNxrmfCn3EoM43F5XHh2C/user-oHyrpXv0GiOsmYjenJB4DyaV/img-4gxBgW7RB9BxWe5acOebIVe5.png?st=2023-05-05T13%3A04%3A09Z&se=2023-05-05T15%3A04%3A09Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-05-05T04%3A49%3A44Z&ske=2023-05-06T04%3A49%3A44Z&sks=b&skv=2021-08-06&sig=ZWMPGNIZVzf8YpD4ETHU/KMHcllajhzu%2Bq6gJ95aJ3c%3D"
+    },
+    {
+      "url": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-zgHnNxrmfCn3EoM43F5XHh2C/user-oHyrpXv0GiOsmYjenJB4DyaV/img-R8X7hpnVKw5323PXAdfgdXBK.png?st=2023-05-05T13%3A04%3A09Z&se=2023-05-05T15%3A04%3A09Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-05-05T04%3A49%3A44Z&ske=2023-05-06T04%3A49%3A44Z&sks=b&skv=2021-08-06&sig=3kI%2BQKEOxGJuLDjc6AJiK5PqPtqVpRTrm7wURRRqm7c%3D"
+    }
+  ]
+}
 ```

@@ -5,6 +5,21 @@ environment, demonstrating its practicality and effectiveness.
 
 ![a screenshot](resources/vhs.gif)
 
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+  - [Apple M1 chips](#apple-m1-chips)
+  - [macOS Intel chips](#macos-intel-chips)
+  - [Linux (amd64)](#linux-amd64)
+  - [Linux (arm64)](#linux-arm64)
+  - [Windows (amd64)](#windows-amd64)
+- [Getting Started](#getting-started)
+- [Development](#development)
+- [Reporting Issues and Contributing](#reporting-issues-and-contributing)
+- [Uninstallation](#uninstallation)
+- [Useful Links](#useful-links)
+
 ## Features
 
 * **Interactive streaming mode**: Real-time interaction with the GPT model.

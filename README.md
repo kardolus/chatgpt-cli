@@ -156,6 +156,35 @@ If you encounter any issues or have suggestions for improvements,
 please [submit an issue](https://github.com/kardolus/chatgpt-cli/issues/new) on GitHub. We appreciate your feedback and
 contributions to help make this project better.
 
+## Uninstallation
+
+If for any reason you wish to uninstall the ChatGPT CLI application from your system, you can do so by following these steps:
+
+### MacOS / Linux
+
+1. Remove the binary:
+
+    ```shell
+    sudo rm /usr/local/bin/chatgpt
+    ```
+
+2. Optionally, if you wish to remove the history tracking directory, you can also delete the `~/.chatgpt-cli` directory:
+
+    ```shell
+    rm -rf ~/.chatgpt-cli
+    ```
+
+### Windows
+
+1. Navigate to the location of the `chatgpt` binary in your system, which should be in your PATH.
+
+2. Delete the `chatgpt` binary.
+
+3. Optionally, if you wish to remove the history tracking, navigate to the `~/.chatgpt-cli` directory (where `~` refers to your user's home directory) and delete it.
+
+Please note that the history tracking directory `~/.chatgpt-cli` only contains conversation history and no personal data. If you have any concerns about this, please feel free to delete this directory during uninstallation.
+
+
 ## Useful Links
 
 * [ChatGPT API Documentation](https://platform.openai.com/docs/introduction/overview)

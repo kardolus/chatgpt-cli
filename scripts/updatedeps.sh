@@ -3,6 +3,7 @@ set -o pipefail
 
 go get -u ./...
 go mod vendor
+go mod tidy
 
 if [[ `git status --porcelain` ]]; then
   echo "Updated dependencies"

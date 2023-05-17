@@ -9,11 +9,11 @@ environment, demonstrating its practicality and effectiveness.
 
 - [Features](#features)
 - [Installation](#installation)
-  - [Apple M1 chips](#apple-m1-chips)
-  - [macOS Intel chips](#macos-intel-chips)
-  - [Linux (amd64)](#linux-amd64)
-  - [Linux (arm64)](#linux-arm64)
-  - [Windows (amd64)](#windows-amd64)
+    - [Apple M1 chips](#apple-m1-chips)
+    - [macOS Intel chips](#macos-intel-chips)
+    - [Linux (amd64)](#linux-amd64)
+    - [Linux (arm64)](#linux-arm64)
+    - [Windows (amd64)](#windows-amd64)
 - [Getting Started](#getting-started)
 - [Development](#development)
 - [Reporting Issues and Contributing](#reporting-issues-and-contributing)
@@ -22,8 +22,10 @@ environment, demonstrating its practicality and effectiveness.
 
 ## Features
 
-* **Interactive streaming mode**: Real-time interaction with the GPT model.
+* **Streaming mode**: Real-time interaction with the GPT model.
 * **Query mode**: Single input-output interactions with the GPT model.
+* **Interactive mode**: The interactive mode allows for a more conversational experience with the model. Exit
+  interactive mode by simply typing 'exit'.
 * **Context management**: Seamless conversations with the GPT model by maintaining message history across CLI calls.
 * **Sliding window history**: Automatically trims conversation history while maintaining context to stay within token
   limits.
@@ -40,31 +42,31 @@ system and architecture:
 ### Apple M1 chips
 
 ```shell
-curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.3/chatgpt-darwin-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-darwin-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 ### macOS Intel chips
 
 ```shell
-curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.3/chatgpt-darwin-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-darwin-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 ### Linux (amd64)
 
 ```shell
-curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.3/chatgpt-linux-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-linux-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 ### Linux (arm64)
 
 ```shell
-curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.3/chatgpt-linux-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-linux-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 ### Windows (amd64)
 
 Download the binary
-from [this link](https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.3/chatgpt-windows-amd64.exe) and add it
+from [this link](https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-windows-amd64.exe) and add it
 to your PATH.
 
 Choose the appropriate command for your system, which will download the binary, make it executable, and move it to your
@@ -97,7 +99,13 @@ interaction quality.
 chatgpt what is the capital of the Netherlands
 ```
 
-4. To use the pipe feature, create a text file containing some context. For example, create a file named context.txt
+4. To start interactive mode, use the `-i` or `--interactive` flag:
+
+```shell
+chatgpt --interactive
+```
+
+5. To use the pipe feature, create a text file containing some context. For example, create a file named context.txt
    with the following content:
 
 ```shell
@@ -173,7 +181,8 @@ contributions to help make this project better.
 
 ## Uninstallation
 
-If for any reason you wish to uninstall the ChatGPT CLI application from your system, you can do so by following these steps:
+If for any reason you wish to uninstall the ChatGPT CLI application from your system, you can do so by following these
+steps:
 
 ### MacOS / Linux
 
@@ -195,10 +204,11 @@ If for any reason you wish to uninstall the ChatGPT CLI application from your sy
 
 2. Delete the `chatgpt` binary.
 
-3. Optionally, if you wish to remove the history tracking, navigate to the `~/.chatgpt-cli` directory (where `~` refers to your user's home directory) and delete it.
+3. Optionally, if you wish to remove the history tracking, navigate to the `~/.chatgpt-cli` directory (where `~` refers
+   to your user's home directory) and delete it.
 
-Please note that the history tracking directory `~/.chatgpt-cli` only contains conversation history and no personal data. If you have any concerns about this, please feel free to delete this directory during uninstallation.
-
+Please note that the history tracking directory `~/.chatgpt-cli` only contains conversation history and no personal
+data. If you have any concerns about this, please feel free to delete this directory during uninstallation.
 
 ## Useful Links
 

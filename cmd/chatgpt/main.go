@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/client"
@@ -16,12 +17,13 @@ import (
 const secretEnv = "OPENAI_API_KEY"
 
 var (
-	queryMode    bool
-	clearHistory bool
-	showVersion  bool
-	GitCommit    string
-	GitVersion   string
-	modelName    string
+	queryMode       bool
+	clearHistory    bool
+	showVersion     bool
+	interactiveMode bool
+	modelName       string
+	GitCommit       string
+	GitVersion      string
 )
 
 func main() {
@@ -34,6 +36,7 @@ func main() {
 		RunE: run,
 	}
 
+	rootCmd.PersistentFlags().BoolVarP(&interactiveMode, "interactive", "i", false, "Use interactive mode")
 	rootCmd.PersistentFlags().BoolVarP(&queryMode, "query", "q", false, "Use query mode instead of stream mode")
 	rootCmd.PersistentFlags().BoolVarP(&clearHistory, "clear-history", "c", false, "Clear the history of ChatGPT CLI")
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
@@ -48,28 +51,6 @@ func main() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	if showVersion {
-		fmt.Printf("ChatGPT CLI version %s (commit %s)\n", GitVersion, GitCommit)
-		return nil
-	}
-
-	if clearHistory {
-		historyHandler := history.New()
-		err := historyHandler.Delete()
-		if err != nil {
-			return err
-		}
-		fmt.Println("History successfully cleared.")
-	}
-
-	if len(args) == 0 {
-		if clearHistory {
-			return nil
-		} else {
-			return errors.New("you must specify your query")
-		}
-	}
-
 	secret := viper.GetString(secretEnv)
 	if secret == "" {
 		return errors.New("missing environment variable: " + secretEnv)
@@ -90,15 +71,60 @@ func run(cmd *cobra.Command, args []string) error {
 		client.ProvideContext(string(pipeContent))
 	}
 
-	if queryMode {
-		result, err := client.Query(strings.Join(args, " "))
+	if showVersion {
+		fmt.Printf("ChatGPT CLI version %s (commit %s)\n", GitVersion, GitCommit)
+		return nil
+	}
+
+	if clearHistory {
+		historyHandler := history.New()
+		err := historyHandler.Delete()
 		if err != nil {
 			return err
 		}
-		fmt.Println(result)
+		fmt.Println("History successfully cleared.")
+		return nil
+	}
+
+	if interactiveMode {
+		scanner := bufio.NewScanner(os.Stdin)
+		qNum := 1
+		for {
+			fmt.Printf("Q%d: ", qNum)
+			scanned := scanner.Scan()
+			if !scanned {
+				if err := scanner.Err(); err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+				// Exit the loop if no more input (e.g., Ctrl+D)
+				break
+			}
+			line := scanner.Text()
+			if line == "exit" {
+				break
+			}
+			if err := client.Stream(line); err != nil {
+				fmt.Println("Error:", err)
+			} else {
+				// Handle the streamed response here, which currently does nothing
+				qNum++
+			}
+		}
 	} else {
-		if err := client.Stream(strings.Join(args, " ")); err != nil {
-			return err
+		if len(args) == 0 {
+			return errors.New("you must specify your query")
+		}
+		if queryMode {
+			result, err := client.Query(strings.Join(args, " "))
+			if err != nil {
+				return err
+			}
+			fmt.Println(result)
+		} else {
+			if err := client.Stream(strings.Join(args, " ")); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

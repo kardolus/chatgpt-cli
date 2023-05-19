@@ -196,7 +196,22 @@ contributions to help make this project better.
 If for any reason you wish to uninstall the ChatGPT CLI application from your system, you can do so by following these
 steps:
 
+### Using Homebrew (macOS)
+
+If you installed the CLI using Homebrew you can do:
+
+```shell
+brew uninstall chatgpt-cli
+```
+
+And to remove the tap:
+```shell
+brew untap kardolus/chatgpt-cli
+```
+
 ### MacOS / Linux
+
+If you installed the binary directly, follow these steps:
 
 1. Remove the binary:
 

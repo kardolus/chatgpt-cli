@@ -43,7 +43,7 @@ environment, demonstrating its practicality and effectiveness.
 You can install chatgpt-cli using Homebrew:
 
 ```shell
-brew tap kardolus/homebrew-chatgpt-cli && brew install chatgpt-cli
+brew tap kardolus/chatgpt-cli && brew install chatgpt-cli
 ```
 
 ### Direct Download

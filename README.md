@@ -9,11 +9,13 @@ environment, demonstrating its practicality and effectiveness.
 
 - [Features](#features)
 - [Installation](#installation)
-    - [Apple M1 chips](#apple-m1-chips)
-    - [macOS Intel chips](#macos-intel-chips)
-    - [Linux (amd64)](#linux-amd64)
-    - [Linux (arm64)](#linux-arm64)
-    - [Windows (amd64)](#windows-amd64)
+    - [Using Homebrew (macOS)](#using-homebrew-macos)
+    - [Direct Download](#direct-download)
+        - [Apple M1 chips](#apple-m1-chips)
+        - [macOS Intel chips](#macos-intel-chips)
+        - [Linux (amd64)](#linux-amd64)
+        - [Linux (arm64)](#linux-arm64)
+        - [Windows (amd64)](#windows-amd64)
 - [Getting Started](#getting-started)
 - [Development](#development)
 - [Reporting Issues and Contributing](#reporting-issues-and-contributing)
@@ -36,34 +38,44 @@ environment, demonstrating its practicality and effectiveness.
 
 ## Installation
 
+### Using Homebrew (macOS)
+
+You can install chatgpt-cli using Homebrew:
+
+```shell
+brew tap kardolus/homebrew-chatgpt-cli && brew install chatgpt-cli
+```
+
+### Direct Download
+
 For a quick and easy installation without compiling, you can directly download the pre-built binary for your operating
 system and architecture:
 
-### Apple M1 chips
+#### Apple M1 chips
 
 ```shell
 curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-darwin-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
-### macOS Intel chips
+#### macOS Intel chips
 
 ```shell
 curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-darwin-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
-### Linux (amd64)
+#### Linux (amd64)
 
 ```shell
 curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-linux-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
-### Linux (arm64)
+#### Linux (arm64)
 
 ```shell
 curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-linux-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
-### Windows (amd64)
+#### Windows (amd64)
 
 Download the binary
 from [this link](https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-windows-amd64.exe) and add it

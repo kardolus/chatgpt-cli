@@ -116,6 +116,12 @@ Golden Retrievers like Piet Kernbom typically enjoy playing with toys that can b
 Overall, it's good to keep a variety of toys on hand and observe your dog's preferences to find out what he likes best.
 ```
 
+### List Models
+```shell
+curl https://api.openai.com/v1/models \
+  -H "Authorization: Bearer ${OPENAI_API_KEY}"
+```
+
 ### curl DALL-E
 ```shell
 curl https://api.openai.com/v1/images/generations \

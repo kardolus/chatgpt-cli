@@ -13,8 +13,20 @@ import (
 	"strings"
 )
 
+const (
+	bearer                   = "Bearer %s"
+	contentType              = "application/json"
+	errFailedToRead          = "failed to read response: %w"
+	errFailedToCreateRequest = "failed to create request: %w"
+	errFailedToMakeRequest   = "failed to make request: %w"
+	errHTTP                  = "http error: %d"
+	headerAuthorization      = "Authorization"
+	headerContentType        = "Content-Type"
+)
+
 type Caller interface {
 	Post(url string, body []byte, stream bool) ([]byte, error)
+	Get(url string) ([]byte, error)
 }
 
 type RestCaller struct {
@@ -36,36 +48,12 @@ func (r *RestCaller) WithSecret(secret string) *RestCaller {
 	return r
 }
 
+func (r *RestCaller) Get(url string) ([]byte, error) {
+	return r.doRequest(http.MethodGet, url, nil, false)
+}
+
 func (r *RestCaller) Post(url string, body []byte, stream bool) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	if r.secret != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.secret))
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	response, err := r.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode >= 200 && response.StatusCode < 300 {
-		if stream {
-			return ProcessResponse(response.Body, os.Stdout), nil
-		} else {
-			result, err := ioutil.ReadAll(response.Body)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read response: %w", err)
-			}
-			return result, nil
-		}
-	}
-
-	return nil, fmt.Errorf("http error: %d", response.StatusCode)
+	return r.doRequest(http.MethodPost, url, body, stream)
 }
 
 func ProcessResponse(r io.Reader, w io.Writer) []byte {
@@ -102,4 +90,46 @@ func ProcessResponse(r io.Reader, w io.Writer) []byte {
 		}
 	}
 	return result
+}
+
+func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]byte, error) {
+	req, err := r.newRequest(method, url, body)
+	if err != nil {
+		return nil, fmt.Errorf(errFailedToCreateRequest, err)
+	}
+
+	response, err := r.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf(errFailedToMakeRequest, err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, fmt.Errorf(errHTTP, response.StatusCode)
+	}
+
+	if stream {
+		return ProcessResponse(response.Body, os.Stdout), nil
+	}
+
+	result, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf(errFailedToRead, err)
+	}
+
+	return result, nil
+}
+
+func (r *RestCaller) newRequest(method, url string, body []byte) (*http.Request, error) {
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+
+	if r.secret != "" {
+		req.Header.Set(headerAuthorization, fmt.Sprintf(bearer, r.secret))
+	}
+	req.Header.Set(headerContentType, contentType)
+
+	return req, nil
 }

@@ -34,6 +34,7 @@ environment, demonstrating its practicality and effectiveness.
 * **Custom context from local files**: Provide custom context through piping for GPT model reference during
   conversation.
 * **Custom chat models**: Use a custom chat model by specifying the model name with the `-m` or `--model` flag.
+* **Model listing**: Get a list of available models by using the `-l` or `--list-models` flag.
 * **Viper integration**: Robust configuration management.
 
 ## Installation
@@ -128,6 +129,12 @@ Then, use the pipe feature to provide this context to ChatGPT:
 
 ```shell
 cat context.txt | chatgpt "What kind of toy would Kya enjoy?"
+```
+
+6. To list all available models, use the -l or --list-models flag:
+
+```shell
+chatgpt --list-models
 ```
 
 ## Development

@@ -7,6 +7,7 @@ import (
 	_ "github.com/golang/mock/mockgen/model"
 	"github.com/kardolus/chatgpt-cli/client"
 	"github.com/kardolus/chatgpt-cli/types"
+	"github.com/kardolus/chatgpt-cli/utils"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -60,7 +61,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			mockStore.EXPECT().Read().Return(nil, nil).Times(1)
 
 			errorMsg := "error message"
-			mockCaller.EXPECT().Post(client.URL, body, false).Return(nil, errors.New(errorMsg))
+			mockCaller.EXPECT().Post(client.CompletionURL, body, false).Return(nil, errors.New(errorMsg))
 
 			_, err := subject.Query(query)
 			Expect(err).To(HaveOccurred())
@@ -68,7 +69,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		})
 		it("throws an error when the response is empty", func() {
 			mockStore.EXPECT().Read().Return(nil, nil).Times(1)
-			mockCaller.EXPECT().Post(client.URL, body, false).Return(nil, nil)
+			mockCaller.EXPECT().Post(client.CompletionURL, body, false).Return(nil, nil)
 
 			_, err := subject.Query(query)
 			Expect(err).To(HaveOccurred())
@@ -78,7 +79,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			mockStore.EXPECT().Read().Return(nil, nil).Times(1)
 
 			malformed := `{"invalid":"json"` // missing closing brace
-			mockCaller.EXPECT().Post(client.URL, body, false).Return([]byte(malformed), nil)
+			mockCaller.EXPECT().Post(client.CompletionURL, body, false).Return([]byte(malformed), nil)
 
 			_, err := subject.Query(query)
 			Expect(err).To(HaveOccurred())
@@ -87,7 +88,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		it("throws an error when the response is missing Choices", func() {
 			mockStore.EXPECT().Read().Return(nil, nil).Times(1)
 
-			response := &types.Response{
+			response := &types.CompletionsResponse{
 				ID:      "id",
 				Object:  "object",
 				Created: 0,
@@ -97,7 +98,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			respBytes, err := json.Marshal(response)
 			Expect(err).NotTo(HaveOccurred())
-			mockCaller.EXPECT().Post(client.URL, body, false).Return(respBytes, nil)
+			mockCaller.EXPECT().Post(client.CompletionURL, body, false).Return(respBytes, nil)
 
 			_, err = subject.Query(query)
 			Expect(err).To(HaveOccurred())
@@ -117,19 +118,19 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					FinishReason: "",
 					Index:        0,
 				}
-				response := &types.Response{
+				response := &types.CompletionsResponse{
 					ID:      "id",
 					Object:  "object",
 					Created: 0,
-					Model:   client.GPTModel,
+					Model:   client.DefaultGPTModel,
 					Choices: []types.Choice{choice},
 				}
 
 				respBytes, err := json.Marshal(response)
 				Expect(err).NotTo(HaveOccurred())
-				mockCaller.EXPECT().Post(client.URL, expectedBody, false).Return(respBytes, nil)
+				mockCaller.EXPECT().Post(client.CompletionURL, expectedBody, false).Return(respBytes, nil)
 
-				var request types.Request
+				var request types.CompletionsRequest
 				err = json.Unmarshal(expectedBody, &request)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -228,7 +229,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			mockStore.EXPECT().Read().Return(nil, nil).Times(1)
 
 			errorMsg := "error message"
-			mockCaller.EXPECT().Post(client.URL, body, true).Return(nil, errors.New(errorMsg))
+			mockCaller.EXPECT().Post(client.CompletionURL, body, true).Return(nil, errors.New(errorMsg))
 
 			err := subject.Stream(query)
 			Expect(err).To(HaveOccurred())
@@ -239,7 +240,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			testValidHTTPResponse := func(history []types.Message, expectedBody []byte) {
 				mockStore.EXPECT().Read().Return(history, nil).Times(1)
-				mockCaller.EXPECT().Post(client.URL, expectedBody, true).Return([]byte(answer), nil)
+				mockCaller.EXPECT().Post(client.CompletionURL, expectedBody, true).Return([]byte(answer), nil)
 
 				messages = createMessages(history, query)
 
@@ -278,6 +279,44 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			})
 		})
 	})
+	when("ListModels()", func() {
+		it("throws an error when the http callout fails", func() {
+			errorMsg := "error message"
+			mockCaller.EXPECT().Get(client.ModelURL).Return(nil, errors.New(errorMsg))
+
+			_, err := subject.ListModels()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal(errorMsg))
+		})
+		it("throws an error when the response is empty", func() {
+			mockCaller.EXPECT().Get(client.ModelURL).Return(nil, nil)
+
+			_, err := subject.ListModels()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("empty response"))
+		})
+		it("throws an error when the response is a malformed json", func() {
+			malformed := `{"invalid":"json"` // missing closing brace
+			mockCaller.EXPECT().Get(client.ModelURL).Return([]byte(malformed), nil)
+
+			_, err := subject.ListModels()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).Should(HavePrefix("failed to decode response:"))
+		})
+		it("filters gpt models as expected", func() {
+			response, err := utils.FileToBytes("models.json")
+			Expect(err).NotTo(HaveOccurred())
+
+			mockCaller.EXPECT().Get(client.ModelURL).Return(response, nil)
+
+			result, err := subject.ListModels()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).NotTo(BeEmpty())
+			Expect(result).To(HaveLen(2))
+			Expect(result[0]).To(Equal("* gpt-3.5-turbo (current)"))
+			Expect(result[1]).To(Equal("- gpt-3.5-turbo-0301"))
+		})
+	})
 	when("ProvideContext()", func() {
 		it("updates the history with the provided context", func() {
 			context := "This is a story about a dog named Kya. Kya loves to play fetch and swim in the lake."
@@ -298,8 +337,8 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 }
 
 func createBody(messages []types.Message, stream bool) ([]byte, error) {
-	req := types.Request{
-		Model:    client.GPTModel,
+	req := types.CompletionsRequest{
+		Model:    client.DefaultGPTModel,
 		Messages: messages,
 		Stream:   stream,
 	}

@@ -1,6 +1,6 @@
 package types
 
-type Request struct {
+type CompletionsRequest struct {
 	Model    string    `json:"model"`
 	Messages []Message `json:"messages"`
 	Stream   bool      `json:"stream"`
@@ -11,7 +11,7 @@ type Message struct {
 	Content string `json:"content"`
 }
 
-type Response struct {
+type CompletionsResponse struct {
 	ID      string `json:"id"`
 	Object  string `json:"object"`
 	Created int    `json:"created"`

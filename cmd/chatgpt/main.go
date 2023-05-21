@@ -21,6 +21,7 @@ var (
 	clearHistory    bool
 	showVersion     bool
 	interactiveMode bool
+	listModels      bool
 	modelName       string
 	GitCommit       string
 	GitVersion      string
@@ -40,6 +41,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&queryMode, "query", "q", false, "Use query mode instead of stream mode")
 	rootCmd.PersistentFlags().BoolVarP(&clearHistory, "clear-history", "c", false, "Clear the history of ChatGPT CLI")
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
+	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
 	rootCmd.PersistentFlags().StringVarP(&modelName, "model", "m", "", "Use a custom GPT model by specifying the model name")
 
 	viper.AutomaticEnv()
@@ -83,6 +85,18 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		fmt.Println("History successfully cleared.")
+		return nil
+	}
+
+	if listModels {
+		models, err := client.ListModels()
+		if err != nil {
+			return err
+		}
+		fmt.Println("Available models:")
+		for _, model := range models {
+			fmt.Println(model)
+		}
 		return nil
 	}
 

@@ -55,31 +55,31 @@ system and architecture:
 #### Apple M1 chips
 
 ```shell
-curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-darwin-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.5/chatgpt-darwin-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 #### macOS Intel chips
 
 ```shell
-curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-darwin-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.5/chatgpt-darwin-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 #### Linux (amd64)
 
 ```shell
-curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-linux-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.5/chatgpt-linux-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 #### Linux (arm64)
 
 ```shell
-curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-linux-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.5/chatgpt-linux-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 #### Windows (amd64)
 
 Download the binary
-from [this link](https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.4/chatgpt-windows-amd64.exe) and add it
+from [this link](https://github.com/kardolus/chatgpt-cli/releases/download/v1.0.5/chatgpt-windows-amd64.exe) and add it
 to your PATH.
 
 Choose the appropriate command for your system, which will download the binary, make it executable, and move it to your

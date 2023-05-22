@@ -1,0 +1,37 @@
+# Release Procedures Manual
+
+## 1. Create a tag
+
+Use the git-cli to create a tag, for example:
+
+```shell
+git tag -a v1.0.5 -m "Add list-models flag"
+```
+
+Next, push the tag:
+
+```shell
+git push origin --tags
+```
+
+## 2. Create binaries
+
+From the root of `kardolus/chatgpt-cli`, run the following script to create binaries for various architectures:
+
+```shell
+./scripts/binaries.sh
+```
+
+## 3. Create a GitHub release
+
+Create a GitHub release for the tag we just pushed out. Upload the binaries created in the previous step.
+
+## 4. Bump the version
+
+Bump the version in the `README` of `kardolus/chatgpt-cli` and in the Homebrew
+formulae (`kardolus/homebrew-chatgpt-cli/HomebrewFormula/chatgpt-cli.rb`). Update the sha256 of the macOS binaries
+using:
+
+```shell
+sha256sum /path/to/binary
+```

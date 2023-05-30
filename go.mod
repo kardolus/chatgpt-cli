@@ -7,7 +7,7 @@ require (
 	github.com/onsi/gomega v1.27.7
 	github.com/sclevine/spec v1.4.0
 	github.com/spf13/cobra v1.7.0
-	github.com/spf13/viper v1.15.0
+	github.com/spf13/viper v1.16.0
 )
 
 require (

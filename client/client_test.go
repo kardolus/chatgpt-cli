@@ -16,13 +16,15 @@ import (
 )
 
 //go:generate mockgen -destination=callermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/http Caller
-//go:generate mockgen -destination=iomocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/history Store
+//go:generate mockgen -destination=historymocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/history HistoryStore
+//go:generate mockgen -destination=configmocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/config ConfigStore
 
 var (
-	mockCtrl   *gomock.Controller
-	mockCaller *MockCaller
-	mockStore  *MockStore
-	subject    *client.Client
+	mockCtrl         *gomock.Controller
+	mockCaller       *MockCaller
+	mockHistoryStore *MockHistoryStore
+	mockConfigStore  *MockConfigStore
+	factory          *clientFactory
 )
 
 func TestUnitClient(t *testing.T) {
@@ -36,8 +38,9 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		RegisterTestingT(t)
 		mockCtrl = gomock.NewController(t)
 		mockCaller = NewMockCaller(mockCtrl)
-		mockStore = NewMockStore(mockCtrl)
-		subject = client.New(mockCaller, mockStore).WithCapacity(50)
+		mockHistoryStore = NewMockHistoryStore(mockCtrl)
+		mockConfigStore = NewMockConfigStore(mockCtrl)
+		factory = newClientFactory(mockCaller, mockConfigStore, mockHistoryStore)
 	})
 
 	it.After(func() {
@@ -51,63 +54,75 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			err      error
 		)
 
-		it.Before(func() {
-			messages = createMessages(nil, query)
-			body, err = createBody(messages, false)
-			Expect(err).NotTo(HaveOccurred())
-		})
+		type TestCase struct {
+			description     string
+			setupPostReturn func() ([]byte, error)
+			postError       error
+			expectedError   string
+		}
 
-		it("throws an error when the http callout fails", func() {
-			mockStore.EXPECT().Read().Return(nil, nil).Times(1)
+		tests := []TestCase{
+			{
+				description:     "throws an error when the http callout fails",
+				setupPostReturn: func() ([]byte, error) { return nil, nil },
+				postError:       errors.New("error message"),
+				expectedError:   "error message",
+			},
+			{
+				description:     "throws an error when the response is empty",
+				setupPostReturn: func() ([]byte, error) { return nil, nil },
+				postError:       nil,
+				expectedError:   "empty response",
+			},
+			{
+				description: "throws an error when the response is a malformed json",
+				setupPostReturn: func() ([]byte, error) {
+					malformed := `{"invalid":"json"` // missing closing brace
+					return []byte(malformed), nil
+				},
+				postError:     nil,
+				expectedError: "failed to decode response:",
+			},
+			{
+				description: "throws an error when the response is missing Choices",
+				setupPostReturn: func() ([]byte, error) {
+					response := &types.CompletionsResponse{
+						ID:      "id",
+						Object:  "object",
+						Created: 0,
+						Model:   "model",
+						Choices: []types.Choice{},
+					}
 
-			errorMsg := "error message"
-			mockCaller.EXPECT().Post(client.CompletionURL, body, false).Return(nil, errors.New(errorMsg))
+					respBytes, err := json.Marshal(response)
+					return respBytes, err
+				},
+				postError:     nil,
+				expectedError: "no responses returned",
+			},
+		}
 
-			_, err := subject.Query(query)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(Equal(errorMsg))
-		})
-		it("throws an error when the response is empty", func() {
-			mockStore.EXPECT().Read().Return(nil, nil).Times(1)
-			mockCaller.EXPECT().Post(client.CompletionURL, body, false).Return(nil, nil)
+		for _, tt := range tests {
+			it(tt.description, func() {
+				factory.withoutHistory()
+				subject := factory.buildClientWithoutConfig()
 
-			_, err := subject.Query(query)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(Equal("empty response"))
-		})
-		it("throws an error when the response is a malformed json", func() {
-			mockStore.EXPECT().Read().Return(nil, nil).Times(1)
+				messages = createMessages(nil, query)
+				body, err = createBody(messages, subject.Model, false)
+				Expect(err).NotTo(HaveOccurred())
 
-			malformed := `{"invalid":"json"` // missing closing brace
-			mockCaller.EXPECT().Post(client.CompletionURL, body, false).Return([]byte(malformed), nil)
+				respBytes, err := tt.setupPostReturn()
+				Expect(err).NotTo(HaveOccurred())
+				mockCaller.EXPECT().Post(client.CompletionURL, body, false).Return(respBytes, tt.postError)
 
-			_, err := subject.Query(query)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).Should(HavePrefix("failed to decode response:"))
-		})
-		it("throws an error when the response is missing Choices", func() {
-			mockStore.EXPECT().Read().Return(nil, nil).Times(1)
+				_, err = subject.Query(query)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(tt.expectedError))
+			})
+		}
 
-			response := &types.CompletionsResponse{
-				ID:      "id",
-				Object:  "object",
-				Created: 0,
-				Model:   "model",
-				Choices: []types.Choice{},
-			}
-
-			respBytes, err := json.Marshal(response)
-			Expect(err).NotTo(HaveOccurred())
-			mockCaller.EXPECT().Post(client.CompletionURL, body, false).Return(respBytes, nil)
-
-			_, err = subject.Query(query)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(Equal("no responses returned"))
-		})
 		when("a valid http response is received", func() {
-			testValidHTTPResponse := func(history []types.Message, expectedBody []byte) {
-				mockStore.EXPECT().Read().Return(history, nil).Times(1)
-
+			testValidHTTPResponse := func(subject *client.Client, history []types.Message, expectedBody []byte) {
 				const answer = "content"
 
 				choice := types.Choice{
@@ -122,7 +137,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					ID:      "id",
 					Object:  "object",
 					Created: 0,
-					Model:   client.DefaultGPTModel,
+					Model:   subject.Model,
 					Choices: []types.Choice{choice},
 				}
 
@@ -134,7 +149,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				err = json.Unmarshal(expectedBody, &request)
 				Expect(err).NotTo(HaveOccurred())
 
-				mockStore.EXPECT().Write(append(request.Messages, types.Message{
+				mockHistoryStore.EXPECT().Write(append(request.Messages, types.Message{
 					Role:    client.AssistantRole,
 					Content: answer,
 				}))
@@ -144,8 +159,42 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				Expect(result).To(Equal(answer))
 			}
 
-			it("returns the expected result for an empty history", func() {
-				testValidHTTPResponse(nil, body)
+			it("uses the model specified by the WithModel method instead of the default model", func() {
+				const model = "overwritten"
+
+				messages = createMessages(nil, query)
+				factory.withoutHistory()
+				subject := factory.buildClientWithoutConfig().WithModel(model)
+
+				body, err = createBody(messages, model, false)
+				Expect(err).NotTo(HaveOccurred())
+				testValidHTTPResponse(subject, nil, body)
+			})
+			it("uses the model specified by the configuration instead of the default model", func() {
+				const model = "overwritten"
+
+				messages = createMessages(nil, query)
+				factory.withoutHistory()
+				subject := factory.buildClientWithConfig(types.Config{
+					Model: model,
+				})
+
+				body, err = createBody(messages, model, false)
+				Expect(err).NotTo(HaveOccurred())
+				testValidHTTPResponse(subject, nil, body)
+			})
+			it("when WithModel is used and a configuration is present, WithModel takes precedence", func() {
+				const model = "with-model"
+
+				messages = createMessages(nil, query)
+				factory.withoutHistory()
+				subject := factory.buildClientWithConfig(types.Config{
+					Model: "config-model",
+				}).WithModel(model)
+
+				body, err = createBody(messages, model, false)
+				Expect(err).NotTo(HaveOccurred())
+				testValidHTTPResponse(subject, nil, body)
 			})
 			it("returns the expected result for a non-empty history", func() {
 				history := []types.Message{
@@ -163,10 +212,13 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					},
 				}
 				messages = createMessages(history, query)
-				body, err = createBody(messages, false)
+				factory.withHistory(history)
+				subject := factory.buildClientWithoutConfig()
+
+				body, err = createBody(messages, subject.Model, false)
 				Expect(err).NotTo(HaveOccurred())
 
-				testValidHTTPResponse(history, body)
+				testValidHTTPResponse(subject, history, body)
 			})
 			it("truncates the history as expected", func() {
 				history := []types.Message{
@@ -202,13 +254,16 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 				messages = createMessages(history, query)
 
+				factory.withHistory(history)
+				subject := factory.buildClientWithoutConfig()
+
 				// messages get truncated. Index 1+2 are cut out
 				messages = append(messages[:1], messages[3:]...)
 
-				body, err = createBody(messages, false)
+				body, err = createBody(messages, subject.Model, false)
 				Expect(err).NotTo(HaveOccurred())
 
-				testValidHTTPResponse(history, body)
+				testValidHTTPResponse(subject, history, body)
 			})
 		})
 	})
@@ -219,14 +274,13 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			err      error
 		)
 
-		it.Before(func() {
-			messages = createMessages(nil, query)
-			body, err = createBody(messages, true)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
 		it("throws an error when the http callout fails", func() {
-			mockStore.EXPECT().Read().Return(nil, nil).Times(1)
+			factory.withoutHistory()
+			subject := factory.buildClientWithoutConfig()
+
+			messages = createMessages(nil, query)
+			body, err = createBody(messages, subject.Model, true)
+			Expect(err).NotTo(HaveOccurred())
 
 			errorMsg := "error message"
 			mockCaller.EXPECT().Post(client.CompletionURL, body, true).Return(nil, errors.New(errorMsg))
@@ -238,13 +292,16 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		when("a valid http response is received", func() {
 			const answer = "answer"
 
-			testValidHTTPResponse := func(history []types.Message, expectedBody []byte) {
-				mockStore.EXPECT().Read().Return(history, nil).Times(1)
+			testValidHTTPResponse := func(subject *client.Client, history []types.Message, expectedBody []byte) {
+				messages = createMessages(nil, query)
+				body, err = createBody(messages, subject.Model, true)
+				Expect(err).NotTo(HaveOccurred())
+
 				mockCaller.EXPECT().Post(client.CompletionURL, expectedBody, true).Return([]byte(answer), nil)
 
 				messages = createMessages(history, query)
 
-				mockStore.EXPECT().Write(append(messages, types.Message{
+				mockHistoryStore.EXPECT().Write(append(messages, types.Message{
 					Role:    client.AssistantRole,
 					Content: answer,
 				}))
@@ -254,7 +311,14 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			}
 
 			it("returns the expected result for an empty history", func() {
-				testValidHTTPResponse(nil, body)
+				factory.withHistory(nil)
+				subject := factory.buildClientWithoutConfig()
+
+				messages = createMessages(nil, query)
+				body, err = createBody(messages, subject.Model, true)
+				Expect(err).NotTo(HaveOccurred())
+
+				testValidHTTPResponse(subject, nil, body)
 			})
 			it("returns the expected result for a non-empty history", func() {
 				history := []types.Message{
@@ -271,16 +335,21 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 						Content: "answer 1",
 					},
 				}
+				factory.withHistory(history)
+				subject := factory.buildClientWithoutConfig()
+
 				messages = createMessages(history, query)
-				body, err = createBody(messages, true)
+				body, err = createBody(messages, subject.Model, true)
 				Expect(err).NotTo(HaveOccurred())
 
-				testValidHTTPResponse(history, body)
+				testValidHTTPResponse(subject, history, body)
 			})
 		})
 	})
 	when("ListModels()", func() {
 		it("throws an error when the http callout fails", func() {
+			subject := factory.buildClientWithoutConfig()
+
 			errorMsg := "error message"
 			mockCaller.EXPECT().Get(client.ModelURL).Return(nil, errors.New(errorMsg))
 
@@ -289,6 +358,8 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(err.Error()).To(Equal(errorMsg))
 		})
 		it("throws an error when the response is empty", func() {
+			subject := factory.buildClientWithoutConfig()
+
 			mockCaller.EXPECT().Get(client.ModelURL).Return(nil, nil)
 
 			_, err := subject.ListModels()
@@ -296,6 +367,8 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(err.Error()).To(Equal("empty response"))
 		})
 		it("throws an error when the response is a malformed json", func() {
+			subject := factory.buildClientWithoutConfig()
+
 			malformed := `{"invalid":"json"` // missing closing brace
 			mockCaller.EXPECT().Get(client.ModelURL).Return([]byte(malformed), nil)
 
@@ -304,6 +377,8 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(err.Error()).Should(HavePrefix("failed to decode response:"))
 		})
 		it("filters gpt models as expected", func() {
+			subject := factory.buildClientWithoutConfig()
+
 			response, err := utils.FileToBytes("models.json")
 			Expect(err).NotTo(HaveOccurred())
 
@@ -319,8 +394,11 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 	})
 	when("ProvideContext()", func() {
 		it("updates the history with the provided context", func() {
+			subject := factory.buildClientWithoutConfig()
+
 			context := "This is a story about a dog named Kya. Kya loves to play fetch and swim in the lake."
-			mockStore.EXPECT().Read().Return(nil, nil).Times(1)
+			mockHistoryStore.EXPECT().Read().Return(nil, nil).Times(1)
+
 			subject.ProvideContext(context)
 
 			Expect(len(subject.History)).To(Equal(2)) // The system message and the provided context
@@ -336,9 +414,9 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 	})
 }
 
-func createBody(messages []types.Message, stream bool) ([]byte, error) {
+func createBody(messages []types.Message, model string, stream bool) ([]byte, error) {
 	req := types.CompletionsRequest{
-		Model:    client.DefaultGPTModel,
+		Model:    model,
 		Messages: messages,
 		Stream:   stream,
 	}
@@ -364,4 +442,36 @@ func createMessages(history []types.Message, query string) []types.Message {
 	})
 
 	return messages
+}
+
+type clientFactory struct {
+	mockCaller       *MockCaller
+	mockConfigStore  *MockConfigStore
+	mockHistoryStore *MockHistoryStore
+}
+
+func newClientFactory(mc *MockCaller, mcs *MockConfigStore, mhs *MockHistoryStore) *clientFactory {
+	return &clientFactory{
+		mockCaller:       mc,
+		mockConfigStore:  mcs,
+		mockHistoryStore: mhs,
+	}
+}
+
+func (f *clientFactory) buildClientWithoutConfig() *client.Client {
+	f.mockConfigStore.EXPECT().Read().Return(types.Config{}, nil).Times(1)
+	return client.New(f.mockCaller, f.mockConfigStore, f.mockHistoryStore).WithCapacity(50)
+}
+
+func (f *clientFactory) buildClientWithConfig(config types.Config) *client.Client {
+	f.mockConfigStore.EXPECT().Read().Return(config, nil).Times(1)
+	return client.New(f.mockCaller, f.mockConfigStore, f.mockHistoryStore).WithCapacity(50)
+}
+
+func (f *clientFactory) withoutHistory() {
+	f.mockHistoryStore.EXPECT().Read().Return(nil, nil).Times(1)
+}
+
+func (f *clientFactory) withHistory(history []types.Message) {
+	f.mockHistoryStore.EXPECT().Read().Return(history, nil).Times(1)
 }

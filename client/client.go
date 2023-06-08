@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kardolus/chatgpt-cli/config"
+	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/kardolus/chatgpt-cli/types"
@@ -26,20 +28,28 @@ const (
 )
 
 type Client struct {
-	History    []types.Message
-	caller     http.Caller
-	capacity   int
-	model      string
-	readWriter history.Store
+	History      []types.Message
+	Model        string
+	caller       http.Caller
+	capacity     int
+	historyStore history.HistoryStore
 }
 
-func New(caller http.Caller, rw history.Store) *Client {
-	return &Client{
-		caller:     caller,
-		readWriter: rw,
-		capacity:   MaxTokenSize,
-		model:      DefaultGPTModel,
+func New(caller http.Caller, cs config.ConfigStore, hs history.HistoryStore) *Client {
+	result := &Client{
+		caller:       caller,
+		historyStore: hs,
+		capacity:     MaxTokenSize,
 	}
+
+	// do not error out when the config cannot be read
+	result.Model, _ = configmanager.New(cs).ReadModel()
+
+	if result.Model == "" {
+		result.Model = DefaultGPTModel
+	}
+
+	return result
 }
 
 func (c *Client) WithCapacity(capacity int) *Client {
@@ -48,7 +58,7 @@ func (c *Client) WithCapacity(capacity int) *Client {
 }
 
 func (c *Client) WithModel(model string) *Client {
-	c.model = model
+	c.Model = model
 	return c
 }
 
@@ -73,7 +83,7 @@ func (c *Client) ListModels() ([]string, error) {
 
 	for _, model := range response.Data {
 		if strings.HasPrefix(model.Id, gptPrefix) {
-			if model.Id != DefaultGPTModel {
+			if model.Id != c.Model {
 				result = append(result, fmt.Sprintf("- %s", model.Id))
 				continue
 			}
@@ -156,7 +166,7 @@ func (c *Client) Stream(input string) error {
 func (c *Client) createBody(stream bool) ([]byte, error) {
 	body := types.CompletionsRequest{
 		Messages: c.History,
-		Model:    c.model,
+		Model:    c.Model,
 		Stream:   stream,
 	}
 
@@ -168,7 +178,7 @@ func (c *Client) initHistory() {
 		return
 	}
 
-	c.History, _ = c.readWriter.Read()
+	c.History, _ = c.historyStore.Read()
 	if len(c.History) == 0 {
 		c.History = []types.Message{{
 			Role:    SystemRole,
@@ -232,7 +242,7 @@ func (c *Client) updateHistory(response string) {
 		Role:    AssistantRole,
 		Content: response,
 	})
-	_ = c.readWriter.Write(c.History)
+	_ = c.historyStore.Write(c.History)
 }
 
 func calculateEffectiveTokenSize(maxTokenSize int, bufferPercentage int) int {

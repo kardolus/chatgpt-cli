@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/client"
+	"github.com/kardolus/chatgpt-cli/config"
+	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/spf13/cobra"
@@ -43,6 +45,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
 	rootCmd.PersistentFlags().StringVarP(&modelName, "model", "m", "", "Use a custom GPT model by specifying the model name")
+	rootCmd.PersistentFlags().StringVar(&modelName, "set-model", "", "Set a new default GPT model by specifying the model name")
 
 	viper.AutomaticEnv()
 
@@ -57,7 +60,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if secret == "" {
 		return errors.New("missing environment variable: " + secretEnv)
 	}
-	client := client.New(http.New().WithSecret(secret), history.New())
+	client := client.New(http.New().WithSecret(secret), config.New(), history.New())
 
 	if modelName != "" {
 		client = client.WithModel(modelName)
@@ -75,6 +78,14 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if showVersion {
 		fmt.Printf("ChatGPT CLI version %s (commit %s)\n", GitVersion, GitCommit)
+		return nil
+	}
+
+	if cmd.Flag("set-model").Changed {
+		if err := configmanager.New(config.New()).WriteModel(modelName); err != nil {
+			return err
+		}
+		fmt.Println("Model successfully updated to", modelName)
 		return nil
 	}
 

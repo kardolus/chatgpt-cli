@@ -3,19 +3,18 @@ package history
 import (
 	"encoding/json"
 	"github.com/kardolus/chatgpt-cli/types"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
 
-type Store interface {
+type HistoryStore interface {
 	Delete() error
 	Read() ([]types.Message, error)
 	Write([]types.Message) error
 }
 
-// Ensure RestCaller implements Caller interface
-var _ Store = &FileIO{}
+// Ensure FileIO implements the HistoryStore interface
+var _ HistoryStore = &FileIO{}
 
 type FileIO struct {
 	historyFilePath string
@@ -28,7 +27,7 @@ func New() *FileIO {
 	}
 }
 
-func (f *FileIO) WithHistory(historyFilePath string) *FileIO {
+func (f *FileIO) WithFilePath(historyFilePath string) *FileIO {
 	f.historyFilePath = historyFilePath
 	return f
 }
@@ -51,7 +50,7 @@ func (f *FileIO) Write(messages []types.Message) error {
 		return err
 	}
 
-	return ioutil.WriteFile(f.historyFilePath, data, 0644)
+	return os.WriteFile(f.historyFilePath, data, 0644)
 }
 
 func getPath() (string, error) {
@@ -66,7 +65,7 @@ func getPath() (string, error) {
 func parseFile(fileName string) ([]types.Message, error) {
 	var result []types.Message
 
-	buf, err := ioutil.ReadFile(fileName)
+	buf, err := os.ReadFile(fileName)
 	if err != nil {
 		return nil, err
 	}

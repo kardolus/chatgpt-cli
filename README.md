@@ -33,7 +33,7 @@ environment, demonstrating its practicality and effectiveness.
   limits.
 * **Custom context from local files**: Provide custom context through piping for GPT model reference during
   conversation.
-* **Custom chat models**: Use a custom chat model by specifying the model name with the `-m` or `--model` flag.
+* **Custom chat models**: Use a custom chat model by specifying the model name with the `--set-model` flag. Ensure that the model exists in the OpenAI model list.
 * **Model listing**: Get a list of available models by using the `-l` or `--list-models` flag.
 * **Viper integration**: Robust configuration management.
 
@@ -131,7 +131,15 @@ Then, use the pipe feature to provide this context to ChatGPT:
 cat context.txt | chatgpt "What kind of toy would Kya enjoy?"
 ```
 
-6. To list all available models, use the -l or --list-models flag:
+6. To set a specific model, use the `--set-model` flag followed by the model name:
+
+```shell
+chatgpt --set-model gpt-3.5-turbo-0301
+```
+
+Remember to check that the model exists in the OpenAI model list before setting it.
+
+7. To list all available models, use the -l or --list-models flag:
 
 ```shell
 chatgpt --list-models

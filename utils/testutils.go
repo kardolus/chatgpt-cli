@@ -2,7 +2,7 @@ package utils
 
 import (
 	. "github.com/onsi/gomega"
-	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -28,5 +28,5 @@ func FileToBytes(fileName string) ([]byte, error) {
 
 	Expect(urlPath).To(BeAnExistingFile())
 
-	return ioutil.ReadFile(urlPath)
+	return os.ReadFile(urlPath)
 }

@@ -3,6 +3,7 @@ package history
 import (
 	"encoding/json"
 	"github.com/kardolus/chatgpt-cli/types"
+	"github.com/kardolus/chatgpt-cli/utils"
 	"os"
 	"path/filepath"
 )
@@ -36,7 +37,6 @@ func (f *FileIO) Delete() error {
 	if _, err := os.Stat(f.historyFilePath); err == nil {
 		return os.Remove(f.historyFilePath)
 	}
-
 	return nil
 }
 
@@ -54,12 +54,12 @@ func (f *FileIO) Write(messages []types.Message) error {
 }
 
 func getPath() (string, error) {
-	homeDir, err := os.UserHomeDir()
+	homeDir, err := utils.GetChatGPTDirectory()
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(homeDir, ".chatgpt-cli", "history"), nil
+	return filepath.Join(homeDir, "history"), nil
 }
 
 func parseFile(fileName string) ([]types.Message, error) {

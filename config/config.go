@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/kardolus/chatgpt-cli/types"
+	"github.com/kardolus/chatgpt-cli/utils"
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
@@ -45,12 +46,12 @@ func (f *FileIO) Write(config types.Config) error {
 }
 
 func getPath() (string, error) {
-	homeDir, err := os.UserHomeDir()
+	homeDir, err := utils.GetChatGPTDirectory()
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(homeDir, ".chatgpt-cli", "config.yaml"), nil
+	return filepath.Join(homeDir, "config.yaml"), nil
 }
 
 func parseFile(fileName string) (types.Config, error) {

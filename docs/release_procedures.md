@@ -24,7 +24,22 @@ From the root of `kardolus/chatgpt-cli`, run the following script to create bina
 
 ## 3. Create a GitHub release
 
-Create a GitHub release for the tag we just pushed out. Upload the binaries created in the previous step.
+Create a GitHub release for the tag we just pushed out. Upload the binaries created in the previous step. Add this 
+section with update instructions to the end:
+
+```markdown
+## How to Update
+
+### Using Homebrew (macOS)
+
+\```shell
+brew upgrade chatgpt-cli
+\```
+
+### Direct Download
+
+For a quick and easy installation without compiling, you can directly download the pre-built binary for your operating system and architecture.
+```
 
 ## 4. Bump the version
 

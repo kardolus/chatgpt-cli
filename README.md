@@ -165,6 +165,12 @@ For integration tests, run:
 ./scripts/integration.sh
 ```
 
+For contract tests, run:
+
+```shell
+./scripts/contract.sh
+```
+
 To run all tests, use:
 
 ```shell
@@ -257,3 +263,5 @@ data. If you have any concerns about this, please feel free to delete this direc
 * [ChatGPT API Documentation](https://platform.openai.com/docs/introduction/overview)
 * [OpenAI API Reference](https://platform.openai.com/docs/api-reference/introduction)
 * [Key Usage Dashboard](https://platform.openai.com/account/usage)
+
+Thank you for using ChatGPT CLI!

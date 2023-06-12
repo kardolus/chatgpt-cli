@@ -9,14 +9,13 @@ import (
 	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/http"
+	"github.com/kardolus/chatgpt-cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"io/ioutil"
 	"os"
 	"strings"
 )
-
-const secretEnv = "OPENAI_API_KEY"
 
 var (
 	queryMode       bool
@@ -56,9 +55,9 @@ func main() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	secret := viper.GetString(secretEnv)
+	secret := viper.GetString(utils.OpenAPIKeyEnv)
 	if secret == "" {
-		return errors.New("missing environment variable: " + secretEnv)
+		return errors.New("missing environment variable: " + utils.OpenAPIKeyEnv)
 	}
 	client := client.New(http.New().WithSecret(secret), config.New(), history.New())
 

@@ -43,7 +43,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			bytes, err := json.Marshal(body)
 			Expect(err).NotTo(HaveOccurred())
 
-			resp, err := restCaller.Post(client.CompletionURL, bytes, false)
+			resp, err := restCaller.Post(client.DefaultServiceURL+client.CompletionPath, bytes, false)
 			Expect(err).NotTo(HaveOccurred())
 
 			var data types.CompletionsResponse
@@ -61,7 +61,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 
 	when("accessing the models endpoint", func() {
 		it("should have the expected keys in the response", func() {
-			resp, err := restCaller.Get(client.ModelURL)
+			resp, err := restCaller.Get(client.DefaultServiceURL + client.ModelPath)
 			Expect(err).NotTo(HaveOccurred())
 
 			var data types.ListModelsResponse

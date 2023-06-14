@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/types"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -112,7 +111,7 @@ func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]
 		return ProcessResponse(response.Body, os.Stdout), nil
 	}
 
-	result, err := ioutil.ReadAll(response.Body)
+	result, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, fmt.Errorf(errFailedToRead, err)
 	}

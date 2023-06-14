@@ -18,11 +18,12 @@ const (
 	AssistantRole            = "assistant"
 	ErrEmptyResponse         = "empty response"
 	DefaultGPTModel          = "gpt-3.5-turbo"
+	DefaultServiceURL        = "https://api.openai.com"
+	CompletionPath           = "/v1/chat/completions"
+	ModelPath                = "/v1/models"
 	MaxTokenBufferPercentage = 20
 	MaxTokenSize             = 4096
 	SystemRole               = "system"
-	CompletionURL            = "https://api.openai.com/v1/chat/completions"
-	ModelURL                 = "https://api.openai.com/v1/models"
 	UserRole                 = "user"
 	gptPrefix                = "gpt"
 )
@@ -33,6 +34,7 @@ type Client struct {
 	caller       http.Caller
 	capacity     int
 	historyStore history.HistoryStore
+	serviceURL   string
 }
 
 func New(caller http.Caller, cs config.ConfigStore, hs history.HistoryStore) *Client {
@@ -40,6 +42,7 @@ func New(caller http.Caller, cs config.ConfigStore, hs history.HistoryStore) *Cl
 		caller:       caller,
 		historyStore: hs,
 		capacity:     MaxTokenSize,
+		serviceURL:   DefaultServiceURL,
 	}
 
 	// do not error out when the config cannot be read
@@ -62,6 +65,11 @@ func (c *Client) WithModel(model string) *Client {
 	return c
 }
 
+func (c *Client) WithServiceURL(url string) *Client {
+	c.serviceURL = url
+	return c
+}
+
 // ListModels retrieves a list of all available models from the OpenAI API.
 // The models are returned as a slice of strings, each entry representing a model ID.
 // Models that have an ID starting with 'gpt' are included.
@@ -71,7 +79,7 @@ func (c *Client) WithModel(model string) *Client {
 func (c *Client) ListModels() ([]string, error) {
 	var result []string
 
-	raw, err := c.caller.Get(ModelURL)
+	raw, err := c.caller.Get(c.getEndpoint(ModelPath))
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +129,7 @@ func (c *Client) Query(input string) (string, error) {
 		return "", err
 	}
 
-	raw, err := c.caller.Post(CompletionURL, body, false)
+	raw, err := c.caller.Post(c.getEndpoint(CompletionPath), body, false)
 	if err != nil {
 		return "", err
 	}
@@ -153,7 +161,7 @@ func (c *Client) Stream(input string) error {
 		return err
 	}
 
-	result, err := c.caller.Post(CompletionURL, body, true)
+	result, err := c.caller.Post(c.getEndpoint(CompletionPath), body, true)
 	if err != nil {
 		return err
 	}
@@ -195,6 +203,10 @@ func (c *Client) addQuery(query string) {
 
 	c.History = append(c.History, message)
 	c.truncateHistory()
+}
+
+func (c *Client) getEndpoint(path string) string {
+	return c.serviceURL + path
 }
 
 func (c *Client) prepareQuery(input string) {

@@ -12,7 +12,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 )
@@ -68,7 +68,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// Check if there is input from the pipe (stdin)
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) == 0 {
-		pipeContent, err := ioutil.ReadAll(os.Stdin)
+		pipeContent, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			return fmt.Errorf("failed to read from pipe: %w", err)
 		}

@@ -113,7 +113,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 				respBytes, err := tt.setupPostReturn()
 				Expect(err).NotTo(HaveOccurred())
-				mockCaller.EXPECT().Post(client.CompletionURL, body, false).Return(respBytes, tt.postError)
+				mockCaller.EXPECT().Post(client.DefaultServiceURL+client.CompletionPath, body, false).Return(respBytes, tt.postError)
 
 				_, err = subject.Query(query)
 				Expect(err).To(HaveOccurred())
@@ -143,7 +143,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 				respBytes, err := json.Marshal(response)
 				Expect(err).NotTo(HaveOccurred())
-				mockCaller.EXPECT().Post(client.CompletionURL, expectedBody, false).Return(respBytes, nil)
+				mockCaller.EXPECT().Post(client.DefaultServiceURL+client.CompletionPath, expectedBody, false).Return(respBytes, nil)
 
 				var request types.CompletionsRequest
 				err = json.Unmarshal(expectedBody, &request)
@@ -283,7 +283,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).NotTo(HaveOccurred())
 
 			errorMsg := "error message"
-			mockCaller.EXPECT().Post(client.CompletionURL, body, true).Return(nil, errors.New(errorMsg))
+			mockCaller.EXPECT().Post(client.DefaultServiceURL+client.CompletionPath, body, true).Return(nil, errors.New(errorMsg))
 
 			err := subject.Stream(query)
 			Expect(err).To(HaveOccurred())
@@ -297,7 +297,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				body, err = createBody(messages, subject.Model, true)
 				Expect(err).NotTo(HaveOccurred())
 
-				mockCaller.EXPECT().Post(client.CompletionURL, expectedBody, true).Return([]byte(answer), nil)
+				mockCaller.EXPECT().Post(client.DefaultServiceURL+client.CompletionPath, expectedBody, true).Return([]byte(answer), nil)
 
 				messages = createMessages(history, query)
 
@@ -351,7 +351,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			subject := factory.buildClientWithoutConfig()
 
 			errorMsg := "error message"
-			mockCaller.EXPECT().Get(client.ModelURL).Return(nil, errors.New(errorMsg))
+			mockCaller.EXPECT().Get(client.DefaultServiceURL+client.ModelPath).Return(nil, errors.New(errorMsg))
 
 			_, err := subject.ListModels()
 			Expect(err).To(HaveOccurred())
@@ -360,7 +360,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		it("throws an error when the response is empty", func() {
 			subject := factory.buildClientWithoutConfig()
 
-			mockCaller.EXPECT().Get(client.ModelURL).Return(nil, nil)
+			mockCaller.EXPECT().Get(client.DefaultServiceURL+client.ModelPath).Return(nil, nil)
 
 			_, err := subject.ListModels()
 			Expect(err).To(HaveOccurred())
@@ -370,7 +370,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			subject := factory.buildClientWithoutConfig()
 
 			malformed := `{"invalid":"json"` // missing closing brace
-			mockCaller.EXPECT().Get(client.ModelURL).Return([]byte(malformed), nil)
+			mockCaller.EXPECT().Get(client.DefaultServiceURL+client.ModelPath).Return([]byte(malformed), nil)
 
 			_, err := subject.ListModels()
 			Expect(err).To(HaveOccurred())
@@ -382,7 +382,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			response, err := utils.FileToBytes("models.json")
 			Expect(err).NotTo(HaveOccurred())
 
-			mockCaller.EXPECT().Get(client.ModelURL).Return(response, nil)
+			mockCaller.EXPECT().Get(client.DefaultServiceURL+client.ModelPath).Return(response, nil)
 
 			result, err := subject.ListModels()
 			Expect(err).NotTo(HaveOccurred())

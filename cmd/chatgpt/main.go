@@ -26,6 +26,7 @@ var (
 	modelName       string
 	GitCommit       string
 	GitVersion      string
+	ServiceURL      string
 )
 
 func main() {
@@ -55,26 +56,7 @@ func main() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	secret := viper.GetString(utils.OpenAPIKeyEnv)
-	if secret == "" {
-		return errors.New("missing environment variable: " + utils.OpenAPIKeyEnv)
-	}
-	client := client.New(http.New().WithSecret(secret), config.New(), history.New())
-
-	if modelName != "" {
-		client = client.WithModel(modelName)
-	}
-
-	// Check if there is input from the pipe (stdin)
-	stat, _ := os.Stdin.Stat()
-	if (stat.Mode() & os.ModeCharDevice) == 0 {
-		pipeContent, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			return fmt.Errorf("failed to read from pipe: %w", err)
-		}
-		client.ProvideContext(string(pipeContent))
-	}
-
+	// Flags that do not require an API key
 	if showVersion {
 		fmt.Printf("ChatGPT CLI version %s (commit %s)\n", GitVersion, GitCommit)
 		return nil
@@ -96,6 +78,30 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Println("History successfully cleared.")
 		return nil
+	}
+
+	secret := viper.GetString(utils.OpenAPIKeyEnv)
+	if secret == "" {
+		return errors.New("missing environment variable: " + utils.OpenAPIKeyEnv)
+	}
+	client := client.New(http.New().WithSecret(secret), config.New(), history.New())
+
+	if modelName != "" {
+		client = client.WithModel(modelName)
+	}
+
+	if ServiceURL != "" {
+		client = client.WithServiceURL(ServiceURL)
+	}
+
+	// Check if there is input from the pipe (stdin)
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		pipeContent, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("failed to read from pipe: %w", err)
+		}
+		client.ProvideContext(string(pipeContent))
 	}
 
 	if listModels {

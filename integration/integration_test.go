@@ -1,18 +1,32 @@
 package integration_test
 
 import (
+	"fmt"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/types"
+	"github.com/kardolus/chatgpt-cli/utils"
+	"github.com/onsi/gomega/gexec"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
+	"io"
 	"os"
+	"os/exec"
+	"path"
 	"testing"
+	"time"
 
 	. "github.com/onsi/gomega"
 )
 
+const (
+	gitCommit  = "some-git-commit"
+	gitVersion = "some-git-version"
+	serviceURL = "http://127.0.0.1"
+)
+
 func TestIntegration(t *testing.T) {
+	defer gexec.CleanupBuildArtifacts()
 	spec.Run(t, "Integration Tests", testIntegration, spec.Report(report.Terminal{}))
 }
 
@@ -137,4 +151,227 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 	})
 
+	when("Performing the Lifecycle", func() {
+		const (
+			exitSuccess = 0
+			exitFailure = 1
+		)
+
+		var (
+			homeDir string
+			err     error
+		)
+
+		it.Before(func() {
+			SetDefaultEventuallyTimeout(5 * time.Second)
+
+			Expect(buildBinary()).To(Succeed())
+
+			Expect(runMockServer()).To(Succeed())
+
+			Eventually(func() (string, error) {
+				return curl(fmt.Sprintf("%s/ping", serviceURL))
+			}).Should(ContainSubstring("pong"))
+
+			homeDir, err = os.MkdirTemp("", "mockHome")
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(os.Setenv("HOME", homeDir)).To(Succeed())
+			Expect(os.Setenv(utils.OpenAPIKeyEnv, "some-key")).To(Succeed())
+		})
+
+		it.After(func() {
+			gexec.Kill()
+			Expect(os.RemoveAll(homeDir))
+		})
+
+		it("throws an error when the API key is missing", func() {
+			Expect(os.Unsetenv(utils.OpenAPIKeyEnv)).To(Succeed())
+
+			command := exec.Command(binaryPath, "some prompt")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring(utils.OpenAPIKeyEnv))
+		})
+
+		it("should not require an API key for the --version flag", func() {
+			Expect(os.Unsetenv(utils.OpenAPIKeyEnv)).To(Succeed())
+
+			command := exec.Command(binaryPath, "--version")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitSuccess))
+		})
+
+		it("should not require an API key for the --clear-history flag", func() {
+			Expect(os.Unsetenv(utils.OpenAPIKeyEnv)).To(Succeed())
+
+			command := exec.Command(binaryPath, "--clear-history")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitSuccess))
+		})
+
+		it("should require an argument for the --set-model flag", func() {
+			command := exec.Command(binaryPath, "--set-model")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring("flag needs an argument: --set-model"))
+		})
+
+		it("should require the chatgpt-cli folder but not an API key for the --set-model flag", func() {
+			Expect(os.Unsetenv(utils.OpenAPIKeyEnv)).To(Succeed())
+
+			command := exec.Command(binaryPath, "--set-model", "123")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
+			Expect(output).NotTo(ContainSubstring(utils.OpenAPIKeyEnv))
+		})
+
+		it("should return the expected result for the --version flag", func() {
+			command := exec.Command(binaryPath, "--version")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitSuccess))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring(fmt.Sprintf("commit %s", gitCommit)))
+			Expect(output).To(ContainSubstring(fmt.Sprintf("version %s", gitVersion)))
+		})
+
+		it("should return the result for the --list-models flag", func() {
+			command := exec.Command(binaryPath, "--list-models")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitSuccess))
+
+			output := string(session.Out.Contents())
+
+			// see models.json
+			Expect(output).To(ContainSubstring("* gpt-3.5-turbo (current)"))
+			Expect(output).To(ContainSubstring("- gpt-3.5-turbo-0301"))
+		})
+
+		it("should return the expected result for the --query flag", func() {
+			command := exec.Command(binaryPath, "--query", "some-query")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitSuccess))
+
+			output := string(session.Out.Contents())
+
+			// see completions.json
+			Expect(output).To(ContainSubstring(`I don't have personal opinions about bars, but here are some popular bars in Red Hook, Brooklyn:`))
+		})
+
+		when("there is a hidden chatgpt-cli folder in the home dir", func() {
+			var filePath string
+
+			it.Before(func() {
+				filePath = path.Join(os.Getenv("HOME"), ".chatgpt-cli")
+				Expect(os.Mkdir(filePath, 0777)).To(Succeed())
+			})
+
+			it.After(func() {
+				Expect(os.RemoveAll(filePath)).To(Succeed())
+			})
+
+			it("keeps track of history", func() {
+				// History should not exist yet
+				historyFile := path.Join(filePath, "history")
+				Expect(historyFile).NotTo(BeAnExistingFile())
+
+				// Perform a query
+				command := exec.Command(binaryPath, "--query", "some-query")
+				session, err := gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				// The CLI response should be as expected
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				output := string(session.Out.Contents())
+
+				response := `I don't have personal opinions about bars, but here are some popular bars in Red Hook, Brooklyn:`
+				Expect(output).To(ContainSubstring(response))
+
+				// The history file should have the expected content
+				Expect(historyFile).To(BeAnExistingFile())
+				content, err := os.ReadFile(historyFile)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(content).NotTo(BeEmpty())
+				Expect(string(content)).To(ContainSubstring(response))
+
+				// Clear the history using the CLI
+				command = exec.Command(binaryPath, "--clear-history")
+				session, err = gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				// History should no longer exist
+				Expect(historyFile).NotTo(BeAnExistingFile())
+			})
+
+			it("has a configurable default model", func() {
+				// config.yaml should not exist yet
+				configFile := path.Join(filePath, "config.yaml")
+				Expect(configFile).NotTo(BeAnExistingFile())
+
+				// --list-models returns the default model
+				command := exec.Command(binaryPath, "--list-models")
+				session, err := gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				output := string(session.Out.Contents())
+
+				// see models.json
+				Expect(output).To(ContainSubstring("* gpt-3.5-turbo (current)"))
+				Expect(output).To(ContainSubstring("- gpt-3.5-turbo-0301"))
+
+				// Set the model
+				command = exec.Command(binaryPath, "--set-model", "gpt-3.5-turbo-0301")
+				session, err = gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				// The CLI response should be as expected
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				// config.yaml should have been created
+				Expect(configFile).To(BeAnExistingFile())
+
+				// --list-models shows the new model as default
+				command = exec.Command(binaryPath, "--list-models")
+				session, err = gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				output = string(session.Out.Contents())
+
+				Expect(output).To(ContainSubstring("- gpt-3.5-turbo"))
+				Expect(output).To(ContainSubstring("* gpt-3.5-turbo-0301 (current)"))
+			})
+		})
+	})
 }

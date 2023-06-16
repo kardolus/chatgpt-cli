@@ -255,7 +255,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(output).To(ContainSubstring(fmt.Sprintf("version %s", gitVersion)))
 		})
 
-		it("should return the result for the --list-models flag", func() {
+		it("should return the expected result for the --list-models flag", func() {
 			command := exec.Command(binaryPath, "--list-models")
 			session, err := gexec.Start(command, io.Discard, io.Discard)
 			Expect(err).NotTo(HaveOccurred())

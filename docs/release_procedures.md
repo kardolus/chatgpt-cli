@@ -1,6 +1,14 @@
 # Release Procedures Manual
 
-## 1. Create a tag
+## 1. Update the dependencies
+
+It's a good practice to update the dependencies before cutting a new release
+
+```shell
+./scripts/updatedeps.sh
+```
+
+## 2. Create a tag
 
 Use the git-cli to create a tag, for example:
 
@@ -14,7 +22,7 @@ Next, push the tag:
 git push origin --tags
 ```
 
-## 2. Create binaries
+## 3. Create binaries
 
 From the root of `kardolus/chatgpt-cli`, run the following script to create binaries for various architectures:
 
@@ -22,7 +30,7 @@ From the root of `kardolus/chatgpt-cli`, run the following script to create bina
 ./scripts/binaries.sh
 ```
 
-## 3. Create a GitHub release
+## 4. Create a GitHub release
 
 Create a GitHub release for the tag we just pushed out. Upload the binaries created in the previous step. Add this 
 section with update instructions to the end:
@@ -41,7 +49,7 @@ brew upgrade chatgpt-cli
 For a quick and easy installation without compiling, you can directly download the pre-built binary for your operating system and architecture.
 ```
 
-## 4. Bump the version
+## 5. Bump the version
 
 Bump the version in the `README` of `kardolus/chatgpt-cli` and in the Homebrew
 formulae (`kardolus/homebrew-chatgpt-cli/HomebrewFormula/chatgpt-cli.rb`). Update the sha256 of the macOS binaries

@@ -63,7 +63,12 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.Flag("set-model").Changed {
-		if err := configmanager.New(config.New()).WriteModel(modelName); err != nil {
+		cm, err := configmanager.New(config.New())
+		if err != nil {
+			return err
+		}
+
+		if err := cm.WriteModel(modelName); err != nil {
 			return err
 		}
 		fmt.Println("Model successfully updated to", modelName)
@@ -84,8 +89,11 @@ func run(cmd *cobra.Command, args []string) error {
 	if secret == "" {
 		return errors.New("missing environment variable: " + utils.OpenAPIKeyEnv)
 	}
-	client := client.New(http.New().WithSecret(secret), config.New(), history.New())
-
+	client, err := client.New(http.New().WithSecret(secret), config.New(), history.New())
+	if err != nil {
+		return err
+	}
+	
 	if modelName != "" {
 		client = client.WithModel(modelName)
 	}

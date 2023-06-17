@@ -3,7 +3,7 @@ package integration_test
 import (
 	"errors"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/client"
+	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/utils"
 	"github.com/onsi/gomega/gexec"
 	"io"
@@ -46,12 +46,16 @@ func curl(url string) (string, error) {
 }
 
 func runMockServer() error {
-	var err error
+	defaults, err := config.New().ReadDefaults()
+	if err != nil {
+		return err
+	}
+
 	onceServe.Do(func() {
 		go func() {
 			http.HandleFunc("/ping", getPing)
-			http.HandleFunc(client.CompletionPath, postCompletions)
-			http.HandleFunc(client.ModelPath, getModels)
+			http.HandleFunc(defaults.CompletionsPath, postCompletions)
+			http.HandleFunc(defaults.ModelsPath, getModels)
 			close(serverReady)
 			err = http.ListenAndServe("", nil)
 		}()

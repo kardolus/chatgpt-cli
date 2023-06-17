@@ -17,56 +17,46 @@ const (
 	AssistantContent         = "You are a helpful assistant."
 	AssistantRole            = "assistant"
 	ErrEmptyResponse         = "empty response"
-	DefaultGPTModel          = "gpt-3.5-turbo"
-	DefaultServiceURL        = "https://api.openai.com"
-	CompletionPath           = "/v1/chat/completions"
-	ModelPath                = "/v1/models"
 	MaxTokenBufferPercentage = 20
-	MaxTokenSize             = 4096
 	SystemRole               = "system"
 	UserRole                 = "user"
 	gptPrefix                = "gpt"
 )
 
 type Client struct {
+	Config       types.Config
 	History      []types.Message
-	Model        string
 	caller       http.Caller
-	capacity     int
 	historyStore history.HistoryStore
-	serviceURL   string
 }
 
-func New(caller http.Caller, cs config.ConfigStore, hs history.HistoryStore) *Client {
+func New(caller http.Caller, cs config.ConfigStore, hs history.HistoryStore) (*Client, error) {
+	cm, err := configmanager.New(cs)
+	if err != nil {
+		return nil, err
+	}
+
 	result := &Client{
+		Config:       cm.Config,
 		caller:       caller,
 		historyStore: hs,
-		capacity:     MaxTokenSize,
-		serviceURL:   DefaultServiceURL,
 	}
 
-	// do not error out when the config cannot be read
-	result.Model, _ = configmanager.New(cs).ReadModel()
-
-	if result.Model == "" {
-		result.Model = DefaultGPTModel
-	}
-
-	return result
+	return result, nil
 }
 
 func (c *Client) WithCapacity(capacity int) *Client {
-	c.capacity = capacity
+	c.Config.MaxTokens = capacity
 	return c
 }
 
 func (c *Client) WithModel(model string) *Client {
-	c.Model = model
+	c.Config.Model = model
 	return c
 }
 
 func (c *Client) WithServiceURL(url string) *Client {
-	c.serviceURL = url
+	c.Config.URL = url
 	return c
 }
 
@@ -79,7 +69,7 @@ func (c *Client) WithServiceURL(url string) *Client {
 func (c *Client) ListModels() ([]string, error) {
 	var result []string
 
-	raw, err := c.caller.Get(c.getEndpoint(ModelPath))
+	raw, err := c.caller.Get(c.getEndpoint(c.Config.ModelsPath))
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +81,7 @@ func (c *Client) ListModels() ([]string, error) {
 
 	for _, model := range response.Data {
 		if strings.HasPrefix(model.Id, gptPrefix) {
-			if model.Id != c.Model {
+			if model.Id != c.Config.Model {
 				result = append(result, fmt.Sprintf("- %s", model.Id))
 				continue
 			}
@@ -129,7 +119,7 @@ func (c *Client) Query(input string) (string, error) {
 		return "", err
 	}
 
-	raw, err := c.caller.Post(c.getEndpoint(CompletionPath), body, false)
+	raw, err := c.caller.Post(c.getEndpoint(c.Config.CompletionsPath), body, false)
 	if err != nil {
 		return "", err
 	}
@@ -161,7 +151,7 @@ func (c *Client) Stream(input string) error {
 		return err
 	}
 
-	result, err := c.caller.Post(c.getEndpoint(CompletionPath), body, true)
+	result, err := c.caller.Post(c.getEndpoint(c.Config.CompletionsPath), body, true)
 	if err != nil {
 		return err
 	}
@@ -174,7 +164,7 @@ func (c *Client) Stream(input string) error {
 func (c *Client) createBody(stream bool) ([]byte, error) {
 	body := types.CompletionsRequest{
 		Messages: c.History,
-		Model:    c.Model,
+		Model:    c.Config.Model,
 		Stream:   stream,
 	}
 
@@ -206,7 +196,7 @@ func (c *Client) addQuery(query string) {
 }
 
 func (c *Client) getEndpoint(path string) string {
-	return c.serviceURL + path
+	return c.Config.URL + path
 }
 
 func (c *Client) prepareQuery(input string) {
@@ -228,7 +218,7 @@ func (c *Client) processResponse(raw []byte, v interface{}) error {
 
 func (c *Client) truncateHistory() {
 	tokens, rolling := countTokens(c.History)
-	effectiveTokenSize := calculateEffectiveTokenSize(c.capacity, MaxTokenBufferPercentage)
+	effectiveTokenSize := calculateEffectiveTokenSize(c.Config.MaxTokens, MaxTokenBufferPercentage)
 
 	if tokens <= effectiveTokenSize {
 		return

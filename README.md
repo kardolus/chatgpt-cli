@@ -1,6 +1,6 @@
 # ChatGPT CLI
 
-This project showcases an implementation of ChatGPT clients with streaming support in a Command-Line Interface (CLI)
+This project showcases an implementation of a ChatGPT client with streaming support in a Command-Line Interface (CLI)
 environment, demonstrating its practicality and effectiveness.
 
 ![a screenshot](resources/vhs.gif)
@@ -17,6 +17,7 @@ environment, demonstrating its practicality and effectiveness.
         - [Linux (arm64)](#linux-arm64)
         - [Windows (amd64)](#windows-amd64)
 - [Getting Started](#getting-started)
+- [Configuration](#configuration)
 - [Development](#development)
 - [Reporting Issues and Contributing](#reporting-issues-and-contributing)
 - [Uninstallation](#uninstallation)
@@ -31,9 +32,10 @@ environment, demonstrating its practicality and effectiveness.
 * **Context management**: Seamless conversations with the GPT model by maintaining message history across CLI calls.
 * **Sliding window history**: Automatically trims conversation history while maintaining context to stay within token
   limits.
-* **Custom context from local files**: Provide custom context through piping for GPT model reference during
-  conversation.
-* **Custom chat models**: Use a custom chat model by specifying the model name with the `--set-model` flag. Ensure that the model exists in the OpenAI model list.
+* **Custom context from local files**: Provide a custom context for the GPT model to reference during the conversation
+  by piping it in.
+* **Custom chat models**: Use a custom chat model by specifying the model name with the `--set-model` flag. Ensure that
+  the model exists in the OpenAI model list.
 * **Model listing**: Get a list of available models by using the `-l` or `--list-models` flag.
 * **Viper integration**: Robust configuration management.
 
@@ -145,6 +147,48 @@ Remember to check that the model exists in the OpenAI model list before setting 
 chatgpt --list-models
 ```
 
+## Configuration
+
+The chatGPT CLI uses a two-level configuration system. The default configuration is read from the
+file `resources/config.yaml` located within the package. These default values are:
+
+```yaml
+model: gpt-3.5-turbo
+max_tokens: 4096
+url: https://api.openai.com
+completions_path: /v1/chat/completions
+models_path: /v1/models
+```
+
+These default settings can be overwritten by user-defined configuration options. The user configuration file
+is `.chatgpt-cli/config.yaml` and is expected to be in the user's home directory.
+
+The user configuration file follows the same structure as the default configuration file. Here is an example of how to
+override the `model` and `max_tokens` values:
+
+```yaml
+model: gpt-3.5-turbo-16k
+max_tokens: 8192
+```
+
+In this example, the `model` is changed to `gpt-3.5-turbo-16k`, and `max_tokens` is set to `8192`. Other options such
+as `url`, `completions_path`, and `models_path` can be adjusted in the same manner if needed.
+
+Note: If the user configuration file is not found or cannot be read for any reason, the application will fall back to
+the default configuration.
+
+As a more immediate and flexible alternative to changing the configuration file manually, the CLI offers command-line
+flags for overwriting specific configuration values. For instance, the `model` can be changed using the `--model`
+flag. This is particularly useful for temporary adjustments or testing different configurations.
+
+```shell
+chatgpt --model gpt-3.5-turbo-16k What are some fun things to do in Red Hook?
+```
+
+This command will temporarily overwrite the `model` value for the duration of the current command. We're currently
+working on adding similar flags for other configuration values, which will allow you to adjust most aspects of the
+configuration directly from the command line.
+
 ## Development
 
 To start developing, set the `OPENAI_API_KEY` environment variable to
@@ -226,6 +270,7 @@ brew uninstall chatgpt-cli
 ```
 
 And to remove the tap:
+
 ```shell
 brew untap kardolus/chatgpt-cli
 ```

@@ -49,6 +49,21 @@ func (mr *MockConfigStoreMockRecorder) Read() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*MockConfigStore)(nil).Read))
 }
 
+// ReadDefaults mocks base method.
+func (m *MockConfigStore) ReadDefaults() (types.Config, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadDefaults")
+	ret0, _ := ret[0].(types.Config)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadDefaults indicates an expected call of ReadDefaults.
+func (mr *MockConfigStoreMockRecorder) ReadDefaults() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadDefaults", reflect.TypeOf((*MockConfigStore)(nil).ReadDefaults))
+}
+
 // Write mocks base method.
 func (m *MockConfigStore) Write(arg0 types.Config) error {
 	m.ctrl.T.Helper()

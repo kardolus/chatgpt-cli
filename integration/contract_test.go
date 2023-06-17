@@ -3,6 +3,7 @@ package integration_test
 import (
 	"encoding/json"
 	"github.com/kardolus/chatgpt-cli/client"
+	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/kardolus/chatgpt-cli/types"
 	"github.com/kardolus/chatgpt-cli/utils"
@@ -18,7 +19,10 @@ func TestContract(t *testing.T) {
 }
 
 func testContract(t *testing.T, when spec.G, it spec.S) {
-	var restCaller *http.RestCaller
+	var (
+		restCaller *http.RestCaller
+		defaults   types.Config
+	)
 
 	it.Before(func() {
 		RegisterTestingT(t)
@@ -27,6 +31,10 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 		Expect(apiKey).NotTo(BeEmpty())
 
 		restCaller = http.New().WithSecret(apiKey)
+
+		var err error
+		defaults, err = config.New().ReadDefaults()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	when("accessing the completion endpoint", func() {
@@ -36,14 +44,14 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 					Role:    client.SystemRole,
 					Content: client.AssistantContent,
 				}},
-				Model:  client.DefaultGPTModel,
+				Model:  defaults.Model,
 				Stream: false,
 			}
 
 			bytes, err := json.Marshal(body)
 			Expect(err).NotTo(HaveOccurred())
 
-			resp, err := restCaller.Post(client.DefaultServiceURL+client.CompletionPath, bytes, false)
+			resp, err := restCaller.Post(defaults.URL+defaults.CompletionsPath, bytes, false)
 			Expect(err).NotTo(HaveOccurred())
 
 			var data types.CompletionsResponse
@@ -61,7 +69,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 
 	when("accessing the models endpoint", func() {
 		it("should have the expected keys in the response", func() {
-			resp, err := restCaller.Get(client.DefaultServiceURL + client.ModelPath)
+			resp, err := restCaller.Get(defaults.URL + defaults.ModelsPath)
 			Expect(err).NotTo(HaveOccurred())
 
 			var data types.ListModelsResponse

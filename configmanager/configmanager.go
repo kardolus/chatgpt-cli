@@ -3,6 +3,7 @@ package configmanager
 import (
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/types"
+	"gopkg.in/yaml.v3"
 )
 
 type ConfigManager struct {
@@ -33,6 +34,15 @@ func New(cs config.ConfigStore) *ConfigManager {
 	}
 
 	return &ConfigManager{configStore: cs, Config: c}
+}
+
+func (c *ConfigManager) ShowConfig() (string, error) {
+	data, err := yaml.Marshal(c.Config)
+	if err != nil {
+		return "", err
+	}
+
+	return string(data), nil
 }
 
 func (c *ConfigManager) WriteModel(model string) error {

@@ -189,6 +189,16 @@ This command will temporarily overwrite the `model` value for the duration of th
 working on adding similar flags for other configuration values, which will allow you to adjust most aspects of the
 configuration directly from the command line.
 
+In addition, the `--config` or `-c` flag can be used to display the current configuration. This allows users to easily
+check their current settings without having to manually open and read the configuration files.
+
+```shell
+chatgpt --config
+```
+
+This command will display the current configuration including any overrides applied by command line flags or the user
+configuration file.
+
 ## Development
 
 To start developing, set the `OPENAI_API_KEY` environment variable to

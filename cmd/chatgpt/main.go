@@ -21,6 +21,7 @@ var (
 	queryMode       bool
 	clearHistory    bool
 	showVersion     bool
+	showConfig      bool
 	interactiveMode bool
 	listModels      bool
 	modelName       string
@@ -41,7 +42,8 @@ func main() {
 
 	rootCmd.PersistentFlags().BoolVarP(&interactiveMode, "interactive", "i", false, "Use interactive mode")
 	rootCmd.PersistentFlags().BoolVarP(&queryMode, "query", "q", false, "Use query mode instead of stream mode")
-	rootCmd.PersistentFlags().BoolVarP(&clearHistory, "clear-history", "c", false, "Clear the history of ChatGPT CLI")
+	rootCmd.PersistentFlags().BoolVar(&clearHistory, "clear-history", false, "Clear the history of ChatGPT CLI")
+	rootCmd.PersistentFlags().BoolVarP(&showConfig, "config", "c", false, "Display the configuration")
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
 	rootCmd.PersistentFlags().StringVarP(&modelName, "model", "m", "", "Use a custom GPT model by specifying the model name")
@@ -79,6 +81,17 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		fmt.Println("History successfully cleared.")
+		return nil
+	}
+
+	if showConfig {
+		cm := configmanager.New(config.New())
+
+		if c, err := cm.ShowConfig(); err != nil {
+			return err
+		} else {
+			fmt.Printf(c)
+		}
 		return nil
 	}
 

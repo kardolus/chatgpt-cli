@@ -2,6 +2,7 @@ package configmanager_test
 
 import (
 	"errors"
+	"fmt"
 	"github.com/golang/mock/gomock"
 	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/types"
@@ -132,6 +133,23 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.URL).To(Equal(defaultURL))
 			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
 			Expect(subject.Config.ModelsPath).To(Equal(modelsPath))
+		})
+	})
+
+	when("ShowConfig()", func() {
+		it("displays the expected configuration", func() {
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(defaultConfig, nil).Times(1)
+
+			subject := configmanager.New(mockConfigStore)
+
+			result, err := subject.ShowConfig()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(ContainSubstring(defaultModel))
+			Expect(result).To(ContainSubstring(defaultURL))
+			Expect(result).To(ContainSubstring(defaultCompletionsPath))
+			Expect(result).To(ContainSubstring(defaultModelsPath))
+			Expect(result).To(ContainSubstring(fmt.Sprintf("%d", defaultMaxTokens)))
 		})
 	})
 

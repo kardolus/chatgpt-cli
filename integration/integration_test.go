@@ -349,6 +349,17 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				Expect(output).To(ContainSubstring("* gpt-3.5-turbo (current)"))
 				Expect(output).To(ContainSubstring("- gpt-3.5-turbo-0301"))
 
+				// --config displays the default model as well
+				command = exec.Command(binaryPath, "--config")
+				session, err = gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				output = string(session.Out.Contents())
+
+				Expect(output).To(ContainSubstring("gpt-3.5-turbo"))
+
 				// Set the model
 				command = exec.Command(binaryPath, "--set-model", "gpt-3.5-turbo-0301")
 				session, err = gexec.Start(command, io.Discard, io.Discard)
@@ -371,6 +382,17 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				Expect(output).To(ContainSubstring("- gpt-3.5-turbo"))
 				Expect(output).To(ContainSubstring("* gpt-3.5-turbo-0301 (current)"))
+
+				// --config displays the new model as well
+				command = exec.Command(binaryPath, "--config")
+				session, err = gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				output = string(session.Out.Contents())
+
+				Expect(output).To(ContainSubstring("gpt-3.5-turbo-0301"))
 			})
 		})
 	})

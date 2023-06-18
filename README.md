@@ -149,8 +149,7 @@ chatgpt --list-models
 
 ## Configuration
 
-The chatGPT CLI uses a two-level configuration system. The default configuration is read from the
-file `utils/constants.go` located within the package. These default values are:
+The chatGPT CLI uses a two-level configuration system. The default values are:
 
 ```yaml
 model: gpt-3.5-turbo

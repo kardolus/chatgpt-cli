@@ -8,6 +8,14 @@ import (
 	"path/filepath"
 )
 
+const (
+	openAIModel           = "gpt-3.5-turbo"
+	openAIModelMaxTokens  = 4096
+	openAIURL             = "https://api.openai.com"
+	openAICompletionsPath = "/v1/chat/completions"
+	openAIModelsPath      = "/v1/models"
+)
+
 type ConfigStore interface {
 	Read() (types.Config, error)
 	ReadDefaults() types.Config
@@ -39,11 +47,11 @@ func (f *FileIO) Read() (types.Config, error) {
 
 func (f *FileIO) ReadDefaults() types.Config {
 	return types.Config{
-		Model:           utils.OpenAIModel,
-		MaxTokens:       utils.OpenAIModelMaxTokens,
-		URL:             utils.OpenAIURL,
-		CompletionsPath: utils.OpenAICompletionsPath,
-		ModelsPath:      utils.OpenAIModelsPath,
+		Model:           openAIModel,
+		MaxTokens:       openAIModelMaxTokens,
+		URL:             openAIURL,
+		CompletionsPath: openAICompletionsPath,
+		ModelsPath:      openAIModelsPath,
 	}
 }
 

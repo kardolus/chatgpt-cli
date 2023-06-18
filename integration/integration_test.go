@@ -177,7 +177,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(os.Setenv("HOME", homeDir)).To(Succeed())
-			Expect(os.Setenv(utils.OpenAPIKeyEnv, "some-key")).To(Succeed())
+			Expect(os.Setenv(utils.OpenAIKeyEnv, "some-key")).To(Succeed())
 		})
 
 		it.After(func() {
@@ -186,7 +186,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("throws an error when the API key is missing", func() {
-			Expect(os.Unsetenv(utils.OpenAPIKeyEnv)).To(Succeed())
+			Expect(os.Unsetenv(utils.OpenAIKeyEnv)).To(Succeed())
 
 			command := exec.Command(binaryPath, "some prompt")
 			session, err := gexec.Start(command, io.Discard, io.Discard)
@@ -195,11 +195,11 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
 			output := string(session.Out.Contents())
-			Expect(output).To(ContainSubstring(utils.OpenAPIKeyEnv))
+			Expect(output).To(ContainSubstring(utils.OpenAIKeyEnv))
 		})
 
 		it("should not require an API key for the --version flag", func() {
-			Expect(os.Unsetenv(utils.OpenAPIKeyEnv)).To(Succeed())
+			Expect(os.Unsetenv(utils.OpenAIKeyEnv)).To(Succeed())
 
 			command := exec.Command(binaryPath, "--version")
 			session, err := gexec.Start(command, io.Discard, io.Discard)
@@ -209,7 +209,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("should not require an API key for the --clear-history flag", func() {
-			Expect(os.Unsetenv(utils.OpenAPIKeyEnv)).To(Succeed())
+			Expect(os.Unsetenv(utils.OpenAIKeyEnv)).To(Succeed())
 
 			command := exec.Command(binaryPath, "--clear-history")
 			session, err := gexec.Start(command, io.Discard, io.Discard)
@@ -230,7 +230,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("should require the chatgpt-cli folder but not an API key for the --set-model flag", func() {
-			Expect(os.Unsetenv(utils.OpenAPIKeyEnv)).To(Succeed())
+			Expect(os.Unsetenv(utils.OpenAIKeyEnv)).To(Succeed())
 
 			command := exec.Command(binaryPath, "--set-model", "123")
 			session, err := gexec.Start(command, io.Discard, io.Discard)
@@ -240,7 +240,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 			output := string(session.Out.Contents())
 			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
-			Expect(output).NotTo(ContainSubstring(utils.OpenAPIKeyEnv))
+			Expect(output).NotTo(ContainSubstring(utils.OpenAIKeyEnv))
 		})
 
 		it("should return the expected result for the --version flag", func() {

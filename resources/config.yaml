@@ -1,5 +1,0 @@
-model: gpt-3.5-turbo
-max_tokens: 4096
-url: https://api.openai.com
-completions_path: /v1/chat/completions
-models_path: /v1/models

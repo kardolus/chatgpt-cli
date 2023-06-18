@@ -52,11 +52,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 
 	when("Constructing a new ConfigManager", func() {
 		it("applies the default configuration when user config is missing", func() {
-			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig, nil).Times(1)
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 			mockConfigStore.EXPECT().Read().Return(types.Config{}, errors.New("no such file")).Times(1)
 
-			subject, err := configmanager.New(mockConfigStore)
-			Expect(err).NotTo(HaveOccurred())
+			subject := configmanager.New(mockConfigStore)
 
 			Expect(subject.Config.Model).To(Equal(defaultModel))
 			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
@@ -67,11 +66,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		it("gives precedence to the user provided model", func() {
 			userModel := "the-model"
 
-			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig, nil).Times(1)
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 			mockConfigStore.EXPECT().Read().Return(types.Config{Model: userModel}, nil).Times(1)
 
-			subject, err := configmanager.New(mockConfigStore)
-			Expect(err).NotTo(HaveOccurred())
+			subject := configmanager.New(mockConfigStore)
 
 			Expect(subject.Config.Model).To(Equal(userModel))
 			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
@@ -82,11 +80,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		it("gives precedence to the user provided max-tokens", func() {
 			userMaxTokens := 42
 
-			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig, nil).Times(1)
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 			mockConfigStore.EXPECT().Read().Return(types.Config{MaxTokens: userMaxTokens}, nil).Times(1)
 
-			subject, err := configmanager.New(mockConfigStore)
-			Expect(err).NotTo(HaveOccurred())
+			subject := configmanager.New(mockConfigStore)
 
 			Expect(subject.Config.Model).To(Equal(defaultModel))
 			Expect(subject.Config.MaxTokens).To(Equal(userMaxTokens))
@@ -97,11 +94,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		it("gives precedence to the user provided URL", func() {
 			userURL := "the-user-url"
 
-			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig, nil).Times(1)
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 			mockConfigStore.EXPECT().Read().Return(types.Config{URL: userURL}, nil).Times(1)
 
-			subject, err := configmanager.New(mockConfigStore)
-			Expect(err).NotTo(HaveOccurred())
+			subject := configmanager.New(mockConfigStore)
 
 			Expect(subject.Config.Model).To(Equal(defaultModel))
 			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
@@ -112,11 +108,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		it("gives precedence to the user provided completions-path", func() {
 			completionsPath := "the-completions-path"
 
-			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig, nil).Times(1)
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 			mockConfigStore.EXPECT().Read().Return(types.Config{CompletionsPath: completionsPath}, nil).Times(1)
 
-			subject, err := configmanager.New(mockConfigStore)
-			Expect(err).NotTo(HaveOccurred())
+			subject := configmanager.New(mockConfigStore)
 
 			Expect(subject.Config.Model).To(Equal(defaultModel))
 			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
@@ -127,11 +122,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		it("gives precedence to the user provided models-path", func() {
 			modelsPath := "the-models-path"
 
-			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig, nil).Times(1)
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 			mockConfigStore.EXPECT().Read().Return(types.Config{ModelsPath: modelsPath}, nil).Times(1)
 
-			subject, err := configmanager.New(mockConfigStore)
-			Expect(err).NotTo(HaveOccurred())
+			subject := configmanager.New(mockConfigStore)
 
 			Expect(subject.Config.Model).To(Equal(defaultModel))
 			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
@@ -143,11 +137,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 
 	when("WriteModel()", func() {
 		it("writes the expected config file", func() {
-			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig, nil).Times(1)
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 			mockConfigStore.EXPECT().Read().Return(defaultConfig, nil).Times(1)
 
-			subject, err := configmanager.New(mockConfigStore)
-			Expect(err).NotTo(HaveOccurred())
+			subject := configmanager.New(mockConfigStore)
 
 			modelName := "the-model"
 			subject.Config.Model = modelName

@@ -6,12 +6,11 @@ import (
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
-	"runtime"
 )
 
 type ConfigStore interface {
 	Read() (types.Config, error)
-	ReadDefaults() (types.Config, error)
+	ReadDefaults() types.Config
 	Write(types.Config) error
 }
 
@@ -38,12 +37,14 @@ func (f *FileIO) Read() (types.Config, error) {
 	return parseFile(f.configFilePath)
 }
 
-func (f *FileIO) ReadDefaults() (types.Config, error) {
-	_, thisFile, _, _ := runtime.Caller(0)
-
-	configPath := filepath.Join(thisFile, "..", "..", "resources", "config.yaml")
-
-	return parseFile(configPath)
+func (f *FileIO) ReadDefaults() types.Config {
+	return types.Config{
+		Model:           utils.OpenAIModel,
+		MaxTokens:       utils.OpenAIModelMaxTokens,
+		URL:             utils.OpenAIURL,
+		CompletionsPath: utils.OpenAICompletionsPath,
+		ModelsPath:      utils.OpenAIModelsPath,
+	}
 }
 
 func (f *FileIO) Write(config types.Config) error {

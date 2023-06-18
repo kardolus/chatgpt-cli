@@ -30,19 +30,12 @@ type Client struct {
 	historyStore history.HistoryStore
 }
 
-func New(caller http.Caller, cs config.ConfigStore, hs history.HistoryStore) (*Client, error) {
-	cm, err := configmanager.New(cs)
-	if err != nil {
-		return nil, err
-	}
-
-	result := &Client{
-		Config:       cm.Config,
+func New(caller http.Caller, cs config.ConfigStore, hs history.HistoryStore) *Client {
+	return &Client{
+		Config:       configmanager.New(cs).Config,
 		caller:       caller,
 		historyStore: hs,
 	}
-
-	return result, nil
 }
 
 func (c *Client) WithCapacity(capacity int) *Client {

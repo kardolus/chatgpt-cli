@@ -54,10 +54,7 @@ func runMockServer() error {
 
 	onceServe.Do(func() {
 		go func() {
-			defaults, err = config.New().ReadDefaults()
-			if err != nil {
-				return
-			}
+			defaults = config.New().ReadDefaults()
 
 			http.HandleFunc("/ping", getPing)
 			http.HandleFunc(defaults.CompletionsPath, postCompletions)

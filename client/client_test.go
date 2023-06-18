@@ -466,7 +466,7 @@ func newClientFactory(mc *MockCaller, mcs *MockConfigStore, mhs *MockHistoryStor
 		URL:             defaultURL,
 		CompletionsPath: defaultCompletionsPath,
 		ModelsPath:      defaultModelsPath,
-	}, nil).Times(1)
+	}).Times(1)
 
 	return &clientFactory{
 		mockCaller:       mc,
@@ -478,8 +478,7 @@ func newClientFactory(mc *MockCaller, mcs *MockConfigStore, mhs *MockHistoryStor
 func (f *clientFactory) buildClientWithoutConfig() *client.Client {
 	f.mockConfigStore.EXPECT().Read().Return(types.Config{}, nil).Times(1)
 
-	c, err := client.New(f.mockCaller, f.mockConfigStore, f.mockHistoryStore)
-	Expect(err).NotTo(HaveOccurred())
+	c := client.New(f.mockCaller, f.mockConfigStore, f.mockHistoryStore)
 
 	return c.WithCapacity(50)
 }
@@ -487,9 +486,8 @@ func (f *clientFactory) buildClientWithoutConfig() *client.Client {
 func (f *clientFactory) buildClientWithConfig(config types.Config) *client.Client {
 	f.mockConfigStore.EXPECT().Read().Return(config, nil).Times(1)
 
-	c, err := client.New(f.mockCaller, f.mockConfigStore, f.mockHistoryStore)
-	Expect(err).NotTo(HaveOccurred())
-	
+	c := client.New(f.mockCaller, f.mockConfigStore, f.mockHistoryStore)
+
 	return c.WithCapacity(50)
 }
 

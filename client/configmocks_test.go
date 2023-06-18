@@ -50,12 +50,11 @@ func (mr *MockConfigStoreMockRecorder) Read() *gomock.Call {
 }
 
 // ReadDefaults mocks base method.
-func (m *MockConfigStore) ReadDefaults() (types.Config, error) {
+func (m *MockConfigStore) ReadDefaults() types.Config {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReadDefaults")
 	ret0, _ := ret[0].(types.Config)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	return ret0
 }
 
 // ReadDefaults indicates an expected call of ReadDefaults.

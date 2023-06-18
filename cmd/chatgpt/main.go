@@ -63,10 +63,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.Flag("set-model").Changed {
-		cm, err := configmanager.New(config.New())
-		if err != nil {
-			return err
-		}
+		cm := configmanager.New(config.New())
 
 		if err := cm.WriteModel(modelName); err != nil {
 			return err
@@ -85,15 +82,13 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	secret := viper.GetString(utils.OpenAPIKeyEnv)
+	secret := viper.GetString(utils.OpenAIKeyEnv)
 	if secret == "" {
-		return errors.New("missing environment variable: " + utils.OpenAPIKeyEnv)
+		return errors.New("missing environment variable: " + utils.OpenAIKeyEnv)
 	}
-	client, err := client.New(http.New().WithSecret(secret), config.New(), history.New())
-	if err != nil {
-		return err
-	}
-	
+
+	client := client.New(http.New().WithSecret(secret), config.New(), history.New())
+
 	if modelName != "" {
 		client = client.WithModel(modelName)
 	}

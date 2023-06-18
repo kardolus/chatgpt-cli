@@ -27,14 +27,11 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 	it.Before(func() {
 		RegisterTestingT(t)
 
-		apiKey := os.Getenv(utils.OpenAPIKeyEnv)
+		apiKey := os.Getenv(utils.OpenAIKeyEnv)
 		Expect(apiKey).NotTo(BeEmpty())
 
 		restCaller = http.New().WithSecret(apiKey)
-
-		var err error
-		defaults, err = config.New().ReadDefaults()
-		Expect(err).NotTo(HaveOccurred())
+		defaults = config.New().ReadDefaults()
 	})
 
 	when("accessing the completion endpoint", func() {

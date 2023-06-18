@@ -1,7 +1,6 @@
 package configmanager
 
 import (
-	"fmt"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/types"
 )
@@ -11,11 +10,8 @@ type ConfigManager struct {
 	Config      types.Config
 }
 
-func New(cs config.ConfigStore) (*ConfigManager, error) {
-	c, err := cs.ReadDefaults()
-	if err != nil {
-		return nil, fmt.Errorf("error reading default values: %w", err)
-	}
+func New(cs config.ConfigStore) *ConfigManager {
+	c := cs.ReadDefaults()
 
 	configured, err := cs.Read()
 	if err == nil {
@@ -36,7 +32,7 @@ func New(cs config.ConfigStore) (*ConfigManager, error) {
 		}
 	}
 
-	return &ConfigManager{configStore: cs, Config: c}, nil
+	return &ConfigManager{configStore: cs, Config: c}
 }
 
 func (c *ConfigManager) WriteModel(model string) error {

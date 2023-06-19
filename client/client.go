@@ -30,21 +30,25 @@ type Client struct {
 	historyStore history.HistoryStore
 }
 
-func New(caller http.Caller, cs config.ConfigStore, hs history.HistoryStore) *Client {
+func New(caller http.Caller, cs config.ConfigStore, hs history.HistoryStore) (*Client, error) {
+	cm := configmanager.New(cs).WithEnvironment()
+	configuration := cm.Config
+
+	if configuration.APIKey == "" {
+		return nil, errors.New("missing environment variable: " + cm.APIKeyEnvVarName())
+	}
+
+	caller.SetAPIKey(configuration.APIKey)
+
 	return &Client{
-		Config:       configmanager.New(cs).Config,
+		Config:       configuration,
 		caller:       caller,
 		historyStore: hs,
-	}
+	}, nil
 }
 
 func (c *Client) WithCapacity(capacity int) *Client {
 	c.Config.MaxTokens = capacity
-	return c
-}
-
-func (c *Client) WithModel(model string) *Client {
-	c.Config.Model = model
 	return c
 }
 
@@ -169,7 +173,10 @@ func (c *Client) initHistory() {
 		return
 	}
 
-	c.History, _ = c.historyStore.Read()
+	if !c.Config.OmitHistory {
+		c.History, _ = c.historyStore.Read()
+	}
+
 	if len(c.History) == 0 {
 		c.History = []types.Message{{
 			Role:    SystemRole,
@@ -237,7 +244,10 @@ func (c *Client) updateHistory(response string) {
 		Role:    AssistantRole,
 		Content: response,
 	})
-	_ = c.historyStore.Write(c.History)
+
+	if !c.Config.OmitHistory {
+		_ = c.historyStore.Write(c.History)
+	}
 }
 
 func calculateEffectiveTokenSize(maxTokenSize int, bufferPercentage int) int {

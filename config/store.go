@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	openAIName            = "openai"
 	openAIModel           = "gpt-3.5-turbo"
 	openAIModelMaxTokens  = 4096
 	openAIURL             = "https://api.openai.com"
@@ -47,6 +48,7 @@ func (f *FileIO) Read() (types.Config, error) {
 
 func (f *FileIO) ReadDefaults() types.Config {
 	return types.Config{
+		Name:            openAIName,
 		Model:           openAIModel,
 		MaxTokens:       openAIModelMaxTokens,
 		URL:             openAIURL,

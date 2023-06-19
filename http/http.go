@@ -26,6 +26,7 @@ const (
 type Caller interface {
 	Post(url string, body []byte, stream bool) ([]byte, error)
 	Get(url string) ([]byte, error)
+	SetAPIKey(secret string)
 }
 
 type RestCaller struct {
@@ -42,9 +43,8 @@ func New() *RestCaller {
 	}
 }
 
-func (r *RestCaller) WithSecret(secret string) *RestCaller {
+func (r *RestCaller) SetAPIKey(secret string) {
 	r.secret = secret
-	return r
 }
 
 func (r *RestCaller) Get(url string) ([]byte, error) {

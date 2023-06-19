@@ -9,7 +9,6 @@ import (
 	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/http"
-	"github.com/kardolus/chatgpt-cli/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"io"
@@ -25,6 +24,7 @@ var (
 	interactiveMode bool
 	listModels      bool
 	modelName       string
+	maxTokens       int
 	GitCommit       string
 	GitVersion      string
 	ServiceURL      string
@@ -46,8 +46,8 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&showConfig, "config", "c", false, "Display the configuration")
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
-	rootCmd.PersistentFlags().StringVarP(&modelName, "model", "m", "", "Use a custom GPT model by specifying the model name")
 	rootCmd.PersistentFlags().StringVar(&modelName, "set-model", "", "Set a new default GPT model by specifying the model name")
+	rootCmd.PersistentFlags().IntVar(&maxTokens, "set-max-tokens", 0, "Set a new default max token size by specifying the max tokens")
 
 	viper.AutomaticEnv()
 
@@ -74,6 +74,16 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	if cmd.Flag("set-max-tokens").Changed {
+		cm := configmanager.New(config.New())
+
+		if err := cm.WriteMaxTokens(maxTokens); err != nil {
+			return err
+		}
+		fmt.Println("Max tokens successfully updated to", maxTokens)
+		return nil
+	}
+
 	if clearHistory {
 		historyHandler := history.New()
 		err := historyHandler.Delete()
@@ -85,7 +95,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if showConfig {
-		cm := configmanager.New(config.New())
+		cm := configmanager.New(config.New()).WithEnvironment()
 
 		if c, err := cm.ShowConfig(); err != nil {
 			return err
@@ -95,15 +105,9 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	secret := viper.GetString(utils.OpenAIKeyEnv)
-	if secret == "" {
-		return errors.New("missing environment variable: " + utils.OpenAIKeyEnv)
-	}
-
-	client := client.New(http.New().WithSecret(secret), config.New(), history.New())
-
-	if modelName != "" {
-		client = client.WithModel(modelName)
+	client, err := client.New(http.New(), config.New(), history.New())
+	if err != nil {
+		return err
 	}
 
 	if ServiceURL != "" {

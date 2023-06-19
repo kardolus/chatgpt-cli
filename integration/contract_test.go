@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"github.com/kardolus/chatgpt-cli/client"
 	"github.com/kardolus/chatgpt-cli/config"
+	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/kardolus/chatgpt-cli/types"
-	"github.com/kardolus/chatgpt-cli/utils"
 	. "github.com/onsi/gomega"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
@@ -27,10 +27,12 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 	it.Before(func() {
 		RegisterTestingT(t)
 
-		apiKey := os.Getenv(utils.OpenAIKeyEnv)
+		apiKey := os.Getenv(configmanager.New(config.New()).WithEnvironment().APIKeyEnvVarName())
 		Expect(apiKey).NotTo(BeEmpty())
 
-		restCaller = http.New().WithSecret(apiKey)
+		restCaller = http.New()
+		restCaller.SetAPIKey(apiKey)
+
 		defaults = config.New().ReadDefaults()
 	})
 

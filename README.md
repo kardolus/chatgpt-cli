@@ -133,15 +133,7 @@ Then, use the pipe feature to provide this context to ChatGPT:
 cat context.txt | chatgpt "What kind of toy would Kya enjoy?"
 ```
 
-6. To set a specific model, use the `--set-model` flag followed by the model name:
-
-```shell
-chatgpt --set-model gpt-3.5-turbo-0301
-```
-
-Remember to check that the model exists in the OpenAI model list before setting it.
-
-7. To list all available models, use the -l or --list-models flag:
+6. To list all available models, use the -l or --list-models flag:
 
 ```shell
 chatgpt --list-models
@@ -149,54 +141,67 @@ chatgpt --list-models
 
 ## Configuration
 
-The chatGPT CLI uses a two-level configuration system. The default values are:
+The ChatGPT CLI adopts a three-tier configuration strategy, with different levels of precedence assigned to default
+values, the `config.yaml` file, and environment variables, in that respective order.
+
+The default configuration:
 
 ```yaml
+name: openai
+api_key:
 model: gpt-3.5-turbo
 max_tokens: 4096
 url: https://api.openai.com
 completions_path: /v1/chat/completions
 models_path: /v1/models
+omit_history: false
 ```
 
-These default settings can be overwritten by user-defined configuration options. The user configuration file
-is `.chatgpt-cli/config.yaml` and is expected to be in the user's home directory.
+These defaults can be overridden by providing your own values in the user configuration file,
+named `.chatgpt-cli/config.yaml`, located in your home directory.
 
-The user configuration file follows the same structure as the default configuration file. Here is an example of how to
-override the `model` and `max_tokens` values:
+The structure of the user configuration file mirrors that of the default configuration. For instance, to override
+the `model` and `max_tokens` parameters, your file might look like this:
 
 ```yaml
 model: gpt-3.5-turbo-16k
 max_tokens: 8192
 ```
 
-In this example, the `model` is changed to `gpt-3.5-turbo-16k`, and `max_tokens` is set to `8192`. Other options such
-as `url`, `completions_path`, and `models_path` can be adjusted in the same manner if needed.
+This alters the `model` to `gpt-3.5-turbo-16k` and adjusts `max_tokens` to `8192`. All other options, such as `url`
+, `completions_path`, and `models_path`, can similarly be modified. If the user configuration file cannot be accessed or
+is missing, the application will resort to the default configuration.
 
-Note: If the user configuration file is not found or cannot be read for any reason, the application will fall back to
-the default configuration.
-
-As a more immediate and flexible alternative to changing the configuration file manually, the CLI offers command-line
-flags for overwriting specific configuration values. For instance, the `model` can be changed using the `--model`
-flag. This is particularly useful for temporary adjustments or testing different configurations.
+Another way to adjust values without manually editing the configuration file is by using environment variables.
+The `name` attribute forms the prefix for these variables. As an example, the `model` can be modified using
+the `OPENAI_MODEL` environment variable. Similarly, to disable history during the execution of a command, use:
 
 ```shell
-chatgpt --model gpt-3.5-turbo-16k What are some fun things to do in Red Hook?
+OPENAI_OMIT_HISTORY=true chatgpt tell me a joke
 ```
 
-This command will temporarily overwrite the `model` value for the duration of the current command. We're currently
-working on adding similar flags for other configuration values, which will allow you to adjust most aspects of the
-configuration directly from the command line.
+This approach is especially beneficial for temporary changes or for testing varying configurations.
 
-In addition, the `--config` or `-c` flag can be used to display the current configuration. This allows users to easily
-check their current settings without having to manually open and read the configuration files.
+Moreover, you can use the `--config` or `-c` flag to view the present configuration. This handy feature allows users to
+swiftly verify their current settings without the need to manually inspect the configuration files.
 
 ```shell
 chatgpt --config
 ```
 
-This command will display the current configuration including any overrides applied by command line flags or the user
-configuration file.
+Executing this command will display the active configuration, including any overrides instituted by environment
+variables or the user configuration file.
+
+To facilitate convenient adjustments, the ChatGPT CLI provides two flags for swiftly modifying the `model`
+and `max_tokens` parameters in your user configured `config.yaml`. These flags are `--set-model` and `--set-max-tokens`.
+
+For instance, to update the model, use the following command:
+
+```shell
+chatgpt --set-model gpt-3.5-turbo-16k
+```
+
+This feature allows for rapid changes to key configuration parameters, optimizing your experience with the ChatGPT CLI.
 
 ## Development
 

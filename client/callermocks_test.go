@@ -62,3 +62,15 @@ func (mr *MockCallerMockRecorder) Post(arg0, arg1, arg2 interface{}) *gomock.Cal
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Post", reflect.TypeOf((*MockCaller)(nil).Post), arg0, arg1, arg2)
 }
+
+// SetAPIKey mocks base method.
+func (m *MockCaller) SetAPIKey(arg0 string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetAPIKey", arg0)
+}
+
+// SetAPIKey indicates an expected call of SetAPIKey.
+func (mr *MockCallerMockRecorder) SetAPIKey(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAPIKey", reflect.TypeOf((*MockCaller)(nil).SetAPIKey), arg0)
+}

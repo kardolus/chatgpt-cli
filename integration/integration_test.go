@@ -3,9 +3,9 @@ package integration_test
 import (
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/config"
+	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/types"
-	"github.com/kardolus/chatgpt-cli/utils"
 	"github.com/onsi/gomega/gexec"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
@@ -13,6 +13,8 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -155,11 +157,13 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		const (
 			exitSuccess = 0
 			exitFailure = 1
+			apiKey      = "some-key"
 		)
 
 		var (
-			homeDir string
-			err     error
+			homeDir      string
+			err          error
+			apiKeyEnvVar string
 		)
 
 		it.Before(func() {
@@ -176,8 +180,10 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			homeDir, err = os.MkdirTemp("", "mockHome")
 			Expect(err).NotTo(HaveOccurred())
 
+			apiKeyEnvVar = configmanager.New(config.New()).WithEnvironment().APIKeyEnvVarName()
+
 			Expect(os.Setenv("HOME", homeDir)).To(Succeed())
-			Expect(os.Setenv(utils.OpenAIKeyEnv, "some-key")).To(Succeed())
+			Expect(os.Setenv(apiKeyEnvVar, apiKey)).To(Succeed())
 		})
 
 		it.After(func() {
@@ -186,7 +192,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("throws an error when the API key is missing", func() {
-			Expect(os.Unsetenv(utils.OpenAIKeyEnv)).To(Succeed())
+			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
 
 			command := exec.Command(binaryPath, "some prompt")
 			session, err := gexec.Start(command, io.Discard, io.Discard)
@@ -195,11 +201,11 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
 			output := string(session.Out.Contents())
-			Expect(output).To(ContainSubstring(utils.OpenAIKeyEnv))
+			Expect(output).To(ContainSubstring(apiKeyEnvVar))
 		})
 
 		it("should not require an API key for the --version flag", func() {
-			Expect(os.Unsetenv(utils.OpenAIKeyEnv)).To(Succeed())
+			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
 
 			command := exec.Command(binaryPath, "--version")
 			session, err := gexec.Start(command, io.Discard, io.Discard)
@@ -209,7 +215,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("should not require an API key for the --clear-history flag", func() {
-			Expect(os.Unsetenv(utils.OpenAIKeyEnv)).To(Succeed())
+			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
 
 			command := exec.Command(binaryPath, "--clear-history")
 			session, err := gexec.Start(command, io.Discard, io.Discard)
@@ -229,8 +235,19 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(output).To(ContainSubstring("flag needs an argument: --set-model"))
 		})
 
+		it("should require an argument for the --set-max-tokens flag", func() {
+			command := exec.Command(binaryPath, "--set-max-tokens")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring("flag needs an argument: --set-max-tokens"))
+		})
+
 		it("should require the chatgpt-cli folder but not an API key for the --set-model flag", func() {
-			Expect(os.Unsetenv(utils.OpenAIKeyEnv)).To(Succeed())
+			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
 
 			command := exec.Command(binaryPath, "--set-model", "123")
 			session, err := gexec.Start(command, io.Discard, io.Discard)
@@ -240,7 +257,21 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 			output := string(session.Out.Contents())
 			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
-			Expect(output).NotTo(ContainSubstring(utils.OpenAIKeyEnv))
+			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
+		})
+
+		it("should require the chatgpt-cli folder but not an API key for the --set-max-tokens flag", func() {
+			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
+
+			command := exec.Command(binaryPath, "--set-max-tokens", "789")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
+			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
 		})
 
 		it("should return the expected result for the --version flag", func() {
@@ -329,9 +360,34 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				// History should no longer exist
 				Expect(historyFile).NotTo(BeAnExistingFile())
+
+				// environment takes precedence
+				omitHistoryEnvKey := strings.Replace(apiKeyEnvVar, "API_KEY", "OMIT_HISTORY", 1)
+				envValue := "true"
+
+				Expect(os.Setenv(omitHistoryEnvKey, envValue)).To(Succeed())
+
+				// Perform a query
+				command = exec.Command(binaryPath, "--query", "some-query")
+				session, err = gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				// The CLI response should be as expected
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				output = string(session.Out.Contents())
+
+				response = `I don't have personal opinions about bars, but here are some popular bars in Red Hook, Brooklyn:`
+				Expect(output).To(ContainSubstring(response))
+
+				// The history file should NOT exist
+				Expect(historyFile).NotTo(BeAnExistingFile())
 			})
 
 			it("has a configurable default model", func() {
+				oldModel := "gpt-3.5-turbo"
+				newModel := "gpt-3.5-turbo-0301"
+
 				// config.yaml should not exist yet
 				configFile := path.Join(filePath, "config.yaml")
 				Expect(configFile).NotTo(BeAnExistingFile())
@@ -346,8 +402,8 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				output := string(session.Out.Contents())
 
 				// see models.json
-				Expect(output).To(ContainSubstring("* gpt-3.5-turbo (current)"))
-				Expect(output).To(ContainSubstring("- gpt-3.5-turbo-0301"))
+				Expect(output).To(ContainSubstring(fmt.Sprintf("* %s (current)", oldModel)))
+				Expect(output).To(ContainSubstring(fmt.Sprintf("- %s", newModel)))
 
 				// --config displays the default model as well
 				command = exec.Command(binaryPath, "--config")
@@ -358,10 +414,10 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				output = string(session.Out.Contents())
 
-				Expect(output).To(ContainSubstring("gpt-3.5-turbo"))
+				Expect(output).To(ContainSubstring(oldModel))
 
 				// Set the model
-				command = exec.Command(binaryPath, "--set-model", "gpt-3.5-turbo-0301")
+				command = exec.Command(binaryPath, "--set-model", newModel)
 				session, err = gexec.Start(command, io.Discard, io.Discard)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -370,6 +426,14 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				// config.yaml should have been created
 				Expect(configFile).To(BeAnExistingFile())
+
+				contentBytes, err := os.ReadFile(configFile)
+				Expect(err).ShouldNot(HaveOccurred())
+
+				// config.yaml should have the expected content
+				content := string(contentBytes)
+				Expect(content).NotTo(ContainSubstring(apiKey))
+				Expect(content).To(ContainSubstring(newModel))
 
 				// --list-models shows the new model as default
 				command = exec.Command(binaryPath, "--list-models")
@@ -380,8 +444,8 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				output = string(session.Out.Contents())
 
-				Expect(output).To(ContainSubstring("- gpt-3.5-turbo"))
-				Expect(output).To(ContainSubstring("* gpt-3.5-turbo-0301 (current)"))
+				Expect(output).To(ContainSubstring(fmt.Sprintf("- %s", oldModel)))
+				Expect(output).To(ContainSubstring(fmt.Sprintf("* %s (current)", newModel)))
 
 				// --config displays the new model as well
 				command = exec.Command(binaryPath, "--config")
@@ -391,8 +455,89 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				Eventually(session).Should(gexec.Exit(exitSuccess))
 
 				output = string(session.Out.Contents())
+				Expect(output).To(ContainSubstring(newModel))
 
-				Expect(output).To(ContainSubstring("gpt-3.5-turbo-0301"))
+				// environment takes precedence
+				modelEnvKey := strings.Replace(apiKeyEnvVar, "API_KEY", "MODEL", 1)
+				envModel := "new-model"
+
+				Expect(os.Setenv(modelEnvKey, envModel)).To(Succeed())
+
+				command = exec.Command(binaryPath, "--config")
+				session, err = gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				output = string(session.Out.Contents())
+				Expect(output).To(ContainSubstring(envModel))
+
+				Expect(os.Unsetenv(modelEnvKey)).To(Succeed())
+			})
+
+			it("has a configurable default max-tokens", func() {
+				defaults := config.New().ReadDefaults()
+
+				// config.yaml should not exist yet
+				configFile := path.Join(filePath, "config.yaml")
+				Expect(configFile).NotTo(BeAnExistingFile())
+
+				// --config displays the default max-tokens as well
+				command := exec.Command(binaryPath, "--config")
+				session, err := gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				output := string(session.Out.Contents())
+
+				Expect(output).To(ContainSubstring(strconv.Itoa(defaults.MaxTokens)))
+
+				// Set the max-tokens
+				newMaxTokens := "81724"
+				command = exec.Command(binaryPath, "--set-max-tokens", newMaxTokens)
+				session, err = gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				// The CLI response should be as expected
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				// config.yaml should have been created
+				Expect(configFile).To(BeAnExistingFile())
+
+				contentBytes, err := os.ReadFile(configFile)
+				Expect(err).ShouldNot(HaveOccurred())
+
+				// config.yaml should have the expected content
+				content := string(contentBytes)
+				Expect(content).NotTo(ContainSubstring(apiKey))
+				Expect(content).To(ContainSubstring(newMaxTokens))
+
+				// --config displays the new max-tokens as well
+				command = exec.Command(binaryPath, "--config")
+				session, err = gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				output = string(session.Out.Contents())
+				Expect(output).To(ContainSubstring(newMaxTokens))
+
+				// environment takes precedence
+				modelEnvKey := strings.Replace(apiKeyEnvVar, "API_KEY", "MAX_TOKENS", 1)
+
+				Expect(os.Setenv(modelEnvKey, newMaxTokens)).To(Succeed())
+
+				command = exec.Command(binaryPath, "--config")
+				session, err = gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				output = string(session.Out.Contents())
+				Expect(output).To(ContainSubstring(newMaxTokens))
+
+				Expect(os.Unsetenv(modelEnvKey)).To(Succeed())
 			})
 		})
 	})

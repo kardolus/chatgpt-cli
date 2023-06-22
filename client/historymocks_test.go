@@ -63,6 +63,18 @@ func (mr *MockHistoryStoreMockRecorder) Read() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*MockHistoryStore)(nil).Read))
 }
 
+// SetThread mocks base method.
+func (m *MockHistoryStore) SetThread(arg0 string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetThread", arg0)
+}
+
+// SetThread indicates an expected call of SetThread.
+func (mr *MockHistoryStoreMockRecorder) SetThread(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetThread", reflect.TypeOf((*MockHistoryStore)(nil).SetThread), arg0)
+}
+
 // Write mocks base method.
 func (m *MockHistoryStore) Write(arg0 []types.Message) error {
 	m.ctrl.T.Helper()

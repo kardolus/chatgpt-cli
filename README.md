@@ -34,10 +34,12 @@ environment, demonstrating its practicality and effectiveness.
   limits.
 * **Custom context from local files**: Provide a custom context for the GPT model to reference during the conversation
   by piping it in.
-* **Custom chat models**: Use a custom chat model by specifying the model name with the `--set-model` flag. Ensure that
-  the model exists in the OpenAI model list.
 * **Model listing**: Get a list of available models by using the `-l` or `--list-models` flag.
-* **Viper integration**: Robust configuration management.
+* **Advanced configuration options**: The application supports a layered configuration system, allowing you to specify
+  settings through default values, a `config.yaml` file, and environment variables. In addition, you can quickly modify
+  specific configuration parameters (`model` and `max_tokens`) through `--set-model` and `--set-max-tokens` flags.
+  The `--config` or `-c` flag lets you check your current settings with ease. New configuration options such
+  as `omit_history` allow for further customization of your user experience.
 
 ## Installation
 
@@ -177,7 +179,7 @@ The `name` attribute forms the prefix for these variables. As an example, the `m
 the `OPENAI_MODEL` environment variable. Similarly, to disable history during the execution of a command, use:
 
 ```shell
-OPENAI_OMIT_HISTORY=true chatgpt tell me a joke
+OPENAI_OMIT_HISTORY=true chatgpt what is the capital of Denmark?
 ```
 
 This approach is especially beneficial for temporary changes or for testing varying configurations.

@@ -23,11 +23,12 @@ import (
 
 const (
 	defaultMaxTokens       = 4096
-	defaultURL             = "https://api.openai.com"
+	defaultURL             = "https://default.openai.com"
 	defaultName            = "default-name"
 	defaultModel           = "gpt-3.5-turbo"
-	defaultCompletionsPath = "/v1/chat/completions"
-	defaultModelsPath      = "/v1/models"
+	defaultCompletionsPath = "/default/completions"
+	defaultModelsPath      = "/default/models"
+	defaultThread          = "default-thread"
 	envApiKey              = "api-key"
 )
 
@@ -230,6 +231,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			})
 			it("ignores history when configured to do so", func() {
 				mockCaller.EXPECT().SetAPIKey(envApiKey).Times(1)
+				mockHistoryStore.EXPECT().SetThread(defaultThread).Times(1)
 				mockConfigStore.EXPECT().Read().Return(types.Config{OmitHistory: true}, nil).Times(1)
 
 				subject, err := client.New(mockCaller, mockConfigStore, mockHistoryStore)
@@ -484,6 +486,7 @@ func newClientFactory(mc *MockCaller, mcs *MockConfigStore, mhs *MockHistoryStor
 		URL:             defaultURL,
 		CompletionsPath: defaultCompletionsPath,
 		ModelsPath:      defaultModelsPath,
+		Thread:          defaultThread,
 	}).Times(1)
 
 	return &clientFactory{
@@ -495,6 +498,7 @@ func newClientFactory(mc *MockCaller, mcs *MockConfigStore, mhs *MockHistoryStor
 
 func (f *clientFactory) buildClientWithoutConfig() *client.Client {
 	f.mockCaller.EXPECT().SetAPIKey(envApiKey).Times(1)
+	f.mockHistoryStore.EXPECT().SetThread(defaultThread).Times(1)
 	f.mockConfigStore.EXPECT().Read().Return(types.Config{}, nil).Times(1)
 
 	c, err := client.New(f.mockCaller, f.mockConfigStore, f.mockHistoryStore)
@@ -505,6 +509,7 @@ func (f *clientFactory) buildClientWithoutConfig() *client.Client {
 
 func (f *clientFactory) buildClientWithConfig(config types.Config) *client.Client {
 	f.mockCaller.EXPECT().SetAPIKey(envApiKey).Times(1)
+	f.mockHistoryStore.EXPECT().SetThread(defaultThread).Times(1)
 	f.mockConfigStore.EXPECT().Read().Return(config, nil).Times(1)
 
 	c, err := client.New(f.mockCaller, f.mockConfigStore, f.mockHistoryStore)

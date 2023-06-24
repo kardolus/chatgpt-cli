@@ -29,17 +29,19 @@ environment, demonstrating its practicality and effectiveness.
 * **Query mode**: Single input-output interactions with the GPT model.
 * **Interactive mode**: The interactive mode allows for a more conversational experience with the model. Exit
   interactive mode by simply typing 'exit'.
-* **Context management**: Seamless conversations with the GPT model by maintaining message history across CLI calls.
-* **Sliding window history**: Automatically trims conversation history while maintaining context to stay within token
-  limits.
-* **Custom context from local files**: Provide a custom context for the GPT model to reference during the conversation
-  by piping it in.
-* **Model listing**: Get a list of available models by using the `-l` or `--list-models` flag.
-* **Advanced configuration options**: The application supports a layered configuration system, allowing you to specify
-  settings through default values, a `config.yaml` file, and environment variables. In addition, you can quickly modify
-  specific configuration parameters (`model` and `max_tokens`) through `--set-model` and `--set-max-tokens` flags.
-  The `--config` or `-c` flag lets you check your current settings with ease. New configuration options such
-  as `omit_history` allow for further customization of your user experience.
+* **Thread-based context management**: Enjoy seamless conversations with the GPT model with individualized context for
+  each thread, much like your experience on the OpenAI website. Each unique thread has its own history, ensuring
+  relevant and coherent responses across different chat instances.
+* **Sliding window history**: To stay within token limits, the chat history automatically trims while still preserving
+  the necessary context.
+* **Custom context from any source**: You can provide the GPT model with a custom context during conversation. This
+  context can be piped in from any source, such as local files, standard input, or even another program. This
+  flexibility allows the model to adapt to a wide range of conversational scenarios.
+* **Model listing**: Access a list of available models using the `-l` or `--list-models` flag.
+* **Advanced configuration options**: The CLI supports a layered configuration system where settings can be specified
+  through default values, a `config.yaml` file, and environment variables. For quick adjustments, use the `--set-model`
+  and `--set-max-tokens` flags. To verify your current settings, use the `--config` or `-c` flag. The newly
+  added `omit_history` configuration option adds another layer of customization to your user experience.
 
 ## Installation
 
@@ -96,70 +98,82 @@ Choose the appropriate command for your system, which will download the binary, 
    the following line to your shell profile (e.g., ~/.bashrc, ~/.zshrc, or ~/.bash_profile), replacing your_api_key with
    your actual key:
 
-```shell
-export OPENAI_API_KEY="your_api_key"
-```
+    ```shell
+    export OPENAI_API_KEY="your_api_key"
+    ```
 
 2. To enable history tracking across CLI calls, create a ~/.chatgpt-cli directory using the command:
 
-```shell
-mkdir -p ~/.chatgpt-cli
-```
+    ```shell
+    mkdir -p ~/.chatgpt-cli
+    ```
 
-With this directory in place, the CLI will automatically manage message history for seamless conversations with the GPT
-model. The history acts as a sliding window, maintaining a maximum of `4096` tokens to ensure optimal performance and
-interaction quality.
+   Once this directory is in place, the CLI automatically manages the message history for each "thread" you converse
+   with. The history operates like a sliding window, maintaining context up to a configurable token maximum. This
+   ensures a balance between maintaining conversation context and achieving optimal performance.
+
+   By default, if a specific thread is not provided by the user, the CLI uses the default thread and stores the history
+   at `~/.chatgpt-cli/history/default.json`. You can find more details about how to configure the `thread` parameter in
+   the
+   [Configuration](#configuration) section of this document.
 
 3. Try it out:
 
-```shell
-chatgpt what is the capital of the Netherlands
-```
+    ```shell
+    chatgpt what is the capital of the Netherlands
+    ```
 
 4. To start interactive mode, use the `-i` or `--interactive` flag:
 
-```shell
-chatgpt --interactive
-```
+    ```shell
+    chatgpt --interactive
+    ```
 
 5. To use the pipe feature, create a text file containing some context. For example, create a file named context.txt
    with the following content:
 
-```shell
-Kya is a playful dog who loves swimming and playing fetch.
-```
+    ```shell
+    Kya is a playful dog who loves swimming and playing fetch.
+    ```
 
-Then, use the pipe feature to provide this context to ChatGPT:
+   Then, use the pipe feature to provide this context to ChatGPT:
 
-```shell
-cat context.txt | chatgpt "What kind of toy would Kya enjoy?"
-```
+    ```shell
+    cat context.txt | chatgpt "What kind of toy would Kya enjoy?"
+    ```
 
 6. To list all available models, use the -l or --list-models flag:
 
-```shell
-chatgpt --list-models
-```
+    ```shell
+    chatgpt --list-models
+    ```
+
+7. For more options, see:
+
+   ```shell
+   chatgpt --help
+   ```
 
 ## Configuration
 
 The ChatGPT CLI adopts a three-tier configuration strategy, with different levels of precedence assigned to default
 values, the `config.yaml` file, and environment variables, in that respective order.
 
-The default configuration:
+Configuration variables:
 
-```yaml
-name: openai
-api_key:
-model: gpt-3.5-turbo
-max_tokens: 4096
-url: https://api.openai.com
-completions_path: /v1/chat/completions
-models_path: /v1/models
-omit_history: false
-```
+| Variable           | Description                                                                       | Default                  |
+|--------------------|-----------------------------------------------------------------------------------|--------------------------|
+| `name`             | The prefix for environment variable overrides.                                    | 'openai'                 |
+| `api_key`          | Your OpenAI API key.                                                              | (none for security)      |
+| `model`            | The GPT model used by the application.                                            | 'gpt-3.5-turbo'          |
+| `max_tokens`       | The maximum number of tokens that can be used in a single API call.               | 4096                     |
+| `thread`           | The name of the current chat thread. Each unique thread name has its own context. | 'default'                |
+| `omit_history`     | If true, the chat history will not be used to provide context for the GPT model.  | false                    |
+| `url`              | The base URL for the OpenAI API.                                                  | 'https://api.openai.com' |
+| `completions_path` | The API endpoint for completions.                                                 | '/v1/chat/completions'   |
+| `models_path`      | The API endpoint for accessing model information.                                 | '/v1/models'             |
 
-These defaults can be overridden by providing your own values in the user configuration file,
+The defaults can be overridden by providing your own values in the user configuration file,
 named `.chatgpt-cli/config.yaml`, located in your home directory.
 
 The structure of the user configuration file mirrors that of the default configuration. For instance, to override
@@ -213,58 +227,51 @@ building the application:
 
 1. Run the tests using the following scripts:
 
-For unit tests, run:
+   For unit tests, run:
 
-```shell
-./scripts/unit.sh
-```
+    ```shell
+    ./scripts/unit.sh
+    ```
 
-For integration tests, run:
+   For integration tests, run:
 
-```shell
-./scripts/integration.sh
-```
+    ```shell
+    ./scripts/integration.sh
+    ```
 
-For contract tests, run:
+   For contract tests, run:
 
-```shell
-./scripts/contract.sh
-```
+    ```shell
+    ./scripts/contract.sh
+    ```
 
-To run all tests, use:
+   To run all tests, use:
 
-```shell
-./scripts/all-tests.sh
-```
+    ```shell
+    ./scripts/all-tests.sh
+    ```
 
 2. Build the app using the installation script:
 
-```shell
-./scripts/install.sh
-```
+    ```shell
+    ./scripts/install.sh
+    ```
 
 3. After a successful build, test the application with the following command:
 
-```shell
-./bin/chatgpt what type of dog is a Jack Russel?
-```
+    ```shell
+    ./bin/chatgpt what type of dog is a Jack Russel?
+    ```
 
-4. As mentioned before, to enable history tracking across CLI calls, create a ~/.chatgpt-cli directory using the
-   command:
+4. As mentioned previously, the ChatGPT CLI supports tracking conversation history across CLI calls. This feature
+   creates a seamless and conversational experience with the GPT model, as the history is utilized as context in
+   subsequent interactions.
 
-```shell
-mkdir -p ~/.chatgpt-cli
-```
+   To enable this feature, you need to create a `~/.chatgpt-cli` directory using the command:
 
-With this directory in place, the CLI will automatically manage message history for seamless conversations with the GPT
-model. The history acts as a sliding window, maintaining a maximum of 4096 tokens to ensure optimal performance and
-interaction quality.
-
-For more options, see:
-
-```shell
-./bin/chatgpt --help
-```
+    ```shell
+    mkdir -p ~/.chatgpt-cli
+    ```
 
 ## Reporting Issues and Contributing
 

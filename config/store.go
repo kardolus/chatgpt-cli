@@ -15,6 +15,7 @@ const (
 	openAIURL             = "https://api.openai.com"
 	openAICompletionsPath = "/v1/chat/completions"
 	openAIModelsPath      = "/v1/models"
+	openAIThread          = "default"
 )
 
 type ConfigStore interface {
@@ -54,6 +55,7 @@ func (f *FileIO) ReadDefaults() types.Config {
 		URL:             openAIURL,
 		CompletionsPath: openAICompletionsPath,
 		ModelsPath:      openAIModelsPath,
+		Thread:          openAIThread,
 	}
 }
 

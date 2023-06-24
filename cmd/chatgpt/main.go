@@ -42,7 +42,7 @@ func main() {
 
 	rootCmd.PersistentFlags().BoolVarP(&interactiveMode, "interactive", "i", false, "Use interactive mode")
 	rootCmd.PersistentFlags().BoolVarP(&queryMode, "query", "q", false, "Use query mode instead of stream mode")
-	rootCmd.PersistentFlags().BoolVar(&clearHistory, "clear-history", false, "Clear the history of ChatGPT CLI")
+	rootCmd.PersistentFlags().BoolVar(&clearHistory, "clear-history", false, "Clear all prior conversation context for the current thread")
 	rootCmd.PersistentFlags().BoolVarP(&showConfig, "config", "c", false, "Display the configuration")
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
@@ -85,11 +85,18 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if clearHistory {
-		historyHandler := history.New()
-		err := historyHandler.Delete()
+		historyHandler, err := history.New()
 		if err != nil {
 			return err
 		}
+
+		cm := configmanager.New(config.New())
+		historyHandler.SetThread(cm.Config.Thread)
+
+		if err := historyHandler.Delete(); err != nil {
+			return err
+		}
+
 		fmt.Println("History successfully cleared.")
 		return nil
 	}
@@ -105,7 +112,8 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	client, err := client.New(http.New(), config.New(), history.New())
+	hs, _ := history.New() // do not error out
+	client, err := client.New(http.New(), config.New(), hs)
 	if err != nil {
 		return err
 	}

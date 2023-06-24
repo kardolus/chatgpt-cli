@@ -1,0 +1,14 @@
+[
+  {
+    "role": "system",
+    "content": "You are a helpful assistant."
+  },
+  {
+    "role": "user",
+    "content": "can you tell me more about this city?"
+  },
+  {
+    "role": "assistant",
+    "content": "Of course! Which city are you referring to?\n"
+  }
+]

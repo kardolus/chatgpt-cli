@@ -6,6 +6,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/types"
+	"github.com/kardolus/chatgpt-cli/utils"
 	"github.com/onsi/gomega/gexec"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
@@ -38,9 +39,10 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 	})
 
 	when("Read, Write and Delete History", func() {
+		const threadName = "default-thread"
+
 		var (
 			tmpDir   string
-			tmpFile  *os.File
 			fileIO   *history.FileIO
 			messages []types.Message
 			err      error
@@ -50,12 +52,9 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			tmpDir, err = os.MkdirTemp("", "chatgpt-cli-test")
 			Expect(err).NotTo(HaveOccurred())
 
-			tmpFile, err = os.CreateTemp(tmpDir, "history.json")
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(tmpFile.Close()).To(Succeed())
-
-			fileIO = history.New().WithFilePath(tmpFile.Name())
+			fileIO, _ = history.New()
+			fileIO = fileIO.WithDirectory(tmpDir)
+			fileIO.SetThread(threadName)
 
 			messages = []types.Message{
 				{
@@ -91,7 +90,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			err = fileIO.Delete()
 			Expect(err).NotTo(HaveOccurred())
 
-			_, err = os.Stat(tmpFile.Name())
+			_, err = os.Stat(threadName + ".json")
 			Expect(os.IsNotExist(err)).To(BeTrue())
 		})
 	})
@@ -170,7 +169,6 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			SetDefaultEventuallyTimeout(5 * time.Second)
 
 			Expect(buildBinary()).To(Succeed())
-
 			Expect(runMockServer()).To(Succeed())
 
 			Eventually(func() (string, error) {
@@ -214,14 +212,17 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Eventually(session).Should(gexec.Exit(exitSuccess))
 		})
 
-		it("should not require an API key for the --clear-history flag", func() {
+		it("should require a hidden folder for the --clear-history flag", func() {
 			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
 
 			command := exec.Command(binaryPath, "--clear-history")
 			session, err := gexec.Start(command, io.Discard, io.Discard)
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(session).Should(gexec.Exit(exitSuccess))
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring(".chatgpt-cli: no such file or directory"))
 		})
 
 		it("should require an argument for the --set-model flag", func() {
@@ -325,9 +326,63 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				Expect(os.RemoveAll(filePath)).To(Succeed())
 			})
 
+			it("migrates the legacy history as expected", func() {
+				// Legacy history file should not exist
+				legacyFile := path.Join(filePath, "history")
+				Expect(legacyFile).NotTo(BeAnExistingFile())
+
+				// History should not exist yet
+				historyFile := path.Join(filePath, "history", "default.json")
+				Expect(historyFile).NotTo(BeAnExistingFile())
+
+				bytes, err := utils.FileToBytes("history.json")
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(os.WriteFile(legacyFile, bytes, 0644)).To(Succeed())
+				Expect(legacyFile).To(BeARegularFile())
+
+				// Perform a query
+				command := exec.Command(binaryPath, "--query", "some-query")
+				session, err := gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				// The CLI response should be as expected
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+
+				output := string(session.Out.Contents())
+
+				response := `I don't have personal opinions about bars, but here are some popular bars in Red Hook, Brooklyn:`
+				Expect(output).To(ContainSubstring(response))
+
+				// The history file should have the expected content
+				Expect(path.Dir(historyFile)).To(BeADirectory())
+				content, err := os.ReadFile(historyFile)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(content).NotTo(BeEmpty())
+				Expect(string(content)).To(ContainSubstring(response))
+
+				// The legacy file should now be a directory
+				Expect(legacyFile).To(BeADirectory())
+				Expect(legacyFile).NotTo(BeARegularFile())
+
+				// The content was moved to the new file
+				Expect(string(content)).To(ContainSubstring("Of course! Which city are you referring to?"))
+			})
+
+			it("should not require an API key for the --clear-history flag", func() {
+				Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
+
+				command := exec.Command(binaryPath, "--clear-history")
+				session, err := gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+			})
+
 			it("keeps track of history", func() {
 				// History should not exist yet
-				historyFile := path.Join(filePath, "history")
+				historyFile := path.Join(filePath, "history", "default.json")
 				Expect(historyFile).NotTo(BeAnExistingFile())
 
 				// Perform a query
@@ -344,7 +399,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				Expect(output).To(ContainSubstring(response))
 
 				// The history file should have the expected content
-				Expect(historyFile).To(BeAnExistingFile())
+				Expect(path.Dir(historyFile)).To(BeADirectory())
 				content, err := os.ReadFile(historyFile)
 
 				Expect(err).NotTo(HaveOccurred())

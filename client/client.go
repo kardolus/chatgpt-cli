@@ -39,6 +39,7 @@ func New(caller http.Caller, cs config.ConfigStore, hs history.HistoryStore) (*C
 	}
 
 	caller.SetAPIKey(configuration.APIKey)
+	hs.SetThread(configuration.Thread)
 
 	return &Client{
 		Config:       configuration,

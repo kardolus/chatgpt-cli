@@ -22,6 +22,7 @@ environment, demonstrating its practicality and effectiveness.
 - [Reporting Issues and Contributing](#reporting-issues-and-contributing)
 - [Uninstallation](#uninstallation)
 - [Useful Links](#useful-links)
+- [Additional Resources](#additional-resources)
 
 ## Features
 
@@ -331,5 +332,11 @@ data. If you have any concerns about this, please feel free to delete this direc
 * [ChatGPT API Documentation](https://platform.openai.com/docs/introduction/overview)
 * [OpenAI API Reference](https://platform.openai.com/docs/api-reference/introduction)
 * [Key Usage Dashboard](https://platform.openai.com/account/usage)
+
+## Additional Resources
+
+* ["Summarize any text instantly with a single shortcut"](https://medium.com/@kardolus/summarize-any-text-instantly-with-a-single-shortcut-582551bcc6e2) on Medium: Dive deep into the capabilities of this CLI tool with this detailed walkthrough.
+* [Join the conversation](https://www.reddit.com/r/ChatGPT/comments/14ip6pm/summarize_any_text_instantly_with_a_single/) on Reddit: Discuss the tool, ask questions, and share your experiences with our growing community.
+
 
 Thank you for using ChatGPT CLI!

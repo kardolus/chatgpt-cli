@@ -14,6 +14,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 )
 
 var (
@@ -145,10 +146,12 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if interactiveMode {
+		fmt.Println("Entering interactive mode. Type 'exit' and press Enter or press Ctrl+C to quit.")
+
 		scanner := bufio.NewScanner(os.Stdin)
 		qNum := 1
 		for {
-			fmt.Printf("Q%d: ", qNum)
+			fmt.Printf("\n[%s] Q%d: ", time.Now().Format("2006-01-02 15:04:05"), qNum)
 			scanned := scanner.Scan()
 			if !scanned {
 				if err := scanner.Err(); err != nil {
@@ -160,6 +163,7 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 			line := scanner.Text()
 			if line == "exit" {
+				fmt.Println("Bye!")
 				break
 			}
 			if err := client.Stream(line); err != nil {

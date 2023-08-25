@@ -343,7 +343,7 @@ r queries.
 Here's how it works:
 
 ```bash
-ls /tmp/query.md | entr -rcs "finclude /tmp/query.md | chatgpt \"Act as a developer\""
+ls /tmp/query.md | entr -rcs "cat /tmp/query.md | chatgpt \"Act as a developer\""
 ```
 
 With this command, each time you save your changes in `/tmp/query.md`, the `entr` tool will detect the change and `chatgpt` will process your new entries.
@@ -351,7 +351,7 @@ With this command, each time you save your changes in `/tmp/query.md`, the `entr
 And there's more. If you want to start with a clean slate after each round of processing your queries, you can use this command:
 
 ```bash
-ls /tmp/query.md | entr -rcs "finclude /tmp/query.md | chatgpt \"Act as a developer\" && echo '' > /tmp/query.md"
+ls /tmp/query.md | entr -rcs "cat /tmp/query.md | chatgpt \"Act as a developer\" && echo '' > /tmp/query.md"
 ```
 
 After `chatgpt` processes your queries, this command clears the contents of `/tmp/query.md` for you.

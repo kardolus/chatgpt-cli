@@ -333,9 +333,36 @@ data. If you have any concerns about this, please feel free to delete this direc
 * [OpenAI API Reference](https://platform.openai.com/docs/api-reference/introduction)
 * [Key Usage Dashboard](https://platform.openai.com/account/usage)
 
+## Recepies
+
+Imagine having a conversation with your favorite text editor. Sound exciting? 
+Well, it's possible! All you need to do is edit the file `/tmp/query.md` and us
+e the `entr` (https://github.com/eradman/entr) utility to constantly update you
+r queries.
+
+Here's how it works:
+
+```bash
+ls /tmp/query.md | entr -rcs "cat /tmp/query.md | chatgpt \"Act as a developer\""
+```
+
+With this command, each time you save your changes in `/tmp/query.md`, the `entr` tool will detect the change and `chatgpt` will process your new entries.
+
+And there's more. If you want to start with a clean slate after each round of processing your queries, you can use this command:
+
+```bash
+ls /tmp/query.md | entr -rcs "cat /tmp/query.md | chatgpt \"Act as a developer\" && echo '' > /tmp/query.md"
+```
+
+After `chatgpt` processes your queries, this command clears the contents of `/tmp/query.md` for you.
+
+Let your editor be not only a tool for coding, but also a friend you can chat with!
+
+
 ## Additional Resources
 
 * ["Summarize any text instantly with a single shortcut"](https://medium.com/@kardolus/summarize-any-text-instantly-with-a-single-shortcut-582551bcc6e2) on Medium: Dive deep into the capabilities of this CLI tool with this detailed walkthrough.
+
 * [Join the conversation](https://www.reddit.com/r/ChatGPT/comments/14ip6pm/summarize_any_text_instantly_with_a_single/) on Reddit: Discuss the tool, ask questions, and share your experiences with our growing community.
 
 

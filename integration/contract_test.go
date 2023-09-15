@@ -41,7 +41,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			body := types.CompletionsRequest{
 				Messages: []types.Message{{
 					Role:    client.SystemRole,
-					Content: client.AssistantContent,
+					Content: defaults.Role,
 				}},
 				Model:  defaults.Model,
 				Stream: false,

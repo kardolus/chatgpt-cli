@@ -162,17 +162,18 @@ values, the `config.yaml` file, and environment variables, in that respective or
 
 Configuration variables:
 
-| Variable           | Description                                                                       | Default                  |
-|--------------------|-----------------------------------------------------------------------------------|--------------------------|
-| `name`             | The prefix for environment variable overrides.                                    | 'openai'                 |
-| `api_key`          | Your OpenAI API key.                                                              | (none for security)      |
-| `model`            | The GPT model used by the application.                                            | 'gpt-3.5-turbo'          |
-| `max_tokens`       | The maximum number of tokens that can be used in a single API call.               | 4096                     |
-| `thread`           | The name of the current chat thread. Each unique thread name has its own context. | 'default'                |
-| `omit_history`     | If true, the chat history will not be used to provide context for the GPT model.  | false                    |
-| `url`              | The base URL for the OpenAI API.                                                  | 'https://api.openai.com' |
-| `completions_path` | The API endpoint for completions.                                                 | '/v1/chat/completions'   |
-| `models_path`      | The API endpoint for accessing model information.                                 | '/v1/models'             |
+| Variable           | Description                                                                       | Default                        |
+|--------------------|-----------------------------------------------------------------------------------|--------------------------------|
+| `name`             | The prefix for environment variable overrides.                                    | 'openai'                       |
+| `api_key`          | Your OpenAI API key.                                                              | (none for security)            |
+| `model`            | The GPT model used by the application.                                            | 'gpt-3.5-turbo'                |
+| `max_tokens`       | The maximum number of tokens that can be used in a single API call.               | 4096                           |
+| `role`             | The system role                                                                   | 'You are a helpful assistant.' |
+| `thread`           | The name of the current chat thread. Each unique thread name has its own context. | 'default'                      |
+| `omit_history`     | If true, the chat history will not be used to provide context for the GPT model.  | false                          |
+| `url`              | The base URL for the OpenAI API.                                                  | 'https://api.openai.com'       |
+| `completions_path` | The API endpoint for completions.                                                 | '/v1/chat/completions'         |
+| `models_path`      | The API endpoint for accessing model information.                                 | '/v1/models'                   |
 
 The defaults can be overridden by providing your own values in the user configuration file,
 named `.chatgpt-cli/config.yaml`, located in your home directory.

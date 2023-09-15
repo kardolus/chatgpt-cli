@@ -29,6 +29,7 @@ const (
 	defaultCompletionsPath = "/default/completions"
 	defaultModelsPath      = "/default/models"
 	defaultThread          = "default-thread"
+	defaultRole            = "You are a great default-role"
 	envApiKey              = "api-key"
 )
 
@@ -209,7 +210,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				history := []types.Message{
 					{
 						Role:    client.SystemRole,
-						Content: client.AssistantContent,
+						Content: defaultRole,
 					},
 					{
 						Role:    client.UserRole,
@@ -252,7 +253,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				history := []types.Message{
 					{
 						Role:    client.SystemRole,
-						Content: client.AssistantContent,
+						Content: defaultRole,
 					},
 					{
 						Role:    client.UserRole,
@@ -352,7 +353,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				history := []types.Message{
 					{
 						Role:    client.SystemRole,
-						Content: client.AssistantContent,
+						Content: defaultRole,
 					},
 					{
 						Role:    client.UserRole,
@@ -433,7 +434,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			systemMessage := subject.History[0]
 			Expect(systemMessage.Role).To(Equal(client.SystemRole))
-			Expect(systemMessage.Content).To(Equal("You are a helpful assistant."))
+			Expect(systemMessage.Content).To(Equal(defaultRole))
 
 			contextMessage := subject.History[1]
 			Expect(contextMessage.Role).To(Equal(client.UserRole))
@@ -458,7 +459,7 @@ func createMessages(history []types.Message, query string) []types.Message {
 	if len(history) == 0 {
 		messages = append(messages, types.Message{
 			Role:    client.SystemRole,
-			Content: client.AssistantContent,
+			Content: defaultRole,
 		})
 	} else {
 		messages = history
@@ -486,6 +487,7 @@ func newClientFactory(mc *MockCaller, mcs *MockConfigStore, mhs *MockHistoryStor
 		URL:             defaultURL,
 		CompletionsPath: defaultCompletionsPath,
 		ModelsPath:      defaultModelsPath,
+		Role:            defaultRole,
 		Thread:          defaultThread,
 	}).Times(1)
 

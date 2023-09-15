@@ -27,6 +27,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		defaultName            = "default-name"
 		defaultURL             = "default-url"
 		defaultModel           = "default-model"
+		defaultRole            = "default-role"
 		defaultApiKey          = "default-api-key"
 		defaultThread          = "default-thread"
 		defaultCompletionsPath = "default-completions-path"
@@ -55,6 +56,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			CompletionsPath: defaultCompletionsPath,
 			ModelsPath:      defaultModelsPath,
 			OmitHistory:     defaultOmitHistory,
+			Role:            defaultRole,
 			Thread:          defaultThread,
 		}
 
@@ -87,6 +89,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.Name).To(Equal(defaultName))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 		it("gives precedence to the user provided model", func() {
@@ -105,6 +108,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.Name).To(Equal(defaultName))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 		it("gives precedence to the user provided name", func() {
@@ -123,6 +127,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 		it("gives precedence to the user provided max-tokens", func() {
@@ -141,6 +146,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 
 		})
@@ -160,6 +166,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 		it("gives precedence to the user provided completions-path", func() {
@@ -178,6 +185,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 		it("gives precedence to the user provided models-path", func() {
@@ -196,6 +204,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(modelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 		it("gives precedence to the user provided api-key", func() {
@@ -214,6 +223,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(apiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 		it("gives precedence to the user provided omit-history", func() {
@@ -231,6 +241,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 			Expect(subject.Config.OmitHistory).To(Equal(omitHistory))
 		})
@@ -250,7 +261,27 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(userThread))
+		})
+		it("gives precedence to the user provided role", func() {
+			userRole := "user-role"
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(types.Config{Role: userRole}, nil).Times(1)
+
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Config.Name).To(Equal(defaultName))
+			Expect(subject.Config.Model).To(Equal(defaultModel))
+			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
+			Expect(subject.Config.URL).To(Equal(defaultURL))
+			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
+			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
+			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Role).To(Equal(userRole))
 		})
 		it("gives precedence to the OMIT_HISTORY environment variable", func() {
 			var (
@@ -272,6 +303,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 			Expect(subject.Config.OmitHistory).To(Equal(environmentValue))
 		})
@@ -296,7 +328,32 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(environmentValue))
+		})
+		it("gives precedence to the ROLE environment variable", func() {
+			var (
+				environmentValue = "env-role"
+				configValue      = "conf-role"
+			)
+
+			Expect(os.Setenv(envPrefix+"ROLE", environmentValue)).To(Succeed())
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(types.Config{Role: configValue}, nil).Times(1)
+
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Config.Name).To(Equal(defaultName))
+			Expect(subject.Config.Model).To(Equal(defaultModel))
+			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
+			Expect(subject.Config.URL).To(Equal(defaultURL))
+			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
+			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
+			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Role).To(Equal(environmentValue))
 		})
 		it("gives precedence to the API_KEY environment variable", func() {
 			var (
@@ -319,6 +376,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(environmentKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 		it("gives precedence to the MODEL environment variable", func() {
@@ -342,6 +400,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 		it("gives precedence to the MAX_TOKENS environment variable", func() {
@@ -365,6 +424,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 		it("gives precedence to the URL environment variable", func() {
@@ -388,6 +448,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 		it("gives precedence to the COMPLETIONS_PATH environment variable", func() {
@@ -411,6 +472,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 		it("gives precedence to the MODELS_PATH environment variable", func() {
@@ -434,6 +496,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.ModelsPath).To(Equal(envModelsPath))
 			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 	})
@@ -455,6 +518,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(result).To(ContainSubstring(defaultModelsPath))
 			Expect(result).To(ContainSubstring(fmt.Sprintf("%d", defaultMaxTokens)))
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 		})
 	})
@@ -499,4 +563,5 @@ func cleanEnv(envPrefix string) {
 	Expect(os.Unsetenv(envPrefix + "MODELS_PATH")).To(Succeed())
 	Expect(os.Unsetenv(envPrefix + "OMIT_HISTORY")).To(Succeed())
 	Expect(os.Unsetenv(envPrefix + "THREAD")).To(Succeed())
+	Expect(os.Unsetenv(envPrefix + "ROLE")).To(Succeed())
 }

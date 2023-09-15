@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	AssistantContent         = "You are a helpful assistant."
 	AssistantRole            = "assistant"
 	ErrEmptyResponse         = "empty response"
 	MaxTokenBufferPercentage = 20
@@ -180,10 +179,11 @@ func (c *Client) initHistory() {
 
 	if len(c.History) == 0 {
 		c.History = []types.Message{{
-			Role:    SystemRole,
-			Content: AssistantContent,
+			Role: SystemRole,
 		}}
 	}
+
+	c.History[0].Content = c.Config.Role
 }
 
 func (c *Client) addQuery(query string) {

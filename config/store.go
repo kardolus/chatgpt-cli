@@ -15,6 +15,7 @@ const (
 	openAIURL             = "https://api.openai.com"
 	openAICompletionsPath = "/v1/chat/completions"
 	openAIModelsPath      = "/v1/models"
+	openAIRole            = "You are a helpful assistant."
 	openAIThread          = "default"
 )
 
@@ -51,6 +52,7 @@ func (f *FileIO) ReadDefaults() types.Config {
 	return types.Config{
 		Name:            openAIName,
 		Model:           openAIModel,
+		Role:            openAIRole,
 		MaxTokens:       openAIModelMaxTokens,
 		URL:             openAIURL,
 		CompletionsPath: openAICompletionsPath,

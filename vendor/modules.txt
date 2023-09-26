@@ -58,7 +58,7 @@ github.com/pelletier/go-toml/v2/unstable
 ## explicit; go 1.13
 github.com/sclevine/spec
 github.com/sclevine/spec/report
-# github.com/spf13/afero v1.9.5
+# github.com/spf13/afero v1.10.0
 ## explicit; go 1.16
 github.com/spf13/afero
 github.com/spf13/afero/internal/common

@@ -44,9 +44,7 @@ environment, demonstrating its practicality and effectiveness.
   and `--set-max-tokens` flags. To verify your current settings, use the `--config` or `-c` flag. The newly
   added `omit_history` configuration option adds another layer of customization to your user experience.
 * **Availability Note**: This CLI supports both gpt-4 and gpt-3.5-turbo models. However, the specific ChatGPT model used
-  on chat.openai.com may not be available via the OpenAI API. The pricing for API usage and the web-based platform may
-  also differ. For the latest model availability and pricing details, please refer to
-  the [OpenAI Pricing page](https://openai.com/pricing).
+  on chat.openai.com may not be available via the OpenAI API.
 
 ## Installation
 
@@ -337,6 +335,7 @@ data. If you have any concerns about this, please feel free to delete this direc
 * [ChatGPT API Documentation](https://platform.openai.com/docs/introduction/overview)
 * [OpenAI API Reference](https://platform.openai.com/docs/api-reference/introduction)
 * [Key Usage Dashboard](https://platform.openai.com/account/usage)
+* [OpenAI Pricing Page](https://openai.com/pricing)
 
 ## Additional Resources
 

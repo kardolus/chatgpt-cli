@@ -38,7 +38,9 @@ func main() {
 		Long: "A powerful ChatGPT client that enables seamless interactions with the GPT model. " +
 			"Provides multiple modes and context management features, including the ability to " +
 			"pipe custom context into the conversation.",
-		RunE: run,
+		RunE:          run,
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	rootCmd.PersistentFlags().BoolVarP(&interactiveMode, "interactive", "i", false, "Use interactive mode")

@@ -45,10 +45,11 @@ Output:
 curl --location --insecure --request POST 'https://api.openai.com/v1/chat/completions' \
   --header "Authorization: Bearer ${OPENAI_API_KEY}" \
   --header 'Content-Type: application/json' \
-    --data-raw '{
+  --data-raw '{
      "model": "gpt-3.5-turbo",
-     "messages": [{"role": "user", "content": "What is the OpenAI mission?"}]
-    }' | jq .
+     "messages": [{"role": "user", "content": "What is the OpenAI mission?"}],
+     "stream": false
+  }' | jq .
 ```
 
 Output:
@@ -75,6 +76,31 @@ Output:
     }
   ]
 }
+```
+
+Or flip `stream` to `true` (this results in retrieving a ton of `jsonl`).
+
+```shell
+curl --location --insecure --request POST 'https://api.openai.com/v1/chat/completions' \
+  --header "Authorization: Bearer ${OPENAI_API_KEY}" \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+     "model": "gpt-3.5-turbo",
+     "messages": [{"role": "user", "content": "What is the OpenAI mission?"}],
+     "stream": true
+  }'
+```
+
+```shell
+... top omitted ... 
+
+data: {"id":"chatcmpl-8B1ELWT5QKYmUbH0Az9anpvoOVdGZ","object":"chat.completion.chunk","created":1697637029,"model":"gpt-3.5-turbo-0613","choices":[{"index":0,"delta":{"content":" power"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8B1ELWT5QKYmUbH0Az9anpvoOVdGZ","object":"chat.completion.chunk","created":1697637029,"model":"gpt-3.5-turbo-0613","choices":[{"index":0,"delta":{"content":"."},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8B1ELWT5QKYmUbH0Az9anpvoOVdGZ","object":"chat.completion.chunk","created":1697637029,"model":"gpt-3.5-turbo-0613","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
 ```
 
 ### Providing custom context

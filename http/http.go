@@ -18,7 +18,8 @@ const (
 	errFailedToRead          = "failed to read response: %w"
 	errFailedToCreateRequest = "failed to create request: %w"
 	errFailedToMakeRequest   = "failed to make request: %w"
-	errHTTP                  = "http error: %d"
+	errHTTP                  = "http status %d: %s"
+	errHTTPStatus            = "http status: %d"
 	headerAuthorization      = "Authorization"
 	headerContentType        = "Content-Type"
 )
@@ -104,7 +105,17 @@ func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]
 	defer response.Body.Close()
 
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf(errHTTP, response.StatusCode)
+		errorResponse, err := io.ReadAll(response.Body)
+		if err != nil {
+			return nil, fmt.Errorf(errHTTPStatus, response.StatusCode)
+		}
+
+		var errorData types.ErrorResponse
+		if err := json.Unmarshal(errorResponse, &errorData); err != nil {
+			return nil, fmt.Errorf(errHTTPStatus, response.StatusCode)
+		}
+
+		return errorResponse, fmt.Errorf(errHTTP, response.StatusCode, errorData.Error.Message)
 	}
 
 	if stream {

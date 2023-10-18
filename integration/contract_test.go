@@ -37,7 +37,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 	})
 
 	when("accessing the completion endpoint", func() {
-		it("should have the expected keys in the response", func() {
+		it("should return a successful response with expected keys", func() {
 			body := types.CompletionsRequest{
 				Messages: []types.Message{{
 					Role:    client.SystemRole,
@@ -63,6 +63,34 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			Expect(data.Model).ShouldNot(BeEmpty(), "Expected Model to be present in the response")
 			Expect(data.Usage).ShouldNot(BeNil(), "Expected Usage to be present in the response")
 			Expect(data.Choices).ShouldNot(BeNil(), "Expected Choices to be present in the response")
+		})
+
+		it("should return an error response with appropriate error details", func() {
+			// Set the wrong API key
+			restCaller.SetAPIKey("wrong-key")
+
+			body := types.CompletionsRequest{
+				Messages: []types.Message{{
+					Role:    client.SystemRole,
+					Content: defaults.Role,
+				}},
+				Model:  defaults.Model,
+				Stream: false,
+			}
+
+			bytes, err := json.Marshal(body)
+			Expect(err).NotTo(HaveOccurred())
+
+			resp, err := restCaller.Post(defaults.URL+defaults.CompletionsPath, bytes, false)
+			Expect(err).To(HaveOccurred())
+
+			var errorData types.ErrorResponse
+			err = json.Unmarshal(resp, &errorData)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(errorData.Error.Message).ShouldNot(BeEmpty(), "Expected error message to be present in the response")
+			Expect(errorData.Error.Type).ShouldNot(BeEmpty(), "Expected error type to be present in the response")
+			Expect(errorData.Error.Code).ShouldNot(BeEmpty(), "Expected error code to be present in the response")
 		})
 	})
 

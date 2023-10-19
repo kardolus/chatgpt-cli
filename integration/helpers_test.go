@@ -13,6 +13,8 @@ import (
 	"sync"
 )
 
+const expectedToken = "valid-api-key"
+
 var (
 	onceBuild   sync.Once
 	onceServe   sync.Once
@@ -81,6 +83,11 @@ func getModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := checkBearerToken(r, expectedToken); err != nil {
+		http.Error(w, creatAuthError(), http.StatusUnauthorized)
+		return
+	}
+
 	const modelFile = "models.json"
 	response, err := utils.FileToBytes(modelFile)
 	if err != nil {
@@ -96,6 +103,11 @@ func postCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := checkBearerToken(r, expectedToken); err != nil {
+		http.Error(w, creatAuthError(), http.StatusUnauthorized)
+		return
+	}
+
 	const completionsFile = "completions.json"
 	response, err := utils.FileToBytes(completionsFile)
 	if err != nil {
@@ -103,6 +115,37 @@ func postCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(response)
+}
+
+func checkBearerToken(r *http.Request, expectedToken string) error {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return errors.New("missing Authorization header")
+	}
+
+	splitToken := strings.Split(authHeader, "Bearer ")
+	if len(splitToken) != 2 {
+		return errors.New("malformed Authorization header")
+	}
+
+	requestToken := splitToken[1]
+	if requestToken != expectedToken {
+		return errors.New("invalid token")
+	}
+
+	return nil
+}
+
+func creatAuthError() string {
+	const errorFile = "error.json"
+
+	response, err := utils.FileToBytes(errorFile)
+	if err != nil {
+		fmt.Printf("error reading %s: %s\n", errorFile, err.Error())
+		return ""
+	}
+
+	return string(response)
 }
 
 func validateRequest(w http.ResponseWriter, r *http.Request, allowedMethod string) error {

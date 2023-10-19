@@ -156,7 +156,6 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		const (
 			exitSuccess = 0
 			exitFailure = 1
-			apiKey      = "some-key"
 		)
 
 		var (
@@ -181,7 +180,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			apiKeyEnvVar = configmanager.New(config.New()).WithEnvironment().APIKeyEnvVarName()
 
 			Expect(os.Setenv("HOME", homeDir)).To(Succeed())
-			Expect(os.Setenv(apiKeyEnvVar, apiKey)).To(Succeed())
+			Expect(os.Setenv(apiKeyEnvVar, expectedToken)).To(Succeed())
 		})
 
 		it.After(func() {
@@ -312,6 +311,21 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 			// see completions.json
 			Expect(output).To(ContainSubstring(`I don't have personal opinions about bars, but here are some popular bars in Red Hook, Brooklyn:`))
+		})
+
+		it("should assemble http errors as expected", func() {
+			Expect(os.Setenv(apiKeyEnvVar, "wrong-token")).To(Succeed())
+
+			command := exec.Command(binaryPath, "--query", "some-query")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Out.Contents())
+
+			// see error.json
+			Expect(output).To(Equal("http status 401: Incorrect API key provided\n"))
 		})
 
 		when("there is a hidden chatgpt-cli folder in the home dir", func() {
@@ -487,7 +501,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				// config.yaml should have the expected content
 				content := string(contentBytes)
-				Expect(content).NotTo(ContainSubstring(apiKey))
+				Expect(content).NotTo(ContainSubstring(expectedToken))
 				Expect(content).To(ContainSubstring(newModel))
 
 				// --list-models shows the new model as default
@@ -565,7 +579,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				// config.yaml should have the expected content
 				content := string(contentBytes)
-				Expect(content).NotTo(ContainSubstring(apiKey))
+				Expect(content).NotTo(ContainSubstring(expectedToken))
 				Expect(content).To(ContainSubstring(newMaxTokens))
 
 				// --config displays the new max-tokens as well

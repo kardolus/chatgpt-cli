@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/golang/mock v1.6.0
-	github.com/onsi/gomega v1.28.1
+	github.com/onsi/gomega v1.29.0
 	github.com/sclevine/spec v1.4.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.17.0

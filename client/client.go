@@ -160,9 +160,13 @@ func (c *Client) Stream(input string) error {
 
 func (c *Client) createBody(stream bool) ([]byte, error) {
 	body := types.CompletionsRequest{
-		Messages: c.History,
-		Model:    c.Config.Model,
-		Stream:   stream,
+		Messages:         c.History,
+		Model:            c.Config.Model,
+		Temperature:      c.Config.Temperature,
+		TopP:             c.Config.TopP,
+		FrequencyPenalty: c.Config.FrequencyPenalty,
+		PresencePenalty:  c.Config.PresencePenalty,
+		Stream:           stream,
 	}
 
 	return json.Marshal(body)

@@ -9,14 +9,18 @@ import (
 )
 
 const (
-	openAIName            = "openai"
-	openAIModel           = "gpt-3.5-turbo"
-	openAIModelMaxTokens  = 4096
-	openAIURL             = "https://api.openai.com"
-	openAICompletionsPath = "/v1/chat/completions"
-	openAIModelsPath      = "/v1/models"
-	openAIRole            = "You are a helpful assistant."
-	openAIThread          = "default"
+	openAIName             = "openai"
+	openAIModel            = "gpt-3.5-turbo"
+	openAIModelMaxTokens   = 4096
+	openAIURL              = "https://api.openai.com"
+	openAICompletionsPath  = "/v1/chat/completions"
+	openAIModelsPath       = "/v1/models"
+	openAIRole             = "You are a helpful assistant."
+	openAIThread           = "default"
+	openAITemperature      = 1.0
+	openAITopP             = 1.0
+	openAIFrequencyPenalty = 0.0
+	openAIPresencePenalty  = 0.0
 )
 
 type ConfigStore interface {
@@ -50,14 +54,18 @@ func (f *FileIO) Read() (types.Config, error) {
 
 func (f *FileIO) ReadDefaults() types.Config {
 	return types.Config{
-		Name:            openAIName,
-		Model:           openAIModel,
-		Role:            openAIRole,
-		MaxTokens:       openAIModelMaxTokens,
-		URL:             openAIURL,
-		CompletionsPath: openAICompletionsPath,
-		ModelsPath:      openAIModelsPath,
-		Thread:          openAIThread,
+		Name:             openAIName,
+		Model:            openAIModel,
+		Role:             openAIRole,
+		MaxTokens:        openAIModelMaxTokens,
+		URL:              openAIURL,
+		CompletionsPath:  openAICompletionsPath,
+		ModelsPath:       openAIModelsPath,
+		Thread:           openAIThread,
+		Temperature:      openAITemperature,
+		TopP:             openAITopP,
+		FrequencyPenalty: openAIFrequencyPenalty,
+		PresencePenalty:  openAIPresencePenalty,
 	}
 }
 

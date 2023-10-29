@@ -1,9 +1,13 @@
 package types
 
 type CompletionsRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
-	Stream   bool      `json:"stream"`
+	Model            string    `json:"model"`
+	Temperature      float64   `json:"temperature"`
+	TopP             float64   `json:"top_p"`
+	FrequencyPenalty float64   `json:"frequency_penalty"`
+	PresencePenalty  float64   `json:"presence_penalty"`
+	Messages         []Message `json:"messages"`
+	Stream           bool      `json:"stream"`
 }
 
 type Message struct {
@@ -31,11 +35,15 @@ type Choice struct {
 }
 
 type Data struct {
-	ID      string `json:"id"`
-	Object  string `json:"object"`
-	Created int    `json:"created"`
-	Model   string `json:"model"`
-	Choices []struct {
+	ID               string  `json:"id"`
+	Object           string  `json:"object"`
+	Created          int     `json:"created"`
+	Model            string  `json:"model"`
+	Temperature      float64 `json:"temperature"`
+	TopP             float64 `json:"top_p"`
+	FrequencyPenalty float64 `json:"frequency_penalty"`
+	PresencePenalty  float64 `json:"presence_penalty"`
+	Choices          []struct {
 		Delta        map[string]string `json:"delta"`
 		Index        int               `json:"index"`
 		FinishReason string            `json:"finish_reason"`

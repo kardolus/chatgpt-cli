@@ -23,16 +23,20 @@ func TestUnitConfigManager(t *testing.T) {
 
 func testConfig(t *testing.T, when spec.G, it spec.S) {
 	const (
-		defaultMaxTokens       = 10
-		defaultName            = "default-name"
-		defaultURL             = "default-url"
-		defaultModel           = "default-model"
-		defaultRole            = "default-role"
-		defaultApiKey          = "default-api-key"
-		defaultThread          = "default-thread"
-		defaultCompletionsPath = "default-completions-path"
-		defaultModelsPath      = "default-models-path"
-		defaultOmitHistory     = false
+		defaultMaxTokens        = 10
+		defaultName             = "default-name"
+		defaultURL              = "default-url"
+		defaultModel            = "default-model"
+		defaultRole             = "default-role"
+		defaultApiKey           = "default-api-key"
+		defaultThread           = "default-thread"
+		defaultCompletionsPath  = "default-completions-path"
+		defaultModelsPath       = "default-models-path"
+		defaultOmitHistory      = false
+		defaultTemperature      = 1.1
+		defaultTopP             = 2.2
+		defaultFrequencyPenalty = 3.3
+		defaultPresencePenalty  = 4.4
 	)
 
 	var (
@@ -48,16 +52,20 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		mockConfigStore = NewMockConfigStore(mockCtrl)
 
 		defaultConfig = types.Config{
-			Name:            defaultName,
-			APIKey:          defaultApiKey,
-			Model:           defaultModel,
-			MaxTokens:       defaultMaxTokens,
-			URL:             defaultURL,
-			CompletionsPath: defaultCompletionsPath,
-			ModelsPath:      defaultModelsPath,
-			OmitHistory:     defaultOmitHistory,
-			Role:            defaultRole,
-			Thread:          defaultThread,
+			Name:             defaultName,
+			APIKey:           defaultApiKey,
+			Model:            defaultModel,
+			MaxTokens:        defaultMaxTokens,
+			URL:              defaultURL,
+			CompletionsPath:  defaultCompletionsPath,
+			ModelsPath:       defaultModelsPath,
+			OmitHistory:      defaultOmitHistory,
+			Role:             defaultRole,
+			Thread:           defaultThread,
+			Temperature:      defaultTemperature,
+			TopP:             defaultTopP,
+			FrequencyPenalty: defaultFrequencyPenalty,
+			PresencePenalty:  defaultPresencePenalty,
 		}
 
 		envPrefix = strings.ToUpper(defaultConfig.Name) + "_"
@@ -91,6 +99,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the user provided model", func() {
 			userModel := "the-model"
@@ -110,6 +122,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the user provided name", func() {
 			userName := "the-name"
@@ -129,6 +145,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the user provided max-tokens", func() {
 			userMaxTokens := 42
@@ -148,7 +168,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
-
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the user provided URL", func() {
 			userURL := "the-user-url"
@@ -187,6 +210,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the user provided models-path", func() {
 			modelsPath := "the-models-path"
@@ -206,6 +233,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the user provided api-key", func() {
 			apiKey := "new-api-key"
@@ -225,6 +256,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the user provided omit-history", func() {
 			omitHistory := true
@@ -244,6 +279,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 			Expect(subject.Config.OmitHistory).To(Equal(omitHistory))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the user provided thread", func() {
 			userThread := "user-thread"
@@ -263,6 +302,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(userThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the user provided role", func() {
 			userRole := "user-role"
@@ -282,8 +325,104 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 			Expect(subject.Config.Role).To(Equal(userRole))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
-		it("gives precedence to the OMIT_HISTORY environment variable", func() {
+		it("gives precedence to the user provided temperature", func() {
+			userTemperature := 100.1
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(types.Config{Temperature: userTemperature}, nil).Times(1)
+
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Config.Name).To(Equal(defaultName))
+			Expect(subject.Config.Model).To(Equal(defaultModel))
+			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
+			Expect(subject.Config.URL).To(Equal(defaultURL))
+			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
+			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
+			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
+			Expect(subject.Config.Temperature).To(Equal(userTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
+		})
+		it("gives precedence to the user provided top_p", func() {
+			userTopP := 200.2
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(types.Config{TopP: userTopP}, nil).Times(1)
+
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Config.Name).To(Equal(defaultName))
+			Expect(subject.Config.Model).To(Equal(defaultModel))
+			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
+			Expect(subject.Config.URL).To(Equal(defaultURL))
+			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
+			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
+			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(userTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
+		})
+		it("gives precedence to the user provided frequency_penalty", func() {
+			userFrequencyPenalty := 300.3
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(types.Config{FrequencyPenalty: userFrequencyPenalty}, nil).Times(1)
+
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Config.Name).To(Equal(defaultName))
+			Expect(subject.Config.Model).To(Equal(defaultModel))
+			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
+			Expect(subject.Config.URL).To(Equal(defaultURL))
+			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
+			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
+			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(userFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
+		})
+		it("gives precedence to the user provided presence_penalty", func() {
+			userPresencePenalty := 400.4
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(types.Config{PresencePenalty: userPresencePenalty}, nil).Times(1)
+
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Config.Name).To(Equal(defaultName))
+			Expect(subject.Config.Model).To(Equal(defaultModel))
+			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
+			Expect(subject.Config.URL).To(Equal(defaultURL))
+			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
+			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
+			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(userPresencePenalty))
+		})
+		it("gives precedence to the OMIT_HISTORY environment variable when environment is true", func() {
 			var (
 				environmentValue = true
 				configValue      = false
@@ -306,6 +445,38 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 			Expect(subject.Config.OmitHistory).To(Equal(environmentValue))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
+		})
+		it("gives precedence to the OMIT_HISTORY environment variable when environment is false", func() {
+			var (
+				environmentValue = false
+				configValue      = true
+			)
+
+			Expect(os.Setenv(envPrefix+"OMIT_HISTORY", strconv.FormatBool(environmentValue))).To(Succeed())
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(types.Config{OmitHistory: configValue}, nil).Times(1)
+
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Config.Name).To(Equal(defaultName))
+			Expect(subject.Config.Model).To(Equal(defaultModel))
+			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
+			Expect(subject.Config.URL).To(Equal(defaultURL))
+			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
+			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
+			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
+			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.OmitHistory).To(Equal(environmentValue))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the THREAD environment variable", func() {
 			var (
@@ -330,6 +501,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(environmentValue))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the ROLE environment variable", func() {
 			var (
@@ -354,6 +529,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
 			Expect(subject.Config.Role).To(Equal(environmentValue))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the API_KEY environment variable", func() {
 			var (
@@ -378,6 +557,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the MODEL environment variable", func() {
 			var (
@@ -402,6 +585,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the MAX_TOKENS environment variable", func() {
 			var (
@@ -426,6 +613,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the URL environment variable", func() {
 			var (
@@ -450,6 +641,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the COMPLETIONS_PATH environment variable", func() {
 			var (
@@ -474,6 +669,10 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		})
 		it("gives precedence to the MODELS_PATH environment variable", func() {
 			var (
@@ -498,6 +697,122 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
 			Expect(subject.Config.Role).To(Equal(defaultRole))
 			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
+		})
+		it("gives precedence to the TEMPERATURE environment variable", func() {
+			var (
+				envTemperature  = 5.5
+				confTemperature = 6.6
+			)
+
+			Expect(os.Setenv(envPrefix+"TEMPERATURE", fmt.Sprintf("%f", envTemperature))).To(Succeed())
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(types.Config{Temperature: confTemperature}, nil).Times(1)
+
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Config.Name).To(Equal(defaultName))
+			Expect(subject.Config.Model).To(Equal(defaultModel))
+			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
+			Expect(subject.Config.URL).To(Equal(defaultURL))
+			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
+			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
+			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
+			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(envTemperature))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
+		})
+		it("gives precedence to the TOP_P environment variable", func() {
+			var (
+				envTopP  = 7.7
+				confTopP = 8.8
+			)
+
+			Expect(os.Setenv(envPrefix+"TOP_P", fmt.Sprintf("%f", envTopP))).To(Succeed())
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(types.Config{TopP: confTopP}, nil).Times(1)
+
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Config.Name).To(Equal(defaultName))
+			Expect(subject.Config.Model).To(Equal(defaultModel))
+			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
+			Expect(subject.Config.URL).To(Equal(defaultURL))
+			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
+			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
+			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
+			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.TopP).To(Equal(envTopP))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
+		})
+		it("gives precedence to the FREQUENCY_PENALTY environment variable", func() {
+			var (
+				envFrequencyPenalty  = 5.5
+				confFrequencyPenalty = 6.6
+			)
+
+			Expect(os.Setenv(envPrefix+"FREQUENCY_PENALTY", fmt.Sprintf("%f", envFrequencyPenalty))).To(Succeed())
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(types.Config{FrequencyPenalty: confFrequencyPenalty}, nil).Times(1)
+
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Config.Name).To(Equal(defaultName))
+			Expect(subject.Config.Model).To(Equal(defaultModel))
+			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
+			Expect(subject.Config.URL).To(Equal(defaultURL))
+			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
+			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
+			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
+			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(envFrequencyPenalty))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
+			Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
+		})
+		it("gives precedence to the PRESENCE_PENALTY environment variable", func() {
+			var (
+				envPresencePenalty  = 5.5
+				confPresencePenalty = 6.6
+			)
+
+			Expect(os.Setenv(envPrefix+"PRESENCE_PENALTY", fmt.Sprintf("%f", envPresencePenalty))).To(Succeed())
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(types.Config{PresencePenalty: confPresencePenalty}, nil).Times(1)
+
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Config.Name).To(Equal(defaultName))
+			Expect(subject.Config.Model).To(Equal(defaultModel))
+			Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
+			Expect(subject.Config.URL).To(Equal(defaultURL))
+			Expect(subject.Config.CompletionsPath).To(Equal(defaultCompletionsPath))
+			Expect(subject.Config.ModelsPath).To(Equal(defaultModelsPath))
+			Expect(subject.Config.APIKey).To(Equal(defaultApiKey))
+			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
+			Expect(subject.Config.Role).To(Equal(defaultRole))
+			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(subject.Config.Temperature).To(Equal(defaultTemperature))
+			Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
+			Expect(subject.Config.PresencePenalty).To(Equal(envPresencePenalty))
+			Expect(subject.Config.TopP).To(Equal(defaultTopP))
 		})
 	})
 
@@ -517,9 +832,13 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(result).To(ContainSubstring(defaultCompletionsPath))
 			Expect(result).To(ContainSubstring(defaultModelsPath))
 			Expect(result).To(ContainSubstring(fmt.Sprintf("%d", defaultMaxTokens)))
-			Expect(subject.Config.OmitHistory).To(Equal(defaultOmitHistory))
-			Expect(subject.Config.Role).To(Equal(defaultRole))
-			Expect(subject.Config.Thread).To(Equal(defaultThread))
+			Expect(result).To(ContainSubstring(fmt.Sprintf("%t", defaultOmitHistory)))
+			Expect(result).To(ContainSubstring(defaultRole))
+			Expect(result).To(ContainSubstring(defaultThread))
+			Expect(result).To(ContainSubstring(fmt.Sprintf("%.1f", defaultTemperature)))
+			Expect(result).To(ContainSubstring(fmt.Sprintf("%.1f", defaultTopP)))
+			Expect(result).To(ContainSubstring(fmt.Sprintf("%.1f", defaultFrequencyPenalty)))
+			Expect(result).To(ContainSubstring(fmt.Sprintf("%.1f", defaultPresencePenalty)))
 		})
 	})
 
@@ -564,4 +883,8 @@ func cleanEnv(envPrefix string) {
 	Expect(os.Unsetenv(envPrefix + "OMIT_HISTORY")).To(Succeed())
 	Expect(os.Unsetenv(envPrefix + "THREAD")).To(Succeed())
 	Expect(os.Unsetenv(envPrefix + "ROLE")).To(Succeed())
+	Expect(os.Unsetenv(envPrefix + "TEMPERATURE")).To(Succeed())
+	Expect(os.Unsetenv(envPrefix + "TOP_P")).To(Succeed())
+	Expect(os.Unsetenv(envPrefix + "FREQUENCY_PENALTY")).To(Succeed())
+	Expect(os.Unsetenv(envPrefix + "PRESENCE_PENALTY")).To(Succeed())
 }

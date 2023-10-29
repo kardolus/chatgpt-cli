@@ -78,6 +78,10 @@ func replaceByConfigFile(defaultConfig, userConfig types.Config) types.Config {
 			if userBool := userField.Bool(); &userBool != nil {
 				defaultField.SetBool(userBool)
 			}
+		case reflect.Float64:
+			if userFloat := userField.Float(); userFloat != 0.0 {
+				defaultField.SetFloat(userFloat)
+			}
 		}
 	}
 
@@ -107,6 +111,9 @@ func replaceByEnvironment(configuration types.Config) types.Config {
 			case reflect.Bool:
 				boolValue, _ := strconv.ParseBool(value)
 				field.SetBool(boolValue)
+			case reflect.Float64:
+				floatValue, _ := strconv.ParseFloat(value, 64)
+				field.SetFloat(floatValue)
 			}
 		}
 	}

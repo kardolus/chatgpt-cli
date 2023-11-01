@@ -1,7 +1,9 @@
 # ChatGPT CLI
 
-This project showcases an implementation of a ChatGPT client with streaming support in a Command-Line Interface (CLI)
-environment, demonstrating its practicality and effectiveness.
+![Test Workflow](https://github.com/kardolus/chatgpt-cli/actions/workflows/test.yml/badge.svg?branch=main)
+
+ChatGPT CLI offers a robust interface for interacting with ChatGPT models directly from the command line, equipped with
+streaming and advanced configurability.
 
 ![a screenshot](resources/vhs.gif)
 

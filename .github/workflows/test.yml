@@ -1,0 +1,43 @@
+name: test
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  mod:
+    runs-on: ubuntu-latest
+    name: Check modules
+    steps:
+    - uses: actions/setup-go@v4
+      with:
+        go-version: '1.20'
+    - uses: actions/checkout@v4
+    - run: go mod tidy && git diff --exit-code go.mod go.sum
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: [ '1.20', '1.21' ]
+    name: Go ${{ matrix.version }}
+    steps:
+    - uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.version }}
+    - uses: actions/checkout@v4
+    - run: go vet ./...
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - run: ./scripts/unit.sh
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - run: ./scripts/integration.sh
+

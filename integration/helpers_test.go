@@ -62,7 +62,7 @@ func runMockServer() error {
 			http.HandleFunc(defaults.CompletionsPath, postCompletions)
 			http.HandleFunc(defaults.ModelsPath, getModels)
 			close(serverReady)
-			err = http.ListenAndServe("", nil)
+			err = http.ListenAndServe(servicePort, nil)
 		}()
 	})
 	<-serverReady

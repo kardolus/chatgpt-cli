@@ -11,11 +11,13 @@ import (
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,10 +25,13 @@ import (
 )
 
 const (
-	gitCommit  = "some-git-commit"
-	gitVersion = "some-git-version"
-	serviceURL = "http://0.0.0.0"
+	gitCommit   = "some-git-commit"
+	gitVersion  = "some-git-version"
+	servicePort = ":8080"
+	serviceURL  = "http://0.0.0.0" + servicePort
 )
+
+var once sync.Once
 
 func TestIntegration(t *testing.T) {
 	defer gexec.CleanupBuildArtifacts()
@@ -165,14 +170,21 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		)
 
 		it.Before(func() {
-			SetDefaultEventuallyTimeout(5 * time.Second)
+			once.Do(func() {
+				SetDefaultEventuallyTimeout(10 * time.Second)
 
-			Expect(buildBinary()).To(Succeed())
-			Expect(runMockServer()).To(Succeed())
+				log.Println("Building binary...")
+				Expect(buildBinary()).To(Succeed())
+				log.Println("Binary built successfully!")
 
-			Eventually(func() (string, error) {
-				return curl(fmt.Sprintf("%s/ping", serviceURL))
-			}).Should(ContainSubstring("pong"))
+				log.Println("Starting mock server...")
+				Expect(runMockServer()).To(Succeed())
+				log.Println("Mock server started!")
+
+				Eventually(func() (string, error) {
+					return curl(fmt.Sprintf("%s/ping", serviceURL))
+				}).Should(ContainSubstring("pong"))
+			})
 
 			homeDir, err = os.MkdirTemp("", "mockHome")
 			Expect(err).NotTo(HaveOccurred())

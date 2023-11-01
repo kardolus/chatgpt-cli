@@ -1,6 +1,8 @@
 # ChatGPT CLI
 
 ![Test Workflow](https://github.com/kardolus/chatgpt-cli/actions/workflows/test.yml/badge.svg?branch=main)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/release/kardolus/chatgpt-cli.svg)](https://GitHub.com/kardolus/chatgpt-cli/releases/)
 
 ChatGPT CLI offers a robust interface for interacting with ChatGPT models directly from the command line, equipped with
 streaming and advanced configurability.

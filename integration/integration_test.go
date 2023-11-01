@@ -25,7 +25,7 @@ import (
 const (
 	gitCommit  = "some-git-commit"
 	gitVersion = "some-git-version"
-	serviceURL = "http://127.0.0.1"
+	serviceURL = "http://0.0.0.0"
 )
 
 func TestIntegration(t *testing.T) {

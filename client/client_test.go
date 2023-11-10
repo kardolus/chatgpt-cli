@@ -6,6 +6,7 @@ import (
 	"github.com/golang/mock/gomock"
 	_ "github.com/golang/mock/mockgen/model"
 	"github.com/kardolus/chatgpt-cli/client"
+	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/kardolus/chatgpt-cli/types"
 	"github.com/kardolus/chatgpt-cli/utils"
 	"os"
@@ -60,7 +61,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		mockHistoryStore = NewMockHistoryStore(mockCtrl)
 		mockConfigStore = NewMockConfigStore(mockCtrl)
 
-		factory = newClientFactory(mockCaller, mockConfigStore, mockHistoryStore)
+		factory = newClientFactory(mockConfigStore, mockHistoryStore)
 
 		apiKeyEnvVar = strings.ToUpper(defaultName) + "_API_KEY"
 		Expect(os.Setenv(apiKeyEnvVar, envApiKey)).To(Succeed())
@@ -76,7 +77,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			mockConfigStore.EXPECT().Read().Return(types.Config{}, nil).Times(1)
 
-			_, err := client.New(mockCaller, mockConfigStore, mockHistoryStore)
+			_, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore)
 
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(apiKeyEnvVar))
@@ -244,11 +245,10 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				testValidHTTPResponse(subject, history, body, false)
 			})
 			it("ignores history when configured to do so", func() {
-				mockCaller.EXPECT().SetAPIKey(envApiKey).Times(1)
 				mockHistoryStore.EXPECT().SetThread(defaultThread).Times(1)
 				mockConfigStore.EXPECT().Read().Return(types.Config{OmitHistory: true}, nil).Times(1)
 
-				subject, err := client.New(mockCaller, mockConfigStore, mockHistoryStore)
+				subject, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Read and Write are never called on the history store
@@ -505,12 +505,11 @@ func createMessages(history []types.Message, query string) []types.Message {
 }
 
 type clientFactory struct {
-	mockCaller       *MockCaller
 	mockConfigStore  *MockConfigStore
 	mockHistoryStore *MockHistoryStore
 }
 
-func newClientFactory(mc *MockCaller, mcs *MockConfigStore, mhs *MockHistoryStore) *clientFactory {
+func newClientFactory(mcs *MockConfigStore, mhs *MockHistoryStore) *clientFactory {
 	mockConfigStore.EXPECT().ReadDefaults().Return(types.Config{
 		Name:             defaultName,
 		Model:            defaultModel,
@@ -527,29 +526,26 @@ func newClientFactory(mc *MockCaller, mcs *MockConfigStore, mhs *MockHistoryStor
 	}).Times(1)
 
 	return &clientFactory{
-		mockCaller:       mc,
 		mockConfigStore:  mcs,
 		mockHistoryStore: mhs,
 	}
 }
 
 func (f *clientFactory) buildClientWithoutConfig() *client.Client {
-	f.mockCaller.EXPECT().SetAPIKey(envApiKey).Times(1)
 	f.mockHistoryStore.EXPECT().SetThread(defaultThread).Times(1)
 	f.mockConfigStore.EXPECT().Read().Return(types.Config{}, nil).Times(1)
 
-	c, err := client.New(f.mockCaller, f.mockConfigStore, f.mockHistoryStore)
+	c, err := client.New(mockCallerFactory, f.mockConfigStore, f.mockHistoryStore)
 	Expect(err).NotTo(HaveOccurred())
 
 	return c.WithCapacity(50)
 }
 
 func (f *clientFactory) buildClientWithConfig(config types.Config) *client.Client {
-	f.mockCaller.EXPECT().SetAPIKey(envApiKey).Times(1)
 	f.mockHistoryStore.EXPECT().SetThread(defaultThread).Times(1)
 	f.mockConfigStore.EXPECT().Read().Return(config, nil).Times(1)
 
-	c, err := client.New(f.mockCaller, f.mockConfigStore, f.mockHistoryStore)
+	c, err := client.New(mockCallerFactory, f.mockConfigStore, f.mockHistoryStore)
 	Expect(err).NotTo(HaveOccurred())
 
 	return c.WithCapacity(50)
@@ -561,4 +557,8 @@ func (f *clientFactory) withoutHistory() {
 
 func (f *clientFactory) withHistory(history []types.Message) {
 	f.mockHistoryStore.EXPECT().Read().Return(history, nil).Times(1)
+}
+
+func mockCallerFactory(cfg types.Config) http.Caller {
+	return mockCaller
 }

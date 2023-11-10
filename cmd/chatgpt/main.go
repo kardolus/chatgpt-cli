@@ -116,7 +116,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	hs, _ := history.New() // do not error out
-	client, err := client.New(http.New(), config.New(), hs)
+	client, err := client.New(http.RealCallerFactory, config.New(), hs)
 	if err != nil {
 		return err
 	}

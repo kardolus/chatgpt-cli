@@ -29,7 +29,7 @@ type Client struct {
 	historyStore history.HistoryStore
 }
 
-func New(caller http.Caller, cs config.ConfigStore, hs history.HistoryStore) (*Client, error) {
+func New(callerFactory http.CallerFactory, cs config.ConfigStore, hs history.HistoryStore) (*Client, error) {
 	cm := configmanager.New(cs).WithEnvironment()
 	configuration := cm.Config
 
@@ -37,7 +37,8 @@ func New(caller http.Caller, cs config.ConfigStore, hs history.HistoryStore) (*C
 		return nil, errors.New("missing environment variable: " + cm.APIKeyEnvVarName())
 	}
 
-	caller.SetAPIKey(configuration.APIKey)
+	caller := callerFactory(configuration)
+
 	hs.SetThread(configuration.Thread)
 
 	return &Client{

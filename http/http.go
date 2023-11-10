@@ -27,25 +27,27 @@ const (
 type Caller interface {
 	Post(url string, body []byte, stream bool) ([]byte, error)
 	Get(url string) ([]byte, error)
-	SetAPIKey(secret string)
 }
 
 type RestCaller struct {
 	client *http.Client
-	secret string
+	config types.Config
 }
 
 // Ensure RestCaller implements Caller interface
 var _ Caller = &RestCaller{}
 
-func New() *RestCaller {
+func New(cfg types.Config) *RestCaller {
 	return &RestCaller{
 		client: &http.Client{},
+		config: cfg,
 	}
 }
 
-func (r *RestCaller) SetAPIKey(secret string) {
-	r.secret = secret
+type CallerFactory func(cfg types.Config) Caller
+
+func RealCallerFactory(cfg types.Config) Caller {
+	return New(cfg)
 }
 
 func (r *RestCaller) Get(url string) ([]byte, error) {
@@ -136,8 +138,8 @@ func (r *RestCaller) newRequest(method, url string, body []byte) (*http.Request,
 		return nil, err
 	}
 
-	if r.secret != "" {
-		req.Header.Set(headerAuthorization, fmt.Sprintf(bearer, r.secret))
+	if r.config.APIKey != "" {
+		req.Header.Set(headerAuthorization, fmt.Sprintf(bearer, r.config.APIKey))
 	}
 	req.Header.Set(headerContentType, contentType)
 

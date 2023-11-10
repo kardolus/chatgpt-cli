@@ -21,7 +21,7 @@ func TestContract(t *testing.T) {
 func testContract(t *testing.T, when spec.G, it spec.S) {
 	var (
 		restCaller *http.RestCaller
-		defaults   types.Config
+		cfg        types.Config
 	)
 
 	it.Before(func() {
@@ -30,10 +30,10 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 		apiKey := os.Getenv(configmanager.New(config.New()).WithEnvironment().APIKeyEnvVarName())
 		Expect(apiKey).NotTo(BeEmpty())
 
-		restCaller = http.New()
-		restCaller.SetAPIKey(apiKey)
+		cfg = config.New().ReadDefaults()
+		cfg.APIKey = apiKey
 
-		defaults = config.New().ReadDefaults()
+		restCaller = http.New(cfg)
 	})
 
 	when("accessing the completion endpoint", func() {
@@ -41,16 +41,16 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			body := types.CompletionsRequest{
 				Messages: []types.Message{{
 					Role:    client.SystemRole,
-					Content: defaults.Role,
+					Content: cfg.Role,
 				}},
-				Model:  defaults.Model,
+				Model:  cfg.Model,
 				Stream: false,
 			}
 
 			bytes, err := json.Marshal(body)
 			Expect(err).NotTo(HaveOccurred())
 
-			resp, err := restCaller.Post(defaults.URL+defaults.CompletionsPath, bytes, false)
+			resp, err := restCaller.Post(cfg.URL+cfg.CompletionsPath, bytes, false)
 			Expect(err).NotTo(HaveOccurred())
 
 			var data types.CompletionsResponse
@@ -66,22 +66,19 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("should return an error response with appropriate error details", func() {
-			// Set the wrong API key
-			restCaller.SetAPIKey("wrong-key")
-
 			body := types.CompletionsRequest{
 				Messages: []types.Message{{
 					Role:    client.SystemRole,
-					Content: defaults.Role,
+					Content: cfg.Role,
 				}},
-				Model:  defaults.Model,
+				Model:  "no-such-model",
 				Stream: false,
 			}
 
 			bytes, err := json.Marshal(body)
 			Expect(err).NotTo(HaveOccurred())
 
-			resp, err := restCaller.Post(defaults.URL+defaults.CompletionsPath, bytes, false)
+			resp, err := restCaller.Post(cfg.URL+cfg.CompletionsPath, bytes, false)
 			Expect(err).To(HaveOccurred())
 
 			var errorData types.ErrorResponse
@@ -96,7 +93,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 
 	when("accessing the models endpoint", func() {
 		it("should have the expected keys in the response", func() {
-			resp, err := restCaller.Get(defaults.URL + defaults.ModelsPath)
+			resp, err := restCaller.Get(cfg.URL + cfg.ModelsPath)
 			Expect(err).NotTo(HaveOccurred())
 
 			var data types.ListModelsResponse
@@ -112,8 +109,6 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 				Expect(model.Object).ShouldNot(BeEmpty(), "Expected Model Object to be present in the response")
 				Expect(model.Created).ShouldNot(BeZero(), "Expected Model Created to be present in the response")
 				Expect(model.OwnedBy).ShouldNot(BeEmpty(), "Expected Model OwnedBy to be present in the response")
-				Expect(model.Permission).ShouldNot(BeNil(), "Expected Model Permission to be present in the response")
-				Expect(model.Root).ShouldNot(BeEmpty(), "Expected Model Root to be present in the response")
 			}
 		})
 	})

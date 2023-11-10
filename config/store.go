@@ -15,6 +15,8 @@ const (
 	openAIURL              = "https://api.openai.com"
 	openAICompletionsPath  = "/v1/chat/completions"
 	openAIModelsPath       = "/v1/models"
+	openAIAuthHeader       = "Authorization"
+	openAIAuthTokenPrefix  = "Bearer "
 	openAIRole             = "You are a helpful assistant."
 	openAIThread           = "default"
 	openAITemperature      = 1.0
@@ -61,6 +63,8 @@ func (f *FileIO) ReadDefaults() types.Config {
 		URL:              openAIURL,
 		CompletionsPath:  openAICompletionsPath,
 		ModelsPath:       openAIModelsPath,
+		AuthHeader:       openAIAuthHeader,
+		AuthTokenPrefix:  openAIAuthTokenPrefix,
 		Thread:           openAIThread,
 		Temperature:      openAITemperature,
 		TopP:             openAITopP,

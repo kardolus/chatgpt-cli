@@ -182,6 +182,8 @@ Configuration variables:
 | `url`               | The base URL for the OpenAI API.                                                                                                                       | 'https://api.openai.com'       |
 | `completions_path`  | The API endpoint for completions.                                                                                                                      | '/v1/chat/completions'         |
 | `models_path`       | The API endpoint for accessing model information.                                                                                                      | '/v1/models'                   |
+| `auth_header`       | The header used for authorization in API requests.                                                                                                     | 'Authorization'                |
+| `auth_token_prefix` | The prefix to be added before the token in the `auth_header`.                                                                                          | 'Bearer '                      |
 
 The defaults can be overridden by providing your own values in the user configuration file,
 named `.chatgpt-cli/config.yaml`, located in your home directory.

@@ -13,14 +13,12 @@ import (
 )
 
 const (
-	bearer                   = "Bearer %s"
 	contentType              = "application/json"
 	errFailedToRead          = "failed to read response: %w"
 	errFailedToCreateRequest = "failed to create request: %w"
 	errFailedToMakeRequest   = "failed to make request: %w"
 	errHTTP                  = "http status %d: %s"
 	errHTTPStatus            = "http status: %d"
-	headerAuthorization      = "Authorization"
 	headerContentType        = "Content-Type"
 )
 
@@ -139,7 +137,7 @@ func (r *RestCaller) newRequest(method, url string, body []byte) (*http.Request,
 	}
 
 	if r.config.APIKey != "" {
-		req.Header.Set(headerAuthorization, fmt.Sprintf(bearer, r.config.APIKey))
+		req.Header.Set(r.config.AuthHeader, r.config.AuthTokenPrefix+r.config.APIKey)
 	}
 	req.Header.Set(headerContentType, contentType)
 

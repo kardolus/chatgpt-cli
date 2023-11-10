@@ -15,4 +15,6 @@ type Config struct {
 	URL              string  `yaml:"url"`
 	CompletionsPath  string  `yaml:"completions_path"`
 	ModelsPath       string  `yaml:"models_path"`
+	AuthHeader       string  `yaml:"auth_header"`
+	AuthTokenPrefix  string  `yaml:"auth_token_prefix"`
 }

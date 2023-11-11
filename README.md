@@ -2,8 +2,8 @@
 
 ![Test Workflow](https://github.com/kardolus/chatgpt-cli/actions/workflows/test.yml/badge.svg?branch=main)
 
-ChatGPT CLI offers a robust interface for interacting with ChatGPT models directly from the command line, equipped with
-streaming and advanced configurability.
+ChatGPT CLI provides a powerful command-line interface for seamless interaction with ChatGPT models via OpenAI and
+Azure, featuring streaming capabilities and extensive configuration options.
 
 ![a screenshot](resources/vhs.gif)
 

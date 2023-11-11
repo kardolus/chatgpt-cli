@@ -70,26 +70,26 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		}
 
 		envPrefix = strings.ToUpper(defaultConfig.Name) + "_"
+
+		Expect(os.Unsetenv(envPrefix + "API_KEY")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "MODEL")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "MAX_TOKENS")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "URL")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "COMPLETIONS_PATH")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "MODELS_PATH")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "AUTH_HEADER")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "AUTH_TOKEN_PREFIX")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "OMIT_HISTORY")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "ROLE")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "THREAD")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "TEMPERATURE")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "TOP_P")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "FREQUENCY_PENALTY")).To(Succeed())
+		Expect(os.Unsetenv(envPrefix + "PRESENCE_PENALTY")).To(Succeed())
 	})
 
 	it.After(func() {
 		mockCtrl.Finish()
-
-		os.Unsetenv(envPrefix + "API_KEY")
-		os.Unsetenv(envPrefix + "MODEL")
-		os.Unsetenv(envPrefix + "MAX_TOKENS")
-		os.Unsetenv(envPrefix + "URL")
-		os.Unsetenv(envPrefix + "COMPLETIONS_PATH")
-		os.Unsetenv(envPrefix + "MODELS_PATH")
-		os.Unsetenv(envPrefix + "AUTH_HEADER")
-		os.Unsetenv(envPrefix + "AUTH_TOKEN_PREFIX")
-		os.Unsetenv(envPrefix + "OMIT_HISTORY")
-		os.Unsetenv(envPrefix + "ROLE")
-		os.Unsetenv(envPrefix + "THREAD")
-		os.Unsetenv(envPrefix + "TEMPERATURE")
-		os.Unsetenv(envPrefix + "TOP_P")
-		os.Unsetenv(envPrefix + "FREQUENCY_PENALTY")
-		os.Unsetenv(envPrefix + "PRESENCE_PENALTY")
 	})
 
 	it("should use default values when no environment variables or user config are provided", func() {

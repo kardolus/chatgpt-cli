@@ -20,6 +20,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
         - [Windows (amd64)](#windows-amd64)
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
+  - [General Configuration](#general-configuration)
+  - [Azure Configuration](#azure-configuration)
 - [Development](#development)
 - [Reporting Issues and Contributing](#reporting-issues-and-contributing)
 - [Uninstallation](#uninstallation)
@@ -164,6 +166,8 @@ Choose the appropriate command for your system, which will download the binary, 
 The ChatGPT CLI adopts a three-tier configuration strategy, with different levels of precedence assigned to default
 values, the `config.yaml` file, and environment variables, in that respective order.
 
+### General Configuration
+
 Configuration variables:
 
 | Variable            | Description                                                                                                                                            | Default                        |
@@ -230,6 +234,35 @@ chatgpt --set-model gpt-3.5-turbo-16k
 ```
 
 This feature allows for rapid changes to key configuration parameters, optimizing your experience with the ChatGPT CLI.
+
+### Azure Configuration
+
+For Azure, use a configuration similar to:
+
+```yaml
+name: azure
+api_key: <your_key>
+model: <not relevant, read from the completions path>
+max_tokens: 4096
+role: You are a helpful assistant.
+temperature: 1
+top_p: 1
+frequency_penalty: 0
+presence_penalty: 0
+thread: default
+omit_history: false
+url: https://<your_resource>.openai.azure.com
+completions_path: /openai/deployments/<your_deployment>/chat/completions?api-version=<your_api>
+models_path: /v1/models
+auth_header: api-key
+auth_token_prefix: " "
+```
+
+You can set the API key either in the `config.yaml` file as shown above or export it as an environment variable:
+
+```shell
+export AZURE_API_KEY=<your_key>
+```
 
 ## Development
 

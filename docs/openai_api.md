@@ -1,43 +1,6 @@
-# OpenAI API
+# ChatGPT API
 
-### cURL davinci
-
-```shell
-curl https://api.openai.com/v1/completions \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer ${OPENAI_API_KEY}" \
-  -d '{
-  "model": "text-davinci-003",
-  "prompt": "What is your name?",
-  "max_tokens": 4000,
-  "temperature": 1.0
-}' \
---insecure | jq .
-```
-
-Output:
-
-```json
-{
-  "id": "cmpl-7BQi5QXWoy83V1HR8VcC7MzrtArGp",
-  "object": "text_completion",
-  "created": 1682958637,
-  "model": "text-davinci-003",
-  "choices": [
-    {
-      "text": "\n\nMy name is John.",
-      "index": 0,
-      "logprobs": null,
-      "finish_reason": "stop"
-    }
-  ],
-  "usage": {
-    "prompt_tokens": 5,
-    "completion_tokens": 7,
-    "total_tokens": 12
-  }
-}
-```
+## OpenAI
 
 ### cURL gpt-turbo
 
@@ -143,12 +106,14 @@ Overall, it's good to keep a variety of toys on hand and observe your dog's pref
 ```
 
 ### List Models
+
 ```shell
 curl https://api.openai.com/v1/models \
   -H "Authorization: Bearer ${OPENAI_API_KEY}"
 ```
 
 ### curl DALL-E
+
 ```shell
 curl https://api.openai.com/v1/images/generations \
   -H "Content-Type: application/json" \
@@ -161,6 +126,7 @@ curl https://api.openai.com/v1/images/generations \
 ```
 
 Output:
+
 ```json
 {
   "created": 1683295449,
@@ -180,9 +146,18 @@ Output:
 1. Create a `jsonl` training file and call it `mydata.jsonl`
 
 ```json lines
-{"prompt": "Who is Piet Kernbom?'", "completion": "Piet Kernbom was a famous baseball player for the Yankees"}
-{"prompt": "Where was Piet Kernbom from?", "completion": "He is from Suriname."}
-{"prompt": "What are some of Piet Kernbom his hobbies", "completion": "Magic tricks and cooking."}
+{
+  "prompt": "Who is Piet Kernbom?'",
+  "completion": "Piet Kernbom was a famous baseball player for the Yankees"
+}
+{
+  "prompt": "Where was Piet Kernbom from?",
+  "completion": "He is from Suriname."
+}
+{
+  "prompt": "What are some of Piet Kernbom his hobbies",
+  "completion": "Magic tricks and cooking."
+}
 ```
 
 2. Upload the `jsonl` training file. Run this `curl` from the same directory the file is located in.
@@ -194,7 +169,7 @@ curl https://api.openai.com/v1/files \
   -F file="@mydata.jsonl"
 ```
 
-Output: 
+Output:
 
 ```json
 {
@@ -222,6 +197,7 @@ curl https://api.openai.com/v1/fine-tunes \
 ```
 
 Output:
+
 ```json
 {
   "object": "fine-tune",
@@ -283,6 +259,7 @@ curl https://api.openai.com/v1/completions   -H 'Content-Type: application/json'
 ```
 
 Output:
+
 ```json
 {
   "id": "cmpl-7Cs7cr7GxXRYkD9YUc9DiXPPx6HJQ",
@@ -301,6 +278,91 @@ Output:
     "prompt_tokens": 19,
     "completion_tokens": 10,
     "total_tokens": 29
+  }
+}
+```
+
+## Azure
+
+```shell
+curl "https://[resource].openai.azure.com/openai/deployments/[deployment]/chat/completions?api-version=[model]" \
+-H "Content-Type: application/json" \
+-H "api-key: ${AZURE_API_KEY}" \
+-d '{
+"messages": [{"role": "user", "content": "What is the OpenAI mission?"}],
+"max_tokens": 800,
+"temperature": 0.7,
+"frequency_penalty": 0,
+"presence_penalty": 0,
+"top_p": 0.95,
+"stop": null,
+"stream": true
+}'
+```
+
+Output:
+
+```shell
+{
+  "id": "chatcmpl-8SFrsgGImGyykR82c2KhdQ40B06rq",
+  "object": "chat.completion",
+  "created": 1701744872,
+  "model": "gpt-4-32k",
+  "prompt_filter_results": [
+    {
+      "prompt_index": 0,
+      "content_filter_results": {
+        "hate": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "self_harm": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "sexual": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "violence": {
+          "filtered": false,
+          "severity": "safe"
+        }
+      }
+    }
+  ],
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "The mission of OpenAI is to ensure that artificial general intelligence (AGI) benefits all of humanity. OpenAI aims to build safe and beneficial AGI directly, but it is also committed to aiding others in achieving this outcome. It focuses on long-term safety, technical leadership, and a cooperative orientation to actively cooperate with other research and policy institutions and create a global community working together to address AGI’s global challenges."
+      },
+      "content_filter_results": {
+        "hate": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "self_harm": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "sexual": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "violence": {
+          "filtered": false,
+          "severity": "safe"
+        }
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 14,
+    "completion_tokens": 84,
+    "total_tokens": 98
   }
 }
 ```

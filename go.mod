@@ -7,7 +7,7 @@ require (
 	github.com/onsi/gomega v1.30.0
 	github.com/sclevine/spec v1.4.0
 	github.com/spf13/cobra v1.8.0
-	github.com/spf13/viper v1.18.0
+	github.com/spf13/viper v1.18.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 

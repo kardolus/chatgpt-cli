@@ -24,6 +24,7 @@ var (
 	showConfig      bool
 	interactiveMode bool
 	listModels      bool
+	listThreads     bool
 	modelName       string
 	threadName      string
 	maxTokens       int
@@ -50,6 +51,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&showConfig, "config", "c", false, "Display the configuration")
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
+	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
 	rootCmd.PersistentFlags().StringVar(&modelName, "set-model", "", "Set a new default GPT model by specifying the model name")
 	rootCmd.PersistentFlags().StringVar(&threadName, "set-thread", "", "Set a new active thread by specifying the thread name")
 	rootCmd.PersistentFlags().IntVar(&maxTokens, "set-max-tokens", 0, "Set a new default max token size by specifying the max tokens")
@@ -155,6 +157,20 @@ func run(cmd *cobra.Command, args []string) error {
 		fmt.Println("Available models:")
 		for _, model := range models {
 			fmt.Println(model)
+		}
+		return nil
+	}
+
+	if listThreads {
+		cm := configmanager.New(config.New())
+
+		threads, err := cm.ListThreads()
+		if err != nil {
+			return err
+		}
+		fmt.Println("Available threads:")
+		for _, thread := range threads {
+			fmt.Println(thread)
 		}
 		return nil
 	}

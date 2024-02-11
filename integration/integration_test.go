@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -102,10 +103,11 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 	})
 
-	when("Read, Write Config", func() {
+	when("Read, Write, List Config", func() {
 		var (
 			tmpDir     string
 			tmpFile    *os.File
+			historyDir string
 			configIO   *config.FileIO
 			testConfig types.Config
 			err        error
@@ -115,12 +117,15 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			tmpDir, err = os.MkdirTemp("", "chatgpt-cli-test")
 			Expect(err).NotTo(HaveOccurred())
 
+			historyDir, err = os.MkdirTemp(tmpDir, "history")
+			Expect(err).NotTo(HaveOccurred())
+
 			tmpFile, err = os.CreateTemp(tmpDir, "config.yaml")
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(tmpFile.Close()).To(Succeed())
 
-			configIO = config.New().WithFilePath(tmpFile.Name())
+			configIO = config.New().WithConfigPath(tmpFile.Name()).WithHistoryPath(historyDir)
 
 			testConfig = types.Config{
 				Model: "test-model",
@@ -143,6 +148,22 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			readConfig, err := configIO.Read()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(readConfig).To(Equal(testConfig))
+		})
+
+		it("lists all the threads", func() {
+			files := []string{"thread1.json", "thread2.json", "thread3.json"}
+
+			for _, file := range files {
+				file, err := os.Create(filepath.Join(historyDir, file))
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(file.Close()).To(Succeed())
+			}
+
+			result, err := configIO.List()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(HaveLen(3))
+			Expect(result[2]).To(Equal("thread3.json"))
 		})
 
 		// Since we don't have a Delete method in the config, we will test if we can overwrite the configuration.
@@ -253,6 +274,17 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 			output := string(session.Out.Contents())
 			Expect(output).To(ContainSubstring(".chatgpt-cli: no such file or directory"))
+		})
+
+		it("should require a hidden folder for the --list-threads flag", func() {
+			command := exec.Command(binaryPath, "--list-threads")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring(".chatgpt-cli/history: no such file or directory"))
 		})
 
 		it("should require an argument for the --set-model flag", func() {
@@ -466,6 +498,29 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				// Cleanup: Unset the environment variable
 				Expect(os.Unsetenv(omitHistoryEnvKey)).To(Succeed())
+			})
+
+			it("should return the expected result for the --list-threads flag", func() {
+				historyDir := path.Join(filePath, "history")
+				Expect(os.Mkdir(historyDir, 0755)).To(Succeed())
+
+				files := []string{"thread1.json", "thread2.json", "thread3.json", "default.json"}
+
+				os.Mkdir(historyDir, 7555)
+
+				for _, file := range files {
+					file, err := os.Create(filepath.Join(historyDir, file))
+					Expect(err).NotTo(HaveOccurred())
+
+					Expect(file.Close()).To(Succeed())
+				}
+
+				output := runCommand("--list-threads")
+
+				Expect(output).To(ContainSubstring("* default (current)"))
+				Expect(output).To(ContainSubstring("- thread1"))
+				Expect(output).To(ContainSubstring("- thread2"))
+				Expect(output).To(ContainSubstring("- thread3"))
 			})
 
 			when("configurable flags are set", func() {

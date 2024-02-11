@@ -11,8 +11,7 @@ import (
 )
 
 const (
-	historyDirName = "history"
-	jsonExtension  = ".json"
+	jsonExtension = ".json"
 )
 
 type HistoryStore interface {
@@ -33,7 +32,7 @@ type FileIO struct {
 func New() (*FileIO, error) {
 	_ = migrate()
 
-	dir, err := getHistoryDir()
+	dir, err := utils.GetHistoryDir()
 	if err != nil {
 		return nil, err
 	}
@@ -88,15 +87,6 @@ func (f *FileIO) getPath() string {
 	return filepath.Join(f.historyDir, f.thread+jsonExtension)
 }
 
-func getHistoryDir() (string, error) {
-	homeDir, err := utils.GetChatGPTDirectory()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(homeDir, historyDirName), nil
-}
-
 // migrate moves the legacy "history" file in ~/.chatgpt-cli to "history/default.json"
 func migrate() error {
 	hiddenDir, err := utils.GetChatGPTDirectory()
@@ -104,7 +94,10 @@ func migrate() error {
 		return err
 	}
 
-	historyFile := path.Join(hiddenDir, historyDirName)
+	historyFile, err := utils.GetHistoryDir()
+	if err != nil {
+		return err
+	}
 
 	fileInfo, err := os.Stat(historyFile)
 	if err != nil {

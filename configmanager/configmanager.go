@@ -1,6 +1,7 @@
 package configmanager
 
 import (
+	"fmt"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/types"
 	"gopkg.in/yaml.v3"
@@ -35,6 +36,31 @@ func (c *ConfigManager) APIKeyEnvVarName() string {
 	return strings.ToUpper(c.Config.Name) + "_" + "API_KEY"
 }
 
+// ListThreads retrieves a list of all threads stored in the configuration.
+// It marks the current thread with an asterisk (*) and returns the list sorted alphabetically.
+// If an error occurs while retrieving the threads from the config store, it returns the error.
+func (c *ConfigManager) ListThreads() ([]string, error) {
+	var result []string
+
+	threads, err := c.configStore.List()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, thread := range threads {
+		thread = strings.ReplaceAll(thread, ".json", "")
+		if thread != c.Config.Thread {
+			result = append(result, fmt.Sprintf("- %s", thread))
+			continue
+		}
+		result = append(result, fmt.Sprintf("* %s (current)", thread))
+	}
+
+	return result, nil
+}
+
+// ShowConfig serializes the current configuration to a YAML string.
+// It returns the serialized string or an error if the serialization fails.
 func (c *ConfigManager) ShowConfig() (string, error) {
 	data, err := yaml.Marshal(c.Config)
 	if err != nil {
@@ -44,18 +70,24 @@ func (c *ConfigManager) ShowConfig() (string, error) {
 	return string(data), nil
 }
 
+// WriteMaxTokens updates the maximum number of tokens in the current configuration.
+// It writes the updated configuration to the config store and returns an error if the write fails.
 func (c *ConfigManager) WriteMaxTokens(tokens int) error {
 	c.Config.MaxTokens = tokens
 
 	return c.configStore.Write(c.Config)
 }
 
+// WriteModel updates the model in the current configuration.
+// It writes the updated configuration to the config store and returns an error if the write fails.
 func (c *ConfigManager) WriteModel(model string) error {
 	c.Config.Model = model
 
 	return c.configStore.Write(c.Config)
 }
 
+// WriteThread updates the current thread in the configuration.
+// It writes the updated configuration to the config store and returns an error if the write fails.
 func (c *ConfigManager) WriteThread(thread string) error {
 	c.Config.Thread = thread
 

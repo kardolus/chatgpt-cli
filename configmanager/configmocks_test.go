@@ -34,6 +34,21 @@ func (m *MockConfigStore) EXPECT() *MockConfigStoreMockRecorder {
 	return m.recorder
 }
 
+// List mocks base method.
+func (m *MockConfigStore) List() ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List")
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// List indicates an expected call of List.
+func (mr *MockConfigStoreMockRecorder) List() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockConfigStore)(nil).List))
+}
+
 // Read mocks base method.
 func (m *MockConfigStore) Read() (types.Config, error) {
 	m.ctrl.T.Helper()

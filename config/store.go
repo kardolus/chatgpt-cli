@@ -26,6 +26,7 @@ const (
 )
 
 type ConfigStore interface {
+	List() ([]string, error)
 	Read() (types.Config, error)
 	ReadDefaults() types.Config
 	Write(types.Config) error
@@ -35,19 +36,43 @@ type ConfigStore interface {
 var _ ConfigStore = &FileIO{}
 
 type FileIO struct {
-	configFilePath string
+	configFilePath  string
+	historyFilePath string
 }
 
 func New() *FileIO {
-	path, _ := getPath()
+	configPath, _ := getPath()
+	historyPath, _ := utils.GetHistoryDir()
+
 	return &FileIO{
-		configFilePath: path,
+		configFilePath:  configPath,
+		historyFilePath: historyPath,
 	}
 }
 
-func (f *FileIO) WithFilePath(configFilePath string) *FileIO {
+func (f *FileIO) WithConfigPath(configFilePath string) *FileIO {
 	f.configFilePath = configFilePath
 	return f
+}
+
+func (f *FileIO) WithHistoryPath(historyPath string) *FileIO {
+	f.historyFilePath = historyPath
+	return f
+}
+
+func (f *FileIO) List() ([]string, error) {
+	var result []string
+
+	files, err := os.ReadDir(f.historyFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, file := range files {
+		result = append(result, file.Name())
+	}
+
+	return result, nil
 }
 
 func (f *FileIO) Read() (types.Config, error) {

@@ -262,6 +262,45 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			subject.WriteThread(thread)
 		})
 	})
+
+	when("ListThreads()", func() {
+		activeThread := "active-thread"
+
+		it.Before(func() {
+			userConfig := types.Config{Thread: activeThread}
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).AnyTimes()
+			mockConfigStore.EXPECT().Read().Return(userConfig, nil).Times(1)
+		})
+
+		it("throws an error when the List call fails", func() {
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			errorInstance := errors.New("an error occurred")
+			mockConfigStore.EXPECT().List().Return(nil, errorInstance).Times(1)
+
+			_, err := subject.ListThreads()
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(errorInstance))
+		})
+
+		it("returns the expected threads", func() {
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+
+			threads := []string{"thread1.json", "thread2.json", activeThread + ".json"}
+			mockConfigStore.EXPECT().List().Return(threads, nil).Times(1)
+
+			result, err := subject.ListThreads()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(HaveLen(3))
+			Expect(result[0]).NotTo(ContainSubstring("current"))
+			Expect(result[0]).NotTo(ContainSubstring("json"))
+			Expect(result[1]).NotTo(ContainSubstring("current"))
+			Expect(result[1]).NotTo(ContainSubstring("json"))
+			Expect(result[2]).To(ContainSubstring("current"))
+			Expect(result[2]).NotTo(ContainSubstring("json"))
+		})
+	})
 }
 
 func performWriteTest(mockConfigStore *MockConfigStore, defaultConfig types.Config, expectedValue interface{}, fieldName string, action func()) {

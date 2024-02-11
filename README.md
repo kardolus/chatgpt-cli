@@ -20,8 +20,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
         - [Windows (amd64)](#windows-amd64)
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
-  - [General Configuration](#general-configuration)
-  - [Azure Configuration](#azure-configuration)
+    - [General Configuration](#general-configuration)
+    - [Azure Configuration](#azure-configuration)
 - [Development](#development)
 - [Reporting Issues and Contributing](#reporting-issues-and-contributing)
 - [Uninstallation](#uninstallation)
@@ -44,9 +44,9 @@ Azure, featuring streaming capabilities and extensive configuration options.
   flexibility allows the model to adapt to a wide range of conversational scenarios.
 * **Model listing**: Access a list of available models using the `-l` or `--list-models` flag.
 * **Advanced configuration options**: The CLI supports a layered configuration system where settings can be specified
-  through default values, a `config.yaml` file, and environment variables. For quick adjustments, use the `--set-model`
-  and `--set-max-tokens` flags. To verify your current settings, use the `--config` or `-c` flag. The newly
-  added `omit_history` configuration option adds another layer of customization to your user experience.
+  through default values, a `config.yaml` file, and environment variables. For quick adjustments, use the `--set-model`,
+  `--set-thread` and `--set-max-tokens` flags. To verify your current settings, use the `--config` or `-c` flag. The
+  newly added `omit_history` configuration option adds another layer of customization to your user experience.
 * **Availability Note**: This CLI supports both gpt-4 and gpt-3.5-turbo models. However, the specific ChatGPT model used
   on chat.openai.com may not be available via the OpenAI API.
 

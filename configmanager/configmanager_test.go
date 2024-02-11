@@ -3,6 +3,7 @@ package configmanager_test
 import (
 	"errors"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -13,6 +14,8 @@ import (
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
 )
+
+//go:generate mockgen -destination=configmocks_test.go -package=configmanager_test github.com/kardolus/chatgpt-cli/config ConfigStore
 
 func TestUnitConfigManager(t *testing.T) {
 	spec.Run(t, "Config Manager", testConfig, spec.Report(report.Terminal{}))
@@ -71,21 +74,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 
 		envPrefix = strings.ToUpper(defaultConfig.Name) + "_"
 
-		Expect(os.Unsetenv(envPrefix + "API_KEY")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "MODEL")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "MAX_TOKENS")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "URL")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "COMPLETIONS_PATH")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "MODELS_PATH")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "AUTH_HEADER")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "AUTH_TOKEN_PREFIX")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "OMIT_HISTORY")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "ROLE")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "THREAD")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "TEMPERATURE")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "TOP_P")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "FREQUENCY_PENALTY")).To(Succeed())
-		Expect(os.Unsetenv(envPrefix + "PRESENCE_PENALTY")).To(Succeed())
+		unsetEnvironmentVariables(envPrefix)
 	})
 
 	it.After(func() {
@@ -249,4 +238,58 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.FrequencyPenalty).To(Equal(4.4))
 		Expect(subject.Config.PresencePenalty).To(Equal(5.5))
 	})
+
+	it("should write the max tokens as expected", func() {
+		maxTokens := 123
+		performWriteTest(mockConfigStore, defaultConfig, maxTokens, "MaxTokens", func() {
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+			subject.WriteMaxTokens(maxTokens)
+		})
+	})
+
+	it("should write the model as expected", func() {
+		model := "user-model"
+		performWriteTest(mockConfigStore, defaultConfig, model, "Model", func() {
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+			subject.WriteModel(model)
+		})
+	})
+
+	it("should write the thread as expected", func() {
+		thread := "user-thread"
+		performWriteTest(mockConfigStore, defaultConfig, thread, "Thread", func() {
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+			subject.WriteThread(thread)
+		})
+	})
+}
+
+func performWriteTest(mockConfigStore *MockConfigStore, defaultConfig types.Config, expectedValue interface{}, fieldName string, action func()) {
+	mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+	mockConfigStore.EXPECT().Read().Return(types.Config{}, errors.New("no user config")).Times(1)
+
+	setValue(&defaultConfig, fieldName, expectedValue)
+	mockConfigStore.EXPECT().Write(defaultConfig).Return(nil).Times(1)
+
+	action()
+}
+
+func setValue(config *types.Config, fieldName string, value interface{}) {
+	// Use reflection to set value of the field by name
+	v := reflect.ValueOf(config).Elem() // Get the value that the pointer 'config' points to
+	fieldVal := v.FieldByName(fieldName)
+
+	if fieldVal.IsValid() && fieldVal.CanSet() {
+		val := reflect.ValueOf(value)
+		if val.Type().AssignableTo(fieldVal.Type()) {
+			fieldVal.Set(val)
+		}
+	}
+}
+
+func unsetEnvironmentVariables(envPrefix string) {
+	variables := []string{"API_KEY", "MODEL", "MAX_TOKENS", "URL", "COMPLETIONS_PATH", "MODELS_PATH", "AUTH_HEADER", "AUTH_TOKEN_PREFIX", "OMIT_HISTORY", "ROLE", "THREAD", "TEMPERATURE", "TOP_P", "FREQUENCY_PENALTY", "PRESENCE_PENALTY"}
+	for _, variable := range variables {
+		Expect(os.Unsetenv(envPrefix + variable)).To(Succeed())
+	}
 }

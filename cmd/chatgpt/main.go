@@ -25,6 +25,7 @@ var (
 	interactiveMode bool
 	listModels      bool
 	modelName       string
+	threadName      string
 	maxTokens       int
 	GitCommit       string
 	GitVersion      string
@@ -50,6 +51,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
 	rootCmd.PersistentFlags().StringVar(&modelName, "set-model", "", "Set a new default GPT model by specifying the model name")
+	rootCmd.PersistentFlags().StringVar(&threadName, "set-thread", "", "Set a new active thread by specifying the thread name")
 	rootCmd.PersistentFlags().IntVar(&maxTokens, "set-max-tokens", 0, "Set a new default max token size by specifying the max tokens")
 
 	viper.AutomaticEnv()
@@ -84,6 +86,16 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		fmt.Println("Max tokens successfully updated to", maxTokens)
+		return nil
+	}
+
+	if cmd.Flag("set-thread").Changed {
+		cm := configmanager.New(config.New())
+
+		if err := cm.WriteThread(threadName); err != nil {
+			return err
+		}
+		fmt.Println("Thread successfully updated to", threadName)
 		return nil
 	}
 

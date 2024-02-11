@@ -31,7 +31,9 @@ const (
 	serviceURL  = "http://0.0.0.0" + servicePort
 )
 
-var once sync.Once
+var (
+	once sync.Once
+)
 
 func TestIntegration(t *testing.T) {
 	defer gexec.CleanupBuildArtifacts()
@@ -165,9 +167,26 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 		var (
 			homeDir      string
+			filePath     string
+			configFile   string
 			err          error
 			apiKeyEnvVar string
 		)
+
+		runCommand := func(args ...string) string {
+			command := exec.Command(binaryPath, args...)
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			ExpectWithOffset(1, err).NotTo(HaveOccurred())
+			<-session.Exited
+			ExpectWithOffset(1, session).Should(gexec.Exit(0))
+			return string(session.Out.Contents())
+		}
+
+		checkConfigFileContent := func(expectedContent string) {
+			content, err := os.ReadFile(configFile)
+			ExpectWithOffset(1, err).NotTo(HaveOccurred())
+			ExpectWithOffset(1, string(content)).To(ContainSubstring(expectedContent))
+		}
 
 		it.Before(func() {
 			once.Do(func() {
@@ -247,6 +266,17 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(output).To(ContainSubstring("flag needs an argument: --set-model"))
 		})
 
+		it("should require an argument for the --set-thread flag", func() {
+			command := exec.Command(binaryPath, "--set-thread")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring("flag needs an argument: --set-thread"))
+		})
+
 		it("should require an argument for the --set-max-tokens flag", func() {
 			command := exec.Command(binaryPath, "--set-max-tokens")
 			session, err := gexec.Start(command, io.Discard, io.Discard)
@@ -272,6 +302,20 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
 		})
 
+		it("should require the chatgpt-cli folder but not an API key for the --set-thread flag", func() {
+			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
+
+			command := exec.Command(binaryPath, "--set-thread", "thread-name")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
+			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
+		})
+
 		it("should require the chatgpt-cli folder but not an API key for the --set-max-tokens flag", func() {
 			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
 
@@ -287,42 +331,24 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("should return the expected result for the --version flag", func() {
-			command := exec.Command(binaryPath, "--version")
-			session, err := gexec.Start(command, io.Discard, io.Discard)
-			Expect(err).NotTo(HaveOccurred())
+			output := runCommand("--version")
 
-			Eventually(session).Should(gexec.Exit(exitSuccess))
-
-			output := string(session.Out.Contents())
 			Expect(output).To(ContainSubstring(fmt.Sprintf("commit %s", gitCommit)))
 			Expect(output).To(ContainSubstring(fmt.Sprintf("version %s", gitVersion)))
 		})
 
 		it("should return the expected result for the --list-models flag", func() {
-			command := exec.Command(binaryPath, "--list-models")
-			session, err := gexec.Start(command, io.Discard, io.Discard)
-			Expect(err).NotTo(HaveOccurred())
+			output := runCommand("--list-models")
 
-			Eventually(session).Should(gexec.Exit(exitSuccess))
-
-			output := string(session.Out.Contents())
-
-			// see models.json
 			Expect(output).To(ContainSubstring("* gpt-3.5-turbo (current)"))
 			Expect(output).To(ContainSubstring("- gpt-3.5-turbo-0301"))
 		})
 
 		it("should return the expected result for the --query flag", func() {
-			command := exec.Command(binaryPath, "--query", "some-query")
-			session, err := gexec.Start(command, io.Discard, io.Discard)
-			Expect(err).NotTo(HaveOccurred())
+			output := runCommand("--query", "some-query")
 
-			Eventually(session).Should(gexec.Exit(exitSuccess))
-
-			output := string(session.Out.Contents())
-
-			// see completions.json
-			Expect(output).To(ContainSubstring(`I don't have personal opinions about bars, but here are some popular bars in Red Hook, Brooklyn:`))
+			expectedResponse := `I don't have personal opinions about bars, but here are some popular bars in Red Hook, Brooklyn:`
+			Expect(output).To(ContainSubstring(expectedResponse))
 		})
 
 		it("should assemble http errors as expected", func() {
@@ -341,8 +367,6 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		when("there is a hidden chatgpt-cli folder in the home dir", func() {
-			var filePath string
-
 			it.Before(func() {
 				filePath = path.Join(os.Getenv("HOME"), ".chatgpt-cli")
 				Expect(os.Mkdir(filePath, 0777)).To(Succeed())
@@ -408,217 +432,122 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 			it("keeps track of history", func() {
 				// History should not exist yet
-				historyFile := path.Join(filePath, "history", "default.json")
+				historyDir := path.Join(filePath, "history")
+				historyFile := path.Join(historyDir, "default.json")
 				Expect(historyFile).NotTo(BeAnExistingFile())
 
-				// Perform a query
-				command := exec.Command(binaryPath, "--query", "some-query")
-				session, err := gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
-
-				// The CLI response should be as expected
-				Eventually(session).Should(gexec.Exit(exitSuccess))
-
-				output := string(session.Out.Contents())
-
+				// Perform a query and check response
 				response := `I don't have personal opinions about bars, but here are some popular bars in Red Hook, Brooklyn:`
+				output := runCommand("--query", "some-query")
 				Expect(output).To(ContainSubstring(response))
 
-				// The history file should have the expected content
-				Expect(path.Dir(historyFile)).To(BeADirectory())
-				content, err := os.ReadFile(historyFile)
-
-				Expect(err).NotTo(HaveOccurred())
-				Expect(content).NotTo(BeEmpty())
-				Expect(string(content)).To(ContainSubstring(response))
+				// Check if history file was created with expected content
+				Expect(historyDir).To(BeADirectory())
+				checkHistoryContent := func(expectedContent string) {
+					content, err := os.ReadFile(historyFile)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(string(content)).To(ContainSubstring(expectedContent))
+				}
+				checkHistoryContent(response)
 
 				// Clear the history using the CLI
-				command = exec.Command(binaryPath, "--clear-history")
-				session, err = gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
-
-				Eventually(session).Should(gexec.Exit(exitSuccess))
-
-				// History should no longer exist
+				runCommand("--clear-history")
 				Expect(historyFile).NotTo(BeAnExistingFile())
 
-				// environment takes precedence
+				// Test omitting history through environment variable
 				omitHistoryEnvKey := strings.Replace(apiKeyEnvVar, "API_KEY", "OMIT_HISTORY", 1)
 				envValue := "true"
-
 				Expect(os.Setenv(omitHistoryEnvKey, envValue)).To(Succeed())
 
-				// Perform a query
-				command = exec.Command(binaryPath, "--query", "some-query")
-				session, err = gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
-
-				// The CLI response should be as expected
-				Eventually(session).Should(gexec.Exit(exitSuccess))
-
-				output = string(session.Out.Contents())
-
-				response = `I don't have personal opinions about bars, but here are some popular bars in Red Hook, Brooklyn:`
-				Expect(output).To(ContainSubstring(response))
-
-				// The history file should NOT exist
+				// Perform another query with history omitted
+				runCommand("--query", "some-query")
+				// The history file should NOT be recreated
 				Expect(historyFile).NotTo(BeAnExistingFile())
+
+				// Cleanup: Unset the environment variable
+				Expect(os.Unsetenv(omitHistoryEnvKey)).To(Succeed())
 			})
 
-			it("has a configurable default model", func() {
-				oldModel := "gpt-3.5-turbo"
-				newModel := "gpt-3.5-turbo-0301"
+			when("configurable flags are set", func() {
+				it.Before(func() {
+					configFile = path.Join(filePath, "config.yaml")
+					Expect(configFile).NotTo(BeAnExistingFile())
+				})
 
-				// config.yaml should not exist yet
-				configFile := path.Join(filePath, "config.yaml")
-				Expect(configFile).NotTo(BeAnExistingFile())
+				it("has a configurable default model", func() {
+					oldModel := "gpt-3.5-turbo"
+					newModel := "gpt-3.5-turbo-0301"
 
-				// --list-models returns the default model
-				command := exec.Command(binaryPath, "--list-models")
-				session, err := gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
+					// Verify initial model
+					output := runCommand("--list-models")
+					Expect(output).To(ContainSubstring("* " + oldModel + " (current)"))
+					Expect(output).To(ContainSubstring("- " + newModel))
 
-				Eventually(session).Should(gexec.Exit(exitSuccess))
+					// Update model
+					runCommand("--set-model", newModel)
 
-				output := string(session.Out.Contents())
+					// Check configFile is created and contains the new model
+					Expect(configFile).To(BeAnExistingFile())
+					checkConfigFileContent(newModel)
 
-				// see models.json
-				Expect(output).To(ContainSubstring(fmt.Sprintf("* %s (current)", oldModel)))
-				Expect(output).To(ContainSubstring(fmt.Sprintf("- %s", newModel)))
+					// Verify updated model through --list-models
+					output = runCommand("--list-models")
+					Expect(output).To(ContainSubstring("* " + newModel + " (current)"))
+				})
 
-				// --config displays the default model as well
-				command = exec.Command(binaryPath, "--config")
-				session, err = gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
+				it("has a configurable default max-tokens", func() {
+					defaults := config.New().ReadDefaults()
 
-				Eventually(session).Should(gexec.Exit(exitSuccess))
+					// Initial check for default max-tokens
+					output := runCommand("--config")
+					Expect(output).To(ContainSubstring(strconv.Itoa(defaults.MaxTokens)))
 
-				output = string(session.Out.Contents())
+					// Update and verify max-tokens
+					newMaxTokens := "81724"
+					runCommand("--set-max-tokens", newMaxTokens)
+					Expect(configFile).To(BeAnExistingFile())
+					checkConfigFileContent(newMaxTokens)
 
-				Expect(output).To(ContainSubstring(oldModel))
+					// Verify update through --config
+					output = runCommand("--config")
+					Expect(output).To(ContainSubstring(newMaxTokens))
 
-				// Set the model
-				command = exec.Command(binaryPath, "--set-model", newModel)
-				session, err = gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
+					// Environment variable takes precedence
+					modelEnvKey := strings.Replace(apiKeyEnvVar, "API_KEY", "MAX_TOKENS", 1)
+					Expect(os.Setenv(modelEnvKey, newMaxTokens)).To(Succeed())
 
-				// The CLI response should be as expected
-				Eventually(session).Should(gexec.Exit(exitSuccess))
+					// Verify environment variable override
+					output = runCommand("--config")
+					Expect(output).To(ContainSubstring(newMaxTokens))
+					Expect(os.Unsetenv(modelEnvKey)).To(Succeed())
+				})
 
-				// config.yaml should have been created
-				Expect(configFile).To(BeAnExistingFile())
+				it("has a configurable default thread", func() {
+					defaults := config.New().ReadDefaults()
 
-				contentBytes, err := os.ReadFile(configFile)
-				Expect(err).ShouldNot(HaveOccurred())
+					// Initial check for default thread
+					output := runCommand("--config")
+					Expect(output).To(ContainSubstring(defaults.Thread))
 
-				// config.yaml should have the expected content
-				content := string(contentBytes)
-				Expect(content).NotTo(ContainSubstring(expectedToken))
-				Expect(content).To(ContainSubstring(newModel))
+					// Update and verify thread
+					newThread := "new-thread"
+					runCommand("--set-thread", newThread)
+					Expect(configFile).To(BeAnExistingFile())
+					checkConfigFileContent(newThread)
 
-				// --list-models shows the new model as default
-				command = exec.Command(binaryPath, "--list-models")
-				session, err = gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
+					// Verify update through --config
+					output = runCommand("--config")
+					Expect(output).To(ContainSubstring(newThread))
 
-				Eventually(session).Should(gexec.Exit(exitSuccess))
+					// Environment variable takes precedence
+					threadEnvKey := strings.Replace(apiKeyEnvVar, "API_KEY", "THREAD", 1)
+					Expect(os.Setenv(threadEnvKey, newThread)).To(Succeed())
 
-				output = string(session.Out.Contents())
-
-				Expect(output).To(ContainSubstring(fmt.Sprintf("- %s", oldModel)))
-				Expect(output).To(ContainSubstring(fmt.Sprintf("* %s (current)", newModel)))
-
-				// --config displays the new model as well
-				command = exec.Command(binaryPath, "--config")
-				session, err = gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
-
-				Eventually(session).Should(gexec.Exit(exitSuccess))
-
-				output = string(session.Out.Contents())
-				Expect(output).To(ContainSubstring(newModel))
-
-				// environment takes precedence
-				modelEnvKey := strings.Replace(apiKeyEnvVar, "API_KEY", "MODEL", 1)
-				envModel := "new-model"
-
-				Expect(os.Setenv(modelEnvKey, envModel)).To(Succeed())
-
-				command = exec.Command(binaryPath, "--config")
-				session, err = gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
-
-				Eventually(session).Should(gexec.Exit(exitSuccess))
-
-				output = string(session.Out.Contents())
-				Expect(output).To(ContainSubstring(envModel))
-
-				Expect(os.Unsetenv(modelEnvKey)).To(Succeed())
-			})
-
-			it("has a configurable default max-tokens", func() {
-				defaults := config.New().ReadDefaults()
-
-				// config.yaml should not exist yet
-				configFile := path.Join(filePath, "config.yaml")
-				Expect(configFile).NotTo(BeAnExistingFile())
-
-				// --config displays the default max-tokens as well
-				command := exec.Command(binaryPath, "--config")
-				session, err := gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
-
-				Eventually(session).Should(gexec.Exit(exitSuccess))
-
-				output := string(session.Out.Contents())
-
-				Expect(output).To(ContainSubstring(strconv.Itoa(defaults.MaxTokens)))
-
-				// Set the max-tokens
-				newMaxTokens := "81724"
-				command = exec.Command(binaryPath, "--set-max-tokens", newMaxTokens)
-				session, err = gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
-
-				// The CLI response should be as expected
-				Eventually(session).Should(gexec.Exit(exitSuccess))
-
-				// config.yaml should have been created
-				Expect(configFile).To(BeAnExistingFile())
-
-				contentBytes, err := os.ReadFile(configFile)
-				Expect(err).ShouldNot(HaveOccurred())
-
-				// config.yaml should have the expected content
-				content := string(contentBytes)
-				Expect(content).NotTo(ContainSubstring(expectedToken))
-				Expect(content).To(ContainSubstring(newMaxTokens))
-
-				// --config displays the new max-tokens as well
-				command = exec.Command(binaryPath, "--config")
-				session, err = gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
-
-				Eventually(session).Should(gexec.Exit(exitSuccess))
-
-				output = string(session.Out.Contents())
-				Expect(output).To(ContainSubstring(newMaxTokens))
-
-				// environment takes precedence
-				modelEnvKey := strings.Replace(apiKeyEnvVar, "API_KEY", "MAX_TOKENS", 1)
-
-				Expect(os.Setenv(modelEnvKey, newMaxTokens)).To(Succeed())
-
-				command = exec.Command(binaryPath, "--config")
-				session, err = gexec.Start(command, io.Discard, io.Discard)
-				Expect(err).NotTo(HaveOccurred())
-
-				Eventually(session).Should(gexec.Exit(exitSuccess))
-
-				output = string(session.Out.Contents())
-				Expect(output).To(ContainSubstring(newMaxTokens))
-
-				Expect(os.Unsetenv(modelEnvKey)).To(Succeed())
+					// Verify environment variable override
+					output = runCommand("--config")
+					Expect(output).To(ContainSubstring(newThread))
+					Expect(os.Unsetenv(threadEnvKey)).To(Succeed())
+				})
 			})
 		})
 	})

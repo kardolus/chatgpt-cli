@@ -56,6 +56,12 @@ func (c *ConfigManager) WriteModel(model string) error {
 	return c.configStore.Write(c.Config)
 }
 
+func (c *ConfigManager) WriteThread(thread string) error {
+	c.Config.Thread = thread
+
+	return c.configStore.Write(c.Config)
+}
+
 func replaceByConfigFile(defaultConfig, userConfig types.Config) types.Config {
 	t := reflect.TypeOf(defaultConfig)
 	vDefault := reflect.ValueOf(&defaultConfig).Elem()

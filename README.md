@@ -43,6 +43,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
   context can be piped in from any source, such as local files, standard input, or even another program. This
   flexibility allows the model to adapt to a wide range of conversational scenarios.
 * **Model listing**: Access a list of available models using the `-l` or `--list-models` flag.
+* **Thread listing**: Display a list of active threads using the `--list-threads` flag.
 * **Advanced configuration options**: The CLI supports a layered configuration system where settings can be specified
   through default values, a `config.yaml` file, and environment variables. For quick adjustments, use the `--set-model`,
   `--set-thread` and `--set-max-tokens` flags. To verify your current settings, use the `--config` or `-c` flag. The
@@ -68,31 +69,31 @@ system and architecture:
 #### Apple M1 chips
 
 ```shell
-curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.4.0/chatgpt-darwin-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.4.1/chatgpt-darwin-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 #### macOS Intel chips
 
 ```shell
-curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.4.0/chatgpt-darwin-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.4.1/chatgpt-darwin-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 #### Linux (amd64)
 
 ```shell
-curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.4.0/chatgpt-linux-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.4.1/chatgpt-linux-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 #### Linux (arm64)
 
 ```shell
-curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.4.0/chatgpt-linux-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/download/v1.4.1/chatgpt-linux-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 #### Windows (amd64)
 
 Download the binary
-from [this link](https://github.com/kardolus/chatgpt-cli/releases/download/v1.4.0/chatgpt-windows-amd64.exe) and add it
+from [this link](https://github.com/kardolus/chatgpt-cli/releases/download/v1.4.1/chatgpt-windows-amd64.exe) and add it
 to your PATH.
 
 Choose the appropriate command for your system, which will download the binary, make it executable, and move it to your

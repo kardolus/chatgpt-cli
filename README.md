@@ -22,6 +22,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
 - [Configuration](#configuration)
     - [General Configuration](#general-configuration)
     - [Azure Configuration](#azure-configuration)
+    - [Command-Line Autocompletion](#command-line-autocompletion)
 - [Development](#development)
 - [Reporting Issues and Contributing](#reporting-issues-and-contributing)
 - [Uninstallation](#uninstallation)
@@ -264,6 +265,30 @@ You can set the API key either in the `config.yaml` file as shown above or expor
 ```shell
 export AZURE_API_KEY=<your_key>
 ```
+
+### Command-Line Autocompletion.
+
+We've introduced a new feature to enhance your CLI experience: a completion script for flag completion! This script
+allows you to use tab completion for command flags, making it easier and faster to use the ChatGPT CLI.
+
+To enable this feature, simply source the completion script from your terminal:
+
+```bash
+source scripts/completion.sh
+```
+
+This command adds flag completion to your current shell session. For convenience, you can add the sourcing command to
+your shell's startup file (e.g., `.bashrc`, `.zshrc`) to automatically enable flag completion every time you open a new
+terminal window:
+
+```bash
+echo "source $(pwd)/scripts/completion.sh" >> ~/.bashrc
+```
+
+*Note: Replace `~/.bashrc` with the appropriate startup file for your shell, such as `~/.zshrc` for Zsh users.*
+
+By sourcing `completion.sh`, you'll enjoy a more streamlined and efficient workflow with the ChatGPT CLI, with quick
+access to available flags and options right at your fingertips.
 
 ## Development
 

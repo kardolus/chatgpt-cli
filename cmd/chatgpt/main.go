@@ -4,6 +4,11 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/kardolus/chatgpt-cli/client"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/configmanager"
@@ -11,10 +16,6 @@ import (
 	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"io"
-	"os"
-	"strings"
-	"time"
 )
 
 var (
@@ -31,6 +32,7 @@ var (
 	GitCommit       string
 	GitVersion      string
 	ServiceURL      string
+	shell           string
 )
 
 func main() {
@@ -54,6 +56,8 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
 	rootCmd.PersistentFlags().StringVar(&modelName, "set-model", "", "Set a new default GPT model by specifying the model name")
 	rootCmd.PersistentFlags().StringVar(&threadName, "set-thread", "", "Set a new active thread by specifying the thread name")
+	rootCmd.PersistentFlags().StringVar(&shell, "set-completions", "", "Generate autocompletion script for your current SHELL")
+
 	rootCmd.PersistentFlags().IntVar(&maxTokens, "set-max-tokens", 0, "Set a new default max token size by specifying the max tokens")
 
 	viper.AutomaticEnv()
@@ -69,6 +73,10 @@ func run(cmd *cobra.Command, args []string) error {
 	if showVersion {
 		fmt.Printf("ChatGPT CLI version %s (commit %s)\n", GitVersion, GitCommit)
 		return nil
+	}
+
+	if cmd.Flag("set-completions").Changed {
+		return config.GenCompletions(cmd, shell)
 	}
 
 	if cmd.Flag("set-model").Changed {
@@ -124,7 +132,7 @@ func run(cmd *cobra.Command, args []string) error {
 		if c, err := cm.ShowConfig(); err != nil {
 			return err
 		} else {
-			fmt.Printf(c)
+			fmt.Println(c)
 		}
 		return nil
 	}

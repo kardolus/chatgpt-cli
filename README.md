@@ -23,6 +23,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
     - [General Configuration](#general-configuration)
     - [Azure Configuration](#azure-configuration)
     - [Command-Line Autocompletion](#command-line-autocompletion)
+      - [Enabling Autocompletion](#enabling-autocompletion)
+      - [Persistent Autocompletion](#persistent-autocompletion)
 - [Development](#development)
 - [Reporting Issues and Contributing](#reporting-issues-and-contributing)
 - [Uninstallation](#uninstallation)
@@ -266,29 +268,49 @@ You can set the API key either in the `config.yaml` file as shown above or expor
 export AZURE_API_KEY=<your_key>
 ```
 
-### Command-Line Autocompletion.
+### Command-Line Autocompletion
 
-We've introduced a new feature to enhance your CLI experience: a completion script for flag completion! This script
-allows you to use tab completion for command flags, making it easier and faster to use the ChatGPT CLI.
+Enhance your CLI experience with our new autocompletion feature for command flags!
 
-To enable this feature, simply source the completion script from your terminal:
+#### Enabling Autocompletion
+
+Autocompletion is currently supported for the following shells: Bash, Zsh, Fish, and PowerShell. To activate flag
+completion in your current shell session, execute the appropriate command based on your shell:
+
+- **Bash**
+    ```bash
+    . <(chatgpt --set-completions bash)
+    ```
+- **Zsh**
+    ```zsh
+    . <(chatgpt --set-completions zsh)
+    ```
+- **Fish**
+    ```fish
+    chatgpt --set-completions fish | source
+    ```
+- **PowerShell**
+    ```powershell
+    chatgpt --set-completions powershell | Out-String | Invoke-Expression
+    ```
+
+#### Persistent Autocompletion
+
+For added convenience, you can make autocompletion persist across all new shell sessions by adding the appropriate
+sourcing command to your shell's startup file. Here are the files typically used for each shell:
+
+- **Bash**: Add to `.bashrc` or `.bash_profile`
+- **Zsh**: Add to `.zshrc`
+- **Fish**: Add to `config.fish`
+- **PowerShell**: Add to your PowerShell profile script
+
+For example, for Bash, you would add the following line to your `.bashrc` file:
 
 ```bash
-source scripts/completion.sh
+. <(chatgpt --set-completions bash)
 ```
 
-This command adds flag completion to your current shell session. For convenience, you can add the sourcing command to
-your shell's startup file (e.g., `.bashrc`, `.zshrc`) to automatically enable flag completion every time you open a new
-terminal window:
-
-```bash
-echo "source $(pwd)/scripts/completion.sh" >> ~/.bashrc
-```
-
-*Note: Replace `~/.bashrc` with the appropriate startup file for your shell, such as `~/.zshrc` for Zsh users.*
-
-By sourcing `completion.sh`, you'll enjoy a more streamlined and efficient workflow with the ChatGPT CLI, with quick
-access to available flags and options right at your fingertips.
+This ensures that command flag autocompletion is enabled automatically every time you open a new terminal window.
 
 ## Development
 

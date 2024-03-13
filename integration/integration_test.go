@@ -401,11 +401,24 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		when("there is a hidden chatgpt-cli folder in the home dir", func() {
 			it.Before(func() {
 				filePath = path.Join(os.Getenv("HOME"), ".chatgpt-cli")
-				Expect(os.Mkdir(filePath, 0777)).To(Succeed())
+				Expect(os.MkdirAll(filePath, 0777)).To(Succeed())
 			})
 
 			it.After(func() {
 				Expect(os.RemoveAll(filePath)).To(Succeed())
+			})
+
+			it("should not require an API key for the --list-threads flag", func() {
+				historyPath := path.Join(filePath, "history")
+				Expect(os.MkdirAll(historyPath, 0777)).To(Succeed())
+
+				Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
+
+				command := exec.Command(binaryPath, "--list-threads")
+				session, err := gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitSuccess))
 			})
 
 			it("migrates the legacy history as expected", func() {

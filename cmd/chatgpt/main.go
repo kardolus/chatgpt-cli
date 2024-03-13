@@ -109,6 +109,20 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	if listThreads {
+		cm := configmanager.New(config.New())
+
+		threads, err := cm.ListThreads()
+		if err != nil {
+			return err
+		}
+		fmt.Println("Available threads:")
+		for _, thread := range threads {
+			fmt.Println(thread)
+		}
+		return nil
+	}
+
 	if clearHistory {
 		historyHandler, err := history.New()
 		if err != nil {
@@ -137,6 +151,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Flags that require an API key
 	hs, _ := history.New() // do not error out
 	client, err := client.New(http.RealCallerFactory, config.New(), hs)
 	if err != nil {
@@ -165,20 +180,6 @@ func run(cmd *cobra.Command, args []string) error {
 		fmt.Println("Available models:")
 		for _, model := range models {
 			fmt.Println(model)
-		}
-		return nil
-	}
-
-	if listThreads {
-		cm := configmanager.New(config.New())
-
-		threads, err := cm.ListThreads()
-		if err != nil {
-			return err
-		}
-		fmt.Println("Available threads:")
-		for _, thread := range threads {
-			fmt.Println(thread)
 		}
 		return nil
 	}

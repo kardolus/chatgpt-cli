@@ -23,7 +23,7 @@ import (
 //go:generate mockgen -destination=configmocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/config ConfigStore
 
 const (
-	defaultMaxTokens        = 4096
+	defaultMaxTokens        = 50
 	defaultURL              = "https://default.openai.com"
 	defaultName             = "default-name"
 	defaultModel            = "gpt-3.5-turbo"
@@ -204,6 +204,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					topP             = 200.2
 					frequencyPenalty = 300.3
 					presencePenalty  = 400.4
+					maxTokens        = 12345
 				)
 
 				messages = createMessages(nil, query)
@@ -214,9 +215,10 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					TopP:             topP,
 					FrequencyPenalty: frequencyPenalty,
 					PresencePenalty:  presencePenalty,
+					MaxTokens:        maxTokens,
 				})
 
-				body, err = createBodyWithConfig(messages, false, model, temperature, topP, frequencyPenalty, presencePenalty)
+				body, err = createBodyWithConfig(messages, false, model, maxTokens, temperature, topP, frequencyPenalty, presencePenalty)
 				Expect(err).NotTo(HaveOccurred())
 				testValidHTTPResponse(subject, nil, body, false)
 			})
@@ -464,18 +466,20 @@ func createBody(messages []types.Message, stream bool) ([]byte, error) {
 		Temperature:      defaultTemperature,
 		TopP:             defaultTopP,
 		FrequencyPenalty: defaultFrequencyPenalty,
+		MaxTokens:        defaultMaxTokens,
 		PresencePenalty:  defaultPresencePenalty,
 	}
 
 	return json.Marshal(req)
 }
 
-func createBodyWithConfig(messages []types.Message, stream bool, model string, temperature float64, topP float64, frequencyPenalty float64, presencePenalty float64) ([]byte, error) {
+func createBodyWithConfig(messages []types.Message, stream bool, model string, maxTokens int, temperature float64, topP float64, frequencyPenalty float64, presencePenalty float64) ([]byte, error) {
 	req := types.CompletionsRequest{
 		Model:            model,
 		Messages:         messages,
 		Stream:           stream,
 		Temperature:      temperature,
+		MaxTokens:        maxTokens,
 		TopP:             topP,
 		FrequencyPenalty: frequencyPenalty,
 		PresencePenalty:  presencePenalty,
@@ -538,7 +542,7 @@ func (f *clientFactory) buildClientWithoutConfig() *client.Client {
 	c, err := client.New(mockCallerFactory, f.mockConfigStore, f.mockHistoryStore)
 	Expect(err).NotTo(HaveOccurred())
 
-	return c.WithCapacity(50)
+	return c
 }
 
 func (f *clientFactory) buildClientWithConfig(config types.Config) *client.Client {
@@ -548,7 +552,7 @@ func (f *clientFactory) buildClientWithConfig(config types.Config) *client.Clien
 	c, err := client.New(mockCallerFactory, f.mockConfigStore, f.mockHistoryStore)
 	Expect(err).NotTo(HaveOccurred())
 
-	return c.WithCapacity(50)
+	return c
 }
 
 func (f *clientFactory) withoutHistory() {

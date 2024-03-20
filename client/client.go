@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+	"unicode/utf8"
+
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/kardolus/chatgpt-cli/types"
-	"strings"
-	"unicode/utf8"
 )
 
 const (
@@ -163,6 +164,7 @@ func (c *Client) createBody(stream bool) ([]byte, error) {
 	body := types.CompletionsRequest{
 		Messages:         c.History,
 		Model:            c.Config.Model,
+		MaxTokens:        c.Config.MaxTokens,
 		Temperature:      c.Config.Temperature,
 		TopP:             c.Config.TopP,
 		FrequencyPenalty: c.Config.FrequencyPenalty,

@@ -43,8 +43,9 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 					Role:    client.SystemRole,
 					Content: cfg.Role,
 				}},
-				Model:  cfg.Model,
-				Stream: false,
+				MaxTokens: 1234,
+				Model:     cfg.Model,
+				Stream:    false,
 			}
 
 			bytes, err := json.Marshal(body)

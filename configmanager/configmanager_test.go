@@ -24,6 +24,7 @@ func TestUnitConfigManager(t *testing.T) {
 func testConfig(t *testing.T, when spec.G, it spec.S) {
 	const (
 		defaultMaxTokens        = 10
+		defaultContextWindow    = 20
 		defaultName             = "default-name"
 		defaultURL              = "default-url"
 		defaultModel            = "default-model"
@@ -58,6 +59,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			APIKey:           defaultApiKey,
 			Model:            defaultModel,
 			MaxTokens:        defaultMaxTokens,
+			ContextWindow:    defaultContextWindow,
 			URL:              defaultURL,
 			CompletionsPath:  defaultCompletionsPath,
 			ModelsPath:       defaultModelsPath,
@@ -88,6 +90,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		subject := configmanager.New(mockConfigStore).WithEnvironment()
 
 		Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
+		Expect(subject.Config.ContextWindow).To(Equal(defaultContextWindow))
 		Expect(subject.Config.Name).To(Equal(defaultName))
 		Expect(subject.Config.Model).To(Equal(defaultModel))
 		Expect(subject.Config.URL).To(Equal(defaultURL))
@@ -108,6 +111,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		userConfig := types.Config{
 			Model:            "user-model",
 			MaxTokens:        20,
+			ContextWindow:    30,
 			URL:              "user-url",
 			CompletionsPath:  "user-completions-path",
 			ModelsPath:       "user-models-path",
@@ -129,6 +133,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 
 		Expect(subject.Config.Model).To(Equal("user-model"))
 		Expect(subject.Config.MaxTokens).To(Equal(20))
+		Expect(subject.Config.ContextWindow).To(Equal(30))
 		Expect(subject.Config.URL).To(Equal("user-url"))
 		Expect(subject.Config.CompletionsPath).To(Equal("user-completions-path"))
 		Expect(subject.Config.ModelsPath).To(Equal("user-models-path"))
@@ -147,6 +152,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"API_KEY", "env-api-key")
 		os.Setenv(envPrefix+"MODEL", "env-model")
 		os.Setenv(envPrefix+"MAX_TOKENS", "15")
+		os.Setenv(envPrefix+"CONTEXT_WINDOW", "25")
 		os.Setenv(envPrefix+"URL", "env-url")
 		os.Setenv(envPrefix+"COMPLETIONS_PATH", "env-completions-path")
 		os.Setenv(envPrefix+"MODELS_PATH", "env-models-path")
@@ -168,6 +174,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.APIKey).To(Equal("env-api-key"))
 		Expect(subject.Config.Model).To(Equal("env-model"))
 		Expect(subject.Config.MaxTokens).To(Equal(15))
+		Expect(subject.Config.ContextWindow).To(Equal(25))
 		Expect(subject.Config.URL).To(Equal("env-url"))
 		Expect(subject.Config.CompletionsPath).To(Equal("env-completions-path"))
 		Expect(subject.Config.ModelsPath).To(Equal("env-models-path"))
@@ -327,7 +334,7 @@ func setValue(config *types.Config, fieldName string, value interface{}) {
 }
 
 func unsetEnvironmentVariables(envPrefix string) {
-	variables := []string{"API_KEY", "MODEL", "MAX_TOKENS", "URL", "COMPLETIONS_PATH", "MODELS_PATH", "AUTH_HEADER", "AUTH_TOKEN_PREFIX", "OMIT_HISTORY", "ROLE", "THREAD", "TEMPERATURE", "TOP_P", "FREQUENCY_PENALTY", "PRESENCE_PENALTY"}
+	variables := []string{"API_KEY", "MODEL", "MAX_TOKENS", "CONTEXT_WINDOW", "URL", "COMPLETIONS_PATH", "MODELS_PATH", "AUTH_HEADER", "AUTH_TOKEN_PREFIX", "OMIT_HISTORY", "ROLE", "THREAD", "TEMPERATURE", "TOP_P", "FREQUENCY_PENALTY", "PRESENCE_PENALTY"}
 	for _, variable := range variables {
 		Expect(os.Unsetenv(envPrefix + variable)).To(Succeed())
 	}

@@ -23,7 +23,8 @@ import (
 //go:generate mockgen -destination=configmocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/config ConfigStore
 
 const (
-	defaultMaxTokens        = 50
+	defaultMaxTokens        = 100
+	defaultContextWindow    = 50
 	defaultURL              = "https://default.openai.com"
 	defaultName             = "default-name"
 	defaultModel            = "gpt-3.5-turbo"
@@ -542,7 +543,7 @@ func (f *clientFactory) buildClientWithoutConfig() *client.Client {
 	c, err := client.New(mockCallerFactory, f.mockConfigStore, f.mockHistoryStore)
 	Expect(err).NotTo(HaveOccurred())
 
-	return c
+	return c.WithContextWindow(defaultContextWindow)
 }
 
 func (f *clientFactory) buildClientWithConfig(config types.Config) *client.Client {
@@ -552,7 +553,7 @@ func (f *clientFactory) buildClientWithConfig(config types.Config) *client.Clien
 	c, err := client.New(mockCallerFactory, f.mockConfigStore, f.mockHistoryStore)
 	Expect(err).NotTo(HaveOccurred())
 
-	return c
+	return c.WithContextWindow(defaultContextWindow)
 }
 
 func (f *clientFactory) withoutHistory() {

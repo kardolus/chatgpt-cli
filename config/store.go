@@ -12,6 +12,7 @@ const (
 	openAIName             = "openai"
 	openAIModel            = "gpt-3.5-turbo"
 	openAIModelMaxTokens   = 4096
+	openAIContextWindow    = 8192
 	openAIURL              = "https://api.openai.com"
 	openAICompletionsPath  = "/v1/chat/completions"
 	openAIModelsPath       = "/v1/models"
@@ -85,6 +86,7 @@ func (f *FileIO) ReadDefaults() types.Config {
 		Model:            openAIModel,
 		Role:             openAIRole,
 		MaxTokens:        openAIModelMaxTokens,
+		ContextWindow:    openAIContextWindow,
 		URL:              openAIURL,
 		CompletionsPath:  openAICompletionsPath,
 		ModelsPath:       openAIModelsPath,

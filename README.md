@@ -23,8 +23,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
     - [General Configuration](#general-configuration)
     - [Azure Configuration](#azure-configuration)
     - [Command-Line Autocompletion](#command-line-autocompletion)
-      - [Enabling Autocompletion](#enabling-autocompletion)
-      - [Persistent Autocompletion](#persistent-autocompletion)
+        - [Enabling Autocompletion](#enabling-autocompletion)
+        - [Persistent Autocompletion](#persistent-autocompletion)
 - [Development](#development)
 - [Reporting Issues and Contributing](#reporting-issues-and-contributing)
 - [Uninstallation](#uninstallation)
@@ -180,6 +180,7 @@ Configuration variables:
 | `api_key`           | Your OpenAI API key.                                                                                                                                   | (none for security)            |
 | `model`             | The GPT model used by the application.                                                                                                                 | 'gpt-3.5-turbo'                |
 | `max_tokens`        | The maximum number of tokens that can be used in a single API call.                                                                                    | 4096                           |
+| `context_window`    | The memory limit for how much of the conversation can be remembered at one time.                                                                       | 8192                           |
 | `role`              | The system role                                                                                                                                        | 'You are a helpful assistant.' |
 | `temperature`       | What sampling temperature to use, between 0 and 2. Higher values make the output more random; lower values make it more focused and deterministic.     | 1.0                            |
 | `frequency_penalty` | Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far.                                 | 0.0                            |
@@ -201,10 +202,10 @@ the `model` and `max_tokens` parameters, your file might look like this:
 
 ```yaml
 model: gpt-3.5-turbo-16k
-max_tokens: 8192
+max_tokens: 4096
 ```
 
-This alters the `model` to `gpt-3.5-turbo-16k` and adjusts `max_tokens` to `8192`. All other options, such as `url`
+This alters the `model` to `gpt-3.5-turbo-16k` and adjusts `max_tokens` to `4096`. All other options, such as `url`
 , `completions_path`, and `models_path`, can similarly be modified. If the user configuration file cannot be accessed or
 is missing, the application will resort to the default configuration.
 
@@ -248,6 +249,7 @@ name: azure
 api_key: <your_key>
 model: <not relevant, read from the completions path>
 max_tokens: 4096
+context_window: 8192
 role: You are a helpful assistant.
 temperature: 1
 top_p: 1

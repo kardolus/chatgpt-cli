@@ -49,8 +49,8 @@ func New(callerFactory http.CallerFactory, cs config.ConfigStore, hs history.His
 	}, nil
 }
 
-func (c *Client) WithCapacity(capacity int) *Client {
-	c.Config.MaxTokens = capacity
+func (c *Client) WithContextWindow(window int) *Client {
+	c.Config.ContextWindow = window
 	return c
 }
 
@@ -226,7 +226,7 @@ func (c *Client) processResponse(raw []byte, v interface{}) error {
 
 func (c *Client) truncateHistory() {
 	tokens, rolling := countTokens(c.History)
-	effectiveTokenSize := calculateEffectiveTokenSize(c.Config.MaxTokens, MaxTokenBufferPercentage)
+	effectiveTokenSize := calculateEffectiveContextWindow(c.Config.ContextWindow, MaxTokenBufferPercentage)
 
 	if tokens <= effectiveTokenSize {
 		return
@@ -258,10 +258,10 @@ func (c *Client) updateHistory(response string) {
 	}
 }
 
-func calculateEffectiveTokenSize(maxTokenSize int, bufferPercentage int) int {
+func calculateEffectiveContextWindow(window int, bufferPercentage int) int {
 	adjustedPercentage := 100 - bufferPercentage
-	effectiveTokenSize := (maxTokenSize * adjustedPercentage) / 100
-	return effectiveTokenSize
+	effectiveContextWindow := (window * adjustedPercentage) / 100
+	return effectiveContextWindow
 }
 
 func countTokens(messages []types.Message) (int, []int) {

@@ -52,9 +52,8 @@ system and architecture.
 
 ## 5. Bump the version
 
-Bump the version in the `README` of `kardolus/chatgpt-cli` and in the Homebrew
-formulae (`kardolus/homebrew-chatgpt-cli/HomebrewFormula/chatgpt-cli.rb`). Update the sha256 of the macOS binaries
-using:
+Bump the version in the Homebrew formulae (`kardolus/homebrew-chatgpt-cli/HomebrewFormula/chatgpt-cli.rb`). Update the
+sha256 of the macOS binaries using:
 
 ```shell
 sha256sum /path/to/binary

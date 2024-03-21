@@ -11,7 +11,7 @@ import (
 const (
 	openAIName             = "openai"
 	openAIModel            = "gpt-3.5-turbo"
-	openAIModelMaxTokens   = 4096
+	openAIMaxTokens        = 4096
 	openAIContextWindow    = 8192
 	openAIURL              = "https://api.openai.com"
 	openAICompletionsPath  = "/v1/chat/completions"
@@ -77,7 +77,12 @@ func (f *FileIO) List() ([]string, error) {
 }
 
 func (f *FileIO) Read() (types.Config, error) {
-	return parseFile(f.configFilePath)
+	result, err := parseFile(f.configFilePath)
+	if err != nil {
+		return types.Config{}, err
+	}
+
+	return migrate(result), nil
 }
 
 func (f *FileIO) ReadDefaults() types.Config {
@@ -85,7 +90,7 @@ func (f *FileIO) ReadDefaults() types.Config {
 		Name:             openAIName,
 		Model:            openAIModel,
 		Role:             openAIRole,
-		MaxTokens:        openAIModelMaxTokens,
+		MaxTokens:        openAIMaxTokens,
 		ContextWindow:    openAIContextWindow,
 		URL:              openAIURL,
 		CompletionsPath:  openAICompletionsPath,
@@ -116,6 +121,19 @@ func getPath() (string, error) {
 	}
 
 	return filepath.Join(homeDir, "config.yaml"), nil
+}
+
+func migrate(config types.Config) types.Config {
+	// the "old" max_tokens became context_window
+	if config.ContextWindow == 0 && config.MaxTokens > 0 {
+		config.ContextWindow = config.MaxTokens
+		// set it to the default in case the value is small
+		if config.ContextWindow < openAIContextWindow {
+			config.ContextWindow = openAIContextWindow
+		}
+		config.MaxTokens = openAIMaxTokens
+	}
+	return config
 }
 
 func parseFile(fileName string) (types.Config, error) {

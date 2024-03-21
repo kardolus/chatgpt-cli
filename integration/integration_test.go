@@ -141,13 +141,49 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		it("reads the config from the file", func() {
-			err = configIO.Write(testConfig) // need to write before reading
-			Expect(err).NotTo(HaveOccurred())
+		when("reading the config from a file", func() {
+			defaults := config.New().ReadDefaults()
 
-			readConfig, err := configIO.Read()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(readConfig).To(Equal(testConfig))
+			it("it doesn't apply a migration when max_tokens is 0", func() {
+				testConfig.MaxTokens = 0
+
+				err = configIO.Write(testConfig) // need to write before reading
+				Expect(err).NotTo(HaveOccurred())
+
+				readConfig, err := configIO.Read()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(readConfig).To(Equal(testConfig))
+			})
+			it("it migrates small values of max_tokens as expected", func() {
+				testConfig.MaxTokens = defaults.ContextWindow - 1
+
+				err = configIO.Write(testConfig) // need to write before reading
+				Expect(err).NotTo(HaveOccurred())
+
+				readConfig, err := configIO.Read()
+				Expect(err).NotTo(HaveOccurred())
+
+				expectedConfig := testConfig
+				expectedConfig.MaxTokens = defaults.MaxTokens
+				expectedConfig.ContextWindow = defaults.ContextWindow
+
+				Expect(readConfig).To(Equal(expectedConfig))
+			})
+			it("it migrates large values of max_tokens as expected", func() {
+				testConfig.MaxTokens = defaults.ContextWindow + 1
+
+				err = configIO.Write(testConfig) // need to write before reading
+				Expect(err).NotTo(HaveOccurred())
+
+				readConfig, err := configIO.Read()
+				Expect(err).NotTo(HaveOccurred())
+
+				expectedConfig := testConfig
+				expectedConfig.MaxTokens = defaults.MaxTokens
+				expectedConfig.ContextWindow = testConfig.MaxTokens
+
+				Expect(readConfig).To(Equal(expectedConfig))
+			})
 		})
 
 		it("lists all the threads", func() {

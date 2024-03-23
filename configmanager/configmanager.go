@@ -78,6 +78,14 @@ func (c *ConfigManager) WriteMaxTokens(tokens int) error {
 	return c.configStore.Write(c.Config)
 }
 
+// WriteContextWindow updates context window in the current configuration.
+// It writes the updated configuration to the config store and returns an error if the write fails.
+func (c *ConfigManager) WriteContextWindow(window int) error {
+	c.Config.ContextWindow = window
+
+	return c.configStore.Write(c.Config)
+}
+
 // WriteModel updates the model in the current configuration.
 // It writes the updated configuration to the config store and returns an error if the write fails.
 func (c *ConfigManager) WriteModel(model string) error {

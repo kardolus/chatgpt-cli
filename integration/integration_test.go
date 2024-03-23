@@ -356,6 +356,17 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(output).To(ContainSubstring("flag needs an argument: --set-max-tokens"))
 		})
 
+		it("should require an argument for the --set-context-window flag", func() {
+			command := exec.Command(binaryPath, "--set-context-window")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring("flag needs an argument: --set-context-window"))
+		})
+
 		it("should require the chatgpt-cli folder but not an API key for the --set-model flag", func() {
 			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
 
@@ -388,6 +399,20 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
 
 			command := exec.Command(binaryPath, "--set-max-tokens", "789")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
+			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
+		})
+
+		it("should require the chatgpt-cli folder but not an API key for the --set-context-window flag", func() {
+			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
+
+			command := exec.Command(binaryPath, "--set-context-window", "789")
 			session, err := gexec.Start(command, io.Discard, io.Discard)
 			Expect(err).NotTo(HaveOccurred())
 

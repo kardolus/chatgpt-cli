@@ -193,6 +193,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"API_KEY", "env-api-key")
 		os.Setenv(envPrefix+"MODEL", "env-model")
 		os.Setenv(envPrefix+"MAX_TOKENS", "15")
+		os.Setenv(envPrefix+"CONTEXT_WINDOW", "25")
 		os.Setenv(envPrefix+"URL", "env-url")
 		os.Setenv(envPrefix+"COMPLETIONS_PATH", "env-completions-path")
 		os.Setenv(envPrefix+"MODELS_PATH", "env-models-path")
@@ -210,6 +211,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			APIKey:           "user-api-key",
 			Model:            "user-model",
 			MaxTokens:        20,
+			ContextWindow:    30,
 			URL:              "user-url",
 			CompletionsPath:  "user-completions-path",
 			ModelsPath:       "user-models-path",
@@ -232,6 +234,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.APIKey).To(Equal("env-api-key"))
 		Expect(subject.Config.Model).To(Equal("env-model"))
 		Expect(subject.Config.MaxTokens).To(Equal(15))
+		Expect(subject.Config.ContextWindow).To(Equal(25))
 		Expect(subject.Config.URL).To(Equal("env-url"))
 		Expect(subject.Config.CompletionsPath).To(Equal("env-completions-path"))
 		Expect(subject.Config.ModelsPath).To(Equal("env-models-path"))
@@ -251,6 +254,14 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		performWriteTest(mockConfigStore, defaultConfig, maxTokens, "MaxTokens", func() {
 			subject := configmanager.New(mockConfigStore).WithEnvironment()
 			subject.WriteMaxTokens(maxTokens)
+		})
+	})
+
+	it("should write the context window as expected", func() {
+		window := 12345
+		performWriteTest(mockConfigStore, defaultConfig, window, "ContextWindow", func() {
+			subject := configmanager.New(mockConfigStore).WithEnvironment()
+			subject.WriteContextWindow(window)
 		})
 	})
 

@@ -29,6 +29,7 @@ var (
 	modelName       string
 	threadName      string
 	maxTokens       int
+	contextWindow   int
 	GitCommit       string
 	GitVersion      string
 	ServiceURL      string
@@ -57,8 +58,8 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&modelName, "set-model", "", "Set a new default GPT model by specifying the model name")
 	rootCmd.PersistentFlags().StringVar(&threadName, "set-thread", "", "Set a new active thread by specifying the thread name")
 	rootCmd.PersistentFlags().StringVar(&shell, "set-completions", "", "Generate autocompletion script for your current shell")
-
 	rootCmd.PersistentFlags().IntVar(&maxTokens, "set-max-tokens", 0, "Set a new default max token size by specifying the max tokens")
+	rootCmd.PersistentFlags().IntVar(&contextWindow, "set-context-window", 0, "Set a new default context window size")
 
 	viper.AutomaticEnv()
 
@@ -96,6 +97,16 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		fmt.Println("Max tokens successfully updated to", maxTokens)
+		return nil
+	}
+
+	if cmd.Flag("set-context-window").Changed {
+		cm := configmanager.New(config.New())
+
+		if err := cm.WriteContextWindow(contextWindow); err != nil {
+			return err
+		}
+		fmt.Println("Context window successfully updated to", contextWindow)
 		return nil
 	}
 

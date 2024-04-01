@@ -184,6 +184,40 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				Expect(readConfig).To(Equal(expectedConfig))
 			})
+			it("preserves comments when writing the config to the file", func() {
+				configFile := filepath.Join(tmpDir, "config_with_comments.yaml")
+				err := os.WriteFile(configFile, []byte(`
+# This is a model configuration
+model: gpt-3.5-turbo # Default model
+# Maximum number of tokens
+max_tokens: 100
+`), 0644)
+				Expect(err).NotTo(HaveOccurred())
+
+				configIO = config.New().WithConfigPath(configFile)
+
+				// Read the existing configuration, modify a value, and write it back
+				readConfig, err := configIO.Read()
+				Expect(err).NotTo(HaveOccurred())
+
+				// Modify the configuration
+				readConfig.Model = "new-model"
+				err = configIO.Write(readConfig)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Read the file content back
+				content, err := os.ReadFile(configFile)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Check if the comments are still present
+				Expect(string(content)).To(ContainSubstring("# This is a model configuration"))
+				Expect(string(content)).To(ContainSubstring("# Default model"))
+				Expect(string(content)).To(ContainSubstring("# Maximum number of tokens"))
+
+				// Verify the configuration was updated
+				Expect(string(content)).To(ContainSubstring("model: new-model"))
+			})
+
 		})
 
 		it("lists all the threads", func() {
@@ -622,6 +656,34 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 					// Verify updated model through --list-models
 					output = runCommand("--list-models")
 					Expect(output).To(ContainSubstring("* " + newModel + " (current)"))
+				})
+
+				it("has a configurable default context-window", func() {
+					defaults := config.New().ReadDefaults()
+
+					// Initial check for default context-window
+					output := runCommand("--config")
+					Expect(output).To(ContainSubstring(strconv.Itoa(defaults.ContextWindow)))
+
+					// Update and verify context-window
+					newContextWindow := "100000"
+					runCommand("--set-context-window", newContextWindow)
+					Expect(configFile).To(BeAnExistingFile())
+					checkConfigFileContent(newContextWindow)
+
+					// Verify update through --config
+					output = runCommand("--config")
+					Expect(output).To(ContainSubstring(newContextWindow))
+
+					// Environment variable takes precedence
+					envContext := "123"
+					modelEnvKey := strings.Replace(apiKeyEnvVar, "API_KEY", "CONTEXT_WINDOW", 1)
+					Expect(os.Setenv(modelEnvKey, envContext)).To(Succeed())
+
+					// Verify environment variable override
+					output = runCommand("--config")
+					Expect(output).To(ContainSubstring(envContext))
+					Expect(os.Unsetenv(modelEnvKey)).To(Succeed())
 				})
 
 				it("has a configurable default max-tokens", func() {

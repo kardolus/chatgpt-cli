@@ -3,6 +3,7 @@ module github.com/kardolus/chatgpt-cli
 go 1.20
 
 require (
+	github.com/chzyer/readline v1.5.1
 	github.com/golang/mock v1.6.0
 	github.com/onsi/gomega v1.32.0
 	github.com/sclevine/spec v1.4.0

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chzyer/readline"
 	"github.com/kardolus/chatgpt-cli/client"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/configmanager"
@@ -196,30 +196,39 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if interactiveMode {
-		fmt.Println("Entering interactive mode. Type 'exit' and press Enter or press Ctrl+C to quit.")
+		fmt.Printf("Entering interactive mode. Type 'exit' and press Enter or press Ctrl+C to quit.\n\n")
 
-		scanner := bufio.NewScanner(os.Stdin)
+		// Initialize readline with an empty prompt first, as we'll set it dynamically.
+		rl, err := readline.New("")
+		if err != nil {
+			return err
+		}
+		defer rl.Close()
+
+		prompt := func(qNum int) string {
+			return fmt.Sprintf("[%s] Q%d: ", time.Now().Format("2006-01-02 15:04:05"), qNum)
+		}
+
 		qNum := 1
 		for {
-			fmt.Printf("\n[%s] Q%d: ", time.Now().Format("2006-01-02 15:04:05"), qNum)
-			scanned := scanner.Scan()
-			if !scanned {
-				if err := scanner.Err(); err != nil {
-					fmt.Println(err)
-					os.Exit(1)
-				}
-				// Exit the loop if no more input (e.g., Ctrl+D)
+			// Set and update the readline prompt dynamically
+			rl.SetPrompt(prompt(qNum))
+
+			line, err := rl.Readline()
+			if err == readline.ErrInterrupt || err == io.EOF {
+				fmt.Println("Bye!")
 				break
 			}
-			line := scanner.Text()
+
 			if line == "exit" {
 				fmt.Println("Bye!")
 				break
 			}
+
 			if err := client.Stream(line); err != nil {
 				fmt.Println("Error:", err)
 			} else {
-				// Handle the streamed response here, which currently does nothing
+				fmt.Println()
 				qNum++
 			}
 		}

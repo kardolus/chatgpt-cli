@@ -15,7 +15,6 @@ const (
 )
 
 type HistoryStore interface {
-	Delete() error
 	Read() ([]types.Message, error)
 	Write([]types.Message) error
 	SetThread(thread string)
@@ -61,13 +60,6 @@ func (f *FileIO) SetThread(thread string) {
 func (f *FileIO) WithDirectory(historyDir string) *FileIO {
 	f.historyDir = historyDir
 	return f
-}
-
-func (f *FileIO) Delete() error {
-	if _, err := os.Stat(f.getPath()); err == nil {
-		return os.Remove(f.getPath())
-	}
-	return nil
 }
 
 func (f *FileIO) Read() ([]types.Message, error) {

@@ -34,20 +34,6 @@ func (m *MockHistoryStore) EXPECT() *MockHistoryStoreMockRecorder {
 	return m.recorder
 }
 
-// Delete mocks base method.
-func (m *MockHistoryStore) Delete() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Delete indicates an expected call of Delete.
-func (mr *MockHistoryStoreMockRecorder) Delete() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockHistoryStore)(nil).Delete))
-}
-
 // Read mocks base method.
 func (m *MockHistoryStore) Read() ([]types.Message, error) {
 	m.ctrl.T.Helper()

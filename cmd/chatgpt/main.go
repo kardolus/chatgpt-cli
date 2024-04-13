@@ -57,6 +57,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
 	rootCmd.PersistentFlags().StringVar(&modelName, "set-model", "", "Set a new default GPT model by specifying the model name")
 	rootCmd.PersistentFlags().StringVar(&threadName, "set-thread", "", "Set a new active thread by specifying the thread name")
+	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
 	rootCmd.PersistentFlags().StringVar(&shell, "set-completions", "", "Generate autocompletion script for your current shell")
 	rootCmd.PersistentFlags().IntVar(&maxTokens, "set-max-tokens", 0, "Set a new default max token size by specifying the max tokens")
 	rootCmd.PersistentFlags().IntVar(&contextWindow, "set-context-window", 0, "Set a new default context window size")
@@ -120,6 +121,16 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	if cmd.Flag("delete-thread").Changed {
+		cm := configmanager.New(config.New())
+
+		if err := cm.DeleteThread(threadName); err != nil {
+			return err
+		}
+		fmt.Printf("Successfully deleted thead %s\n", threadName)
+		return nil
+	}
+
 	if listThreads {
 		cm := configmanager.New(config.New())
 
@@ -135,15 +146,9 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if clearHistory {
-		historyHandler, err := history.New()
-		if err != nil {
-			return err
-		}
-
 		cm := configmanager.New(config.New())
-		historyHandler.SetThread(cm.Config.Thread)
 
-		if err := historyHandler.Delete(); err != nil {
+		if err := cm.DeleteThread(cm.Config.Thread); err != nil {
 			return err
 		}
 

@@ -34,6 +34,20 @@ func (m *MockConfigStore) EXPECT() *MockConfigStoreMockRecorder {
 	return m.recorder
 }
 
+// Delete mocks base method.
+func (m *MockConfigStore) Delete(arg0 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockConfigStoreMockRecorder) Delete(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockConfigStore)(nil).Delete), arg0)
+}
+
 // List mocks base method.
 func (m *MockConfigStore) List() ([]string, error) {
 	m.ctrl.T.Helper()

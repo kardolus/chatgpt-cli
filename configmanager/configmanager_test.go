@@ -126,8 +126,8 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			PresencePenalty:  5.5,
 		}
 
-		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).AnyTimes()
-		mockConfigStore.EXPECT().Read().Return(userConfig, nil).AnyTimes()
+		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+		mockConfigStore.EXPECT().Read().Return(userConfig, nil).Times(1)
 
 		subject := configmanager.New(mockConfigStore).WithEnvironment()
 
@@ -166,8 +166,8 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"FREQUENCY_PENALTY", "4.4")
 		os.Setenv(envPrefix+"PRESENCE_PENALTY", "5.5")
 
-		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).AnyTimes()
-		mockConfigStore.EXPECT().Read().Return(types.Config{}, errors.New("config error")).AnyTimes()
+		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+		mockConfigStore.EXPECT().Read().Return(types.Config{}, errors.New("config error")).Times(1)
 
 		subject := configmanager.New(mockConfigStore).WithEnvironment()
 
@@ -226,8 +226,8 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			PresencePenalty:  4.5,
 		}
 
-		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).AnyTimes()
-		mockConfigStore.EXPECT().Read().Return(userConfig, nil).AnyTimes()
+		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+		mockConfigStore.EXPECT().Read().Return(userConfig, nil).Times(1)
 
 		subject := configmanager.New(mockConfigStore).WithEnvironment()
 
@@ -281,13 +281,46 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		})
 	})
 
+	when("DeleteThread()", func() {
+		var subject *configmanager.ConfigManager
+
+		threadName := "non-active-thread"
+
+		it.Before(func() {
+			userConfig := types.Config{Thread: threadName}
+
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(userConfig, nil).Times(1)
+
+			subject = configmanager.New(mockConfigStore).WithEnvironment()
+		})
+
+		it("propagates the error from the config store", func() {
+			expectedMsg := "expected-error"
+
+			mockConfigStore.EXPECT().Delete(threadName).Return(errors.New(expectedMsg)).Times(1)
+
+			err := subject.DeleteThread(threadName)
+
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(expectedMsg))
+		})
+		it("completes successfully the config store throws no error", func() {
+			mockConfigStore.EXPECT().Delete(threadName).Return(nil).Times(1)
+
+			err := subject.DeleteThread(threadName)
+
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
 	when("ListThreads()", func() {
 		activeThread := "active-thread"
 
 		it.Before(func() {
 			userConfig := types.Config{Thread: activeThread}
 
-			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).AnyTimes()
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 			mockConfigStore.EXPECT().Read().Return(userConfig, nil).Times(1)
 		})
 

@@ -36,6 +36,12 @@ func (c *ConfigManager) APIKeyEnvVarName() string {
 	return strings.ToUpper(c.Config.Name) + "_" + "API_KEY"
 }
 
+// DeleteThread removes the specified thread from the configuration store.
+// This operation is idempotent; non-existent threads do not cause errors.
+func (c *ConfigManager) DeleteThread(thread string) error {
+	return c.configStore.Delete(thread)
+}
+
 // ListThreads retrieves a list of all threads stored in the configuration.
 // It marks the current thread with an asterisk (*) and returns the list sorted alphabetically.
 // If an error occurs while retrieving the threads from the config store, it returns the error.

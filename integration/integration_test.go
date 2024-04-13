@@ -46,7 +46,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		RegisterTestingT(t)
 	})
 
-	when("Read, Write and Delete History", func() {
+	when("Read and Write History", func() {
 		const threadName = "default-thread"
 
 		var (
@@ -93,17 +93,9 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(readMessages).To(Equal(messages))
 		})
-
-		it("deletes the file", func() {
-			err = fileIO.Delete()
-			Expect(err).NotTo(HaveOccurred())
-
-			_, err = os.Stat(threadName + ".json")
-			Expect(os.IsNotExist(err)).To(BeTrue())
-		})
 	})
 
-	when("Read, Write, List Config", func() {
+	when("Read, Write, List, Delete Config", func() {
 		var (
 			tmpDir     string
 			tmpFile    *os.File
@@ -236,6 +228,26 @@ max_tokens: 100
 			Expect(result[2]).To(Equal("thread3.json"))
 		})
 
+		it("deletes the thread", func() {
+			files := []string{"thread1.json", "thread2.json", "thread3.json"}
+
+			for _, file := range files {
+				file, err := os.Create(filepath.Join(historyDir, file))
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(file.Close()).To(Succeed())
+			}
+
+			err = configIO.Delete("thread2")
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = os.Stat(filepath.Join(historyDir, "thread2.json"))
+			Expect(os.IsNotExist(err)).To(BeTrue())
+
+			_, err = os.Stat(filepath.Join(historyDir, "thread3.json"))
+			Expect(os.IsNotExist(err)).To(BeFalse())
+		})
+
 		// Since we don't have a Delete method in the config, we will test if we can overwrite the configuration.
 		it("overwrites the existing config", func() {
 			newConfig := types.Config{
@@ -331,19 +343,6 @@ max_tokens: 100
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(session).Should(gexec.Exit(exitSuccess))
-		})
-
-		it("should require a hidden folder for the --clear-history flag", func() {
-			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
-
-			command := exec.Command(binaryPath, "--clear-history")
-			session, err := gexec.Start(command, io.Discard, io.Discard)
-			Expect(err).NotTo(HaveOccurred())
-
-			Eventually(session).Should(gexec.Exit(exitFailure))
-
-			output := string(session.Out.Contents())
-			Expect(output).To(ContainSubstring(".chatgpt-cli: no such file or directory"))
 		})
 
 		it("should require a hidden folder for the --list-threads flag", func() {
@@ -629,6 +628,39 @@ max_tokens: 100
 				Expect(output).To(ContainSubstring("- thread1"))
 				Expect(output).To(ContainSubstring("- thread2"))
 				Expect(output).To(ContainSubstring("- thread3"))
+			})
+
+			it("should delete the expected thread using the --delete-threads flag", func() {
+				historyDir := path.Join(filePath, "history")
+				Expect(os.Mkdir(historyDir, 0755)).To(Succeed())
+
+				files := []string{"thread1.json", "thread2.json", "thread3.json", "default.json"}
+
+				os.Mkdir(historyDir, 7555)
+
+				for _, file := range files {
+					file, err := os.Create(filepath.Join(historyDir, file))
+					Expect(err).NotTo(HaveOccurred())
+
+					Expect(file.Close()).To(Succeed())
+				}
+
+				runCommand("--delete-thread", "thread2")
+
+				output := runCommand("--list-threads")
+
+				Expect(output).To(ContainSubstring("* default (current)"))
+				Expect(output).To(ContainSubstring("- thread1"))
+				Expect(output).NotTo(ContainSubstring("- thread2"))
+				Expect(output).To(ContainSubstring("- thread3"))
+			})
+
+			it("should not throw an error when a non-existent thread is deleted using the --delete-threads flag", func() {
+				command := exec.Command(binaryPath, "--delete-thread", "does-not-exist")
+				session, err := gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitSuccess))
 			})
 
 			when("configurable flags are set", func() {

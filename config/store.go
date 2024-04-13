@@ -29,6 +29,7 @@ const (
 )
 
 type ConfigStore interface {
+	Delete(string) error
 	List() ([]string, error)
 	Read() (types.Config, error)
 	ReadDefaults() types.Config
@@ -61,6 +62,15 @@ func (f *FileIO) WithConfigPath(configFilePath string) *FileIO {
 func (f *FileIO) WithHistoryPath(historyPath string) *FileIO {
 	f.historyFilePath = historyPath
 	return f
+}
+
+func (f *FileIO) Delete(name string) error {
+	path := filepath.Join(f.historyFilePath, name+".json")
+
+	if _, err := os.Stat(path); err == nil {
+		return os.Remove(path)
+	}
+	return nil
 }
 
 func (f *FileIO) List() ([]string, error) {

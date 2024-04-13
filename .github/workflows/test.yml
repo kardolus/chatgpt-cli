@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/setup-go@v4
       with:
-        go-version: '1.20'
+        go-version: 'stable'
     - uses: actions/checkout@v4
     - run: go mod tidy && git diff --exit-code go.mod go.sum
 
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: [ '1.20', '1.21' ]
+        version: [ '1.22.0', '1.22.2' ]
     name: Go ${{ matrix.version }}
     steps:
     - uses: actions/setup-go@v4

@@ -13,7 +13,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
 - [Installation](#installation)
     - [Using Homebrew (macOS)](#using-homebrew-macos)
     - [Direct Download](#direct-download)
-        - [Apple M1 chips](#apple-m1-chips)
+        - [Apple Silicon](#apple-silicon)
         - [macOS Intel chips](#macos-intel-chips)
         - [Linux (amd64)](#linux-amd64)
         - [Linux (arm64)](#linux-arm64)
@@ -68,7 +68,7 @@ brew tap kardolus/chatgpt-cli && brew install chatgpt-cli
 For a quick and easy installation without compiling, you can directly download the pre-built binary for your operating
 system and architecture:
 
-#### Apple M1 chips
+#### Apple Silicon
 
 ```shell
 curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/latest/download/chatgpt-darwin-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/

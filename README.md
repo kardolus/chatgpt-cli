@@ -35,8 +35,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
 
 * **Streaming mode**: Real-time interaction with the GPT model.
 * **Query mode**: Single input-output interactions with the GPT model.
-* **Interactive mode**: The interactive mode allows for a more conversational experience with the model. Exit
-  interactive mode by simply typing 'exit'. Prints the token usage when combined with query mode.
+* **Interactive mode**: The interactive mode allows for a more conversational experience with the model. Prints the
+  token usage when combined with query mode.
 * **Thread-based context management**: Enjoy seamless conversations with the GPT model with individualized context for
   each thread, much like your experience on the OpenAI website. Each unique thread has its own history, ensuring
   relevant and coherent responses across different chat instances.

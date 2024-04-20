@@ -153,7 +153,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				Expect(err).NotTo(HaveOccurred())
 				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, body, false).Return(respBytes, tt.postError)
 
-				_, err = subject.Query(query)
+				_, _, err = subject.Query(query)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(tt.expectedError))
 			})
@@ -161,7 +161,10 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 		when("a valid http response is received", func() {
 			testValidHTTPResponse := func(subject *client.Client, history []types.Message, expectedBody []byte, omitHistory bool) {
-				const answer = "content"
+				const (
+					answer = "content"
+					tokens = 789
+				)
 
 				choice := types.Choice{
 					Message: types.Message{
@@ -177,6 +180,11 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					Created: 0,
 					Model:   subject.Config.Model,
 					Choices: []types.Choice{choice},
+					Usage: types.Usage{
+						PromptTokens:     123,
+						CompletionTokens: 456,
+						TotalTokens:      tokens,
+					},
 				}
 
 				respBytes, err := json.Marshal(response)
@@ -194,9 +202,10 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					}))
 				}
 
-				result, err := subject.Query(query)
+				result, usage, err := subject.Query(query)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).To(Equal(answer))
+				Expect(usage).To(Equal(tokens))
 			}
 			it("uses the values specified by the configuration instead of the default values", func() {
 				const (

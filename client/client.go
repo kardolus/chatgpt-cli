@@ -104,37 +104,35 @@ func (c *Client) ProvideContext(context string) {
 	c.History = append(c.History, messages...)
 }
 
-// Query sends a query to the API and returns the response as a string.
-// It takes an input string as a parameter and returns a string containing
-// the API response or an error if there's any issue during the process.
-// The method creates a request body with the input and then makes an API
-// call using the Post method. If the response is not empty, it decodes the
-// response JSON and returns the content of the first choice.
-func (c *Client) Query(input string) (string, error) {
+// Query sends a query to the API, returning the response as a string along with the token usage.
+// It takes an input string, constructs a request body, and makes a POST API call.
+// Returns the API response string, the number of tokens used, and an error if any issues occur.
+// If the response contains choices, it decodes the JSON and returns the content of the first choice.
+func (c *Client) Query(input string) (string, int, error) {
 	c.prepareQuery(input)
 
 	body, err := c.createBody(false)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	raw, err := c.caller.Post(c.getEndpoint(c.Config.CompletionsPath), body, false)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	var response types.CompletionsResponse
 	if err := c.processResponse(raw, &response); err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	if len(response.Choices) == 0 {
-		return "", errors.New("no responses returned")
+		return "", response.Usage.TotalTokens, errors.New("no responses returned")
 	}
 
 	c.updateHistory(response.Choices[0].Message.Content)
 
-	return response.Choices[0].Message.Content, nil
+	return response.Choices[0].Message.Content, response.Usage.TotalTokens, nil
 }
 
 // Stream sends a query to the API and processes the response as a stream.

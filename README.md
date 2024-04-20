@@ -36,12 +36,12 @@ Azure, featuring streaming capabilities and extensive configuration options.
 * **Streaming mode**: Real-time interaction with the GPT model.
 * **Query mode**: Single input-output interactions with the GPT model.
 * **Interactive mode**: The interactive mode allows for a more conversational experience with the model. Exit
-  interactive mode by simply typing 'exit'.
+  interactive mode by simply typing 'exit'. Prints the token usage when combined with query mode.
 * **Thread-based context management**: Enjoy seamless conversations with the GPT model with individualized context for
   each thread, much like your experience on the OpenAI website. Each unique thread has its own history, ensuring
   relevant and coherent responses across different chat instances.
 * **Sliding window history**: To stay within token limits, the chat history automatically trims while still preserving
-  the necessary context. The size of this window can be adjusted through the `context-window` setting. 
+  the necessary context. The size of this window can be adjusted through the `context-window` setting.
 * **Custom context from any source**: You can provide the GPT model with a custom context during conversation. This
   context can be piped in from any source, such as local files, standard input, or even another program. This
   flexibility allows the model to adapt to a wide range of conversational scenarios.
@@ -49,7 +49,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
 * **Thread listing**: Display a list of active threads using the `--list-threads` flag.
 * **Advanced configuration options**: The CLI supports a layered configuration system where settings can be specified
   through default values, a `config.yaml` file, and environment variables. For quick adjustments,
-  various `--set-<value>` flags are provided. To verify your current settings, use the `--config` or `-c` flag. 
+  various `--set-<value>` flags are provided. To verify your current settings, use the `--config` or `-c` flag.
 * **Availability Note**: This CLI supports both gpt-4 and gpt-3.5-turbo models. However, the specific ChatGPT model used
   on chat.openai.com may not be available via the OpenAI API.
 

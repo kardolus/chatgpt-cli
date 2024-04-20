@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -202,22 +203,23 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if interactiveMode {
 		fmt.Printf("Entering interactive mode. Type 'exit' and press Enter or press Ctrl+C to quit.\n\n")
-
-		// Initialize readline with an empty prompt first, as we'll set it dynamically.
 		rl, err := readline.New("")
 		if err != nil {
 			return err
 		}
 		defer rl.Close()
 
-		prompt := func(qNum int) string {
-			return fmt.Sprintf("[%s] Q%d: ", time.Now().Format("2006-01-02 15:04:05"), qNum)
+		prompt := func(counter string) string {
+			return fmt.Sprintf("[%s] [%s]: ", time.Now().Format("2006-01-02 15:04:05"), counter)
 		}
 
-		qNum := 1
+		qNum, usage := 1, 0
 		for {
-			// Set and update the readline prompt dynamically
-			rl.SetPrompt(prompt(qNum))
+			if queryMode {
+				rl.SetPrompt(prompt(strconv.Itoa(usage)))
+			} else {
+				rl.SetPrompt(prompt(fmt.Sprintf("Q%d", qNum)))
+			}
 
 			line, err := rl.Readline()
 			if err == readline.ErrInterrupt || err == io.EOF {
@@ -225,16 +227,29 @@ func run(cmd *cobra.Command, args []string) error {
 				break
 			}
 
-			if line == "exit" {
+			if line == "exit" || line == "/q" {
 				fmt.Println("Bye!")
+				if queryMode {
+					fmt.Printf("Total tokens used: %d\n", usage)
+				}
 				break
 			}
 
-			if err := client.Stream(line); err != nil {
-				fmt.Println("Error:", err)
+			if queryMode {
+				result, qUsage, err := client.Query(line)
+				if err != nil {
+					fmt.Println("Error:", err)
+				} else {
+					fmt.Printf("%s\n\n", result)
+					usage += qUsage
+				}
 			} else {
-				fmt.Println()
-				qNum++
+				if err := client.Stream(line); err != nil {
+					fmt.Println("Error:", err)
+				} else {
+					fmt.Println()
+					qNum++
+				}
 			}
 		}
 	} else {
@@ -242,7 +257,7 @@ func run(cmd *cobra.Command, args []string) error {
 			return errors.New("you must specify your query")
 		}
 		if queryMode {
-			result, err := client.Query(strings.Join(args, " "))
+			result, _, err := client.Query(strings.Join(args, " "))
 			if err != nil {
 				return err
 			}

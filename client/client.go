@@ -1,9 +1,7 @@
 package client
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"unicode/utf8"
 
@@ -26,7 +24,7 @@ const (
 type Client struct {
 	Config       types.Config
 	History      []types.Message
-	caller       http.Caller
+	provider     Provider
 	historyStore history.HistoryStore
 }
 
@@ -39,12 +37,13 @@ func New(callerFactory http.CallerFactory, cs config.ConfigStore, hs history.His
 	}
 
 	caller := callerFactory(configuration)
+	provider := &OpenAIProvider{caller: caller}
 
 	hs.SetThread(configuration.Thread)
 
 	return &Client{
 		Config:       configuration,
-		caller:       caller,
+		provider:     provider,
 		historyStore: hs,
 	}, nil
 }
@@ -66,29 +65,7 @@ func (c *Client) WithServiceURL(url string) *Client {
 // In case of an error during the retrieval or processing of the models,
 // the method returns an error. If the API response is empty, an error is returned as well.
 func (c *Client) ListModels() ([]string, error) {
-	var result []string
-
-	raw, err := c.caller.Get(c.getEndpoint(c.Config.ModelsPath))
-	if err != nil {
-		return nil, err
-	}
-
-	var response types.ListModelsResponse
-	if err := c.processResponse(raw, &response); err != nil {
-		return nil, err
-	}
-
-	for _, model := range response.Data {
-		if strings.HasPrefix(model.Id, gptPrefix) {
-			if model.Id != c.Config.Model {
-				result = append(result, fmt.Sprintf("- %s", model.Id))
-				continue
-			}
-			result = append(result, fmt.Sprintf("* %s (current)", model.Id))
-		}
-	}
-
-	return result, nil
+	return c.provider.ListModels(c.Config)
 }
 
 // ProvideContext adds custom context to the client's history by converting the
@@ -111,28 +88,14 @@ func (c *Client) ProvideContext(context string) {
 func (c *Client) Query(input string) (string, int, error) {
 	c.prepareQuery(input)
 
-	body, err := c.createBody(false)
+	response, usage, err := c.provider.Generate(c.History, c.Config, false)
 	if err != nil {
 		return "", 0, err
 	}
 
-	raw, err := c.caller.Post(c.getEndpoint(c.Config.CompletionsPath), body, false)
-	if err != nil {
-		return "", 0, err
-	}
+	c.updateHistory(response)
 
-	var response types.CompletionsResponse
-	if err := c.processResponse(raw, &response); err != nil {
-		return "", 0, err
-	}
-
-	if len(response.Choices) == 0 {
-		return "", response.Usage.TotalTokens, errors.New("no responses returned")
-	}
-
-	c.updateHistory(response.Choices[0].Message.Content)
-
-	return response.Choices[0].Message.Content, response.Usage.TotalTokens, nil
+	return response, usage, nil
 }
 
 // Stream sends a query to the API and processes the response as a stream.
@@ -143,12 +106,7 @@ func (c *Client) Query(input string) (string, int, error) {
 func (c *Client) Stream(input string) error {
 	c.prepareQuery(input)
 
-	body, err := c.createBody(true)
-	if err != nil {
-		return err
-	}
-
-	result, err := c.caller.Post(c.getEndpoint(c.Config.CompletionsPath), body, true)
+	result, _, err := c.provider.Generate(c.History, c.Config, true)
 	if err != nil {
 		return err
 	}
@@ -156,21 +114,6 @@ func (c *Client) Stream(input string) error {
 	c.updateHistory(string(result))
 
 	return nil
-}
-
-func (c *Client) createBody(stream bool) ([]byte, error) {
-	body := types.CompletionsRequest{
-		Messages:         c.History,
-		Model:            c.Config.Model,
-		MaxTokens:        c.Config.MaxTokens,
-		Temperature:      c.Config.Temperature,
-		TopP:             c.Config.TopP,
-		FrequencyPenalty: c.Config.FrequencyPenalty,
-		PresencePenalty:  c.Config.PresencePenalty,
-		Stream:           stream,
-	}
-
-	return json.Marshal(body)
 }
 
 func (c *Client) initHistory() {
@@ -208,18 +151,6 @@ func (c *Client) getEndpoint(path string) string {
 func (c *Client) prepareQuery(input string) {
 	c.initHistory()
 	c.addQuery(input)
-}
-
-func (c *Client) processResponse(raw []byte, v interface{}) error {
-	if raw == nil {
-		return errors.New(ErrEmptyResponse)
-	}
-
-	if err := json.Unmarshal(raw, v); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return nil
 }
 
 func (c *Client) truncateHistory() {

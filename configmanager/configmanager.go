@@ -104,6 +104,8 @@ func (c *ConfigManager) WriteProvider(provider string) error {
 	default:
 		return fmt.Errorf("invalid provider: %s", provider)
 	}
+	// change config name since it affects env var names
+	c.Config.Name = strings.ToLower(string(c.Config.Provider))
 
 	return c.configStore.Write(c.Config)
 }

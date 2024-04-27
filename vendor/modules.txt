@@ -1,6 +1,18 @@
 # github.com/chzyer/readline v1.5.1
 ## explicit; go 1.15
 github.com/chzyer/readline
+# github.com/cohere-ai/cohere-go/v2 v2.7.3
+## explicit; go 1.18
+github.com/cohere-ai/cohere-go/v2
+github.com/cohere-ai/cohere-go/v2/client
+github.com/cohere-ai/cohere-go/v2/connectors
+github.com/cohere-ai/cohere-go/v2/core
+github.com/cohere-ai/cohere-go/v2/datasets
+github.com/cohere-ai/cohere-go/v2/embedjobs
+github.com/cohere-ai/cohere-go/v2/finetuning
+github.com/cohere-ai/cohere-go/v2/finetuning/client
+github.com/cohere-ai/cohere-go/v2/models
+github.com/cohere-ai/cohere-go/v2/option
 # github.com/fsnotify/fsnotify v1.7.0
 ## explicit; go 1.17
 github.com/fsnotify/fsnotify
@@ -15,6 +27,9 @@ github.com/google/go-cmp/cmp/internal/diff
 github.com/google/go-cmp/cmp/internal/flags
 github.com/google/go-cmp/cmp/internal/function
 github.com/google/go-cmp/cmp/internal/value
+# github.com/google/uuid v1.4.0
+## explicit
+github.com/google/uuid
 # github.com/hashicorp/hcl v1.0.0
 ## explicit
 github.com/hashicorp/hcl

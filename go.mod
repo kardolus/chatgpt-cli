@@ -4,6 +4,7 @@ go 1.22.0
 
 require (
 	github.com/chzyer/readline v1.5.1
+	github.com/cohere-ai/cohere-go/v2 v2.7.3
 	github.com/golang/mock v1.6.0
 	github.com/onsi/gomega v1.33.0
 	github.com/sclevine/spec v1.4.0
@@ -15,6 +16,7 @@ require (
 require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/uuid v1.4.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect

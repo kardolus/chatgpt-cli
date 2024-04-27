@@ -27,6 +27,7 @@ var (
 	interactiveMode bool
 	listModels      bool
 	listThreads     bool
+	providerName    string
 	modelName       string
 	threadName      string
 	maxTokens       int
@@ -56,6 +57,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
 	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
+	rootCmd.PersistentFlags().StringVar(&providerName, "set-provider", "", "Set a model provider, e.g. OpenAI or Cohere")
 	rootCmd.PersistentFlags().StringVar(&modelName, "set-model", "", "Set a new default GPT model by specifying the model name")
 	rootCmd.PersistentFlags().StringVar(&threadName, "set-thread", "", "Set a new active thread by specifying the thread name")
 	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
@@ -80,6 +82,16 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if cmd.Flag("set-completions").Changed {
 		return config.GenCompletions(cmd, shell)
+	}
+
+	if cmd.Flag("set-provider").Changed {
+		cm := configmanager.New(config.New())
+
+		if err := cm.WriteProvider(providerName); err != nil {
+			return err
+		}
+		fmt.Println("Provider successfully updated to", providerName)
+		return nil
 	}
 
 	if cmd.Flag("set-model").Changed {

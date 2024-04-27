@@ -2,6 +2,7 @@ package client
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -38,8 +39,22 @@ func New(callerFactory http.CallerFactory, cs config.ConfigStore, hs history.His
 		return nil, errors.New("missing environment variable: " + cm.APIKeyEnvVarName())
 	}
 
-	caller := callerFactory(configuration)
-	provider := &OpenAIProvider{caller: caller}
+	var (
+		provider Provider
+		err      error
+	)
+	switch configuration.Provider {
+	case types.OpenAI:
+		caller := callerFactory(configuration)
+		provider = &OpenAIProvider{caller: caller}
+	case types.Cohere:
+		provider, err = newCohereProvider(configuration)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported provider: %v", configuration.Provider)
+	}
 
 	hs.SetThread(configuration.Thread)
 

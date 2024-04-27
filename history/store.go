@@ -2,12 +2,13 @@ package history
 
 import (
 	"encoding/json"
-	"github.com/kardolus/chatgpt-cli/config"
-	"github.com/kardolus/chatgpt-cli/types"
-	"github.com/kardolus/chatgpt-cli/utils"
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/kardolus/chatgpt-cli/config"
+	"github.com/kardolus/chatgpt-cli/types"
+	"github.com/kardolus/chatgpt-cli/utils"
 )
 
 const (

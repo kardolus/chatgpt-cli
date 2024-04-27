@@ -2,13 +2,14 @@ package configmanager
 
 import (
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/config"
-	"github.com/kardolus/chatgpt-cli/types"
-	"gopkg.in/yaml.v3"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/kardolus/chatgpt-cli/config"
+	"github.com/kardolus/chatgpt-cli/types"
+	"gopkg.in/yaml.v3"
 )
 
 type ConfigManager struct {
@@ -88,6 +89,23 @@ func (c *ConfigManager) WriteMaxTokens(tokens int) error {
 // It writes the updated configuration to the config store and returns an error if the write fails.
 func (c *ConfigManager) WriteContextWindow(window int) error {
 	c.Config.ContextWindow = window
+
+	return c.configStore.Write(c.Config)
+}
+
+// WriteProvider updates the provider in the current configuration.
+// It writes the updated configuration to the config store and returns an error if the write fails.
+func (c *ConfigManager) WriteProvider(provider string) error {
+	switch strings.ToLower(provider) {
+	case strings.ToLower(string(types.OpenAI)):
+		c.Config.Provider = types.OpenAI
+	case strings.ToLower(string(types.Cohere)):
+		c.Config.Provider = types.Cohere
+	default:
+		return fmt.Errorf("invalid provider: %s", provider)
+	}
+	// change config name since it affects env var names
+	c.Config.Name = strings.ToLower(string(c.Config.Provider))
 
 	return c.configStore.Write(c.Config)
 }

@@ -22,6 +22,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
 - [Configuration](#configuration)
     - [General Configuration](#general-configuration)
     - [Azure Configuration](#azure-configuration)
+    - [Cohere Configuration](#cohere-configuration)
     - [Command-Line Autocompletion](#command-line-autocompletion)
         - [Enabling Autocompletion](#enabling-autocompletion)
         - [Persistent Autocompletion](#persistent-autocompletion)
@@ -269,6 +270,19 @@ You can set the API key either in the `config.yaml` file as shown above or expor
 ```shell
 export AZURE_API_KEY=<your_key>
 ```
+
+### Cohere Configuration
+
+To switch to using Cohere models, use the following commands to update your configuration:
+
+```shell
+chatgpt --set-provider cohere
+chatgpt --list-models
+chatgpt --set-model command-r
+export COHERE_API_KEY=<your_key>
+```
+
+Get your Cohere API key from the [Cohere dashboard](https://dashboard.cohere.com/api-keys).
 
 ### Command-Line Autocompletion
 

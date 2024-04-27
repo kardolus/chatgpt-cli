@@ -1,13 +1,14 @@
 package config
 
 import (
-	"github.com/kardolus/chatgpt-cli/types"
-	"github.com/kardolus/chatgpt-cli/utils"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strconv"
+
+	"github.com/kardolus/chatgpt-cli/types"
+	"github.com/kardolus/chatgpt-cli/utils"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -132,7 +133,10 @@ func (f *FileIO) Write(config types.Config) error {
 	if err != nil {
 		return err
 	}
-
+	dir := filepath.Dir(f.configFilePath)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		os.MkdirAll(dir, 0755)
+	}
 	return os.WriteFile(f.configFilePath, modifiedContent, 0644)
 }
 

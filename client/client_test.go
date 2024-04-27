@@ -1,17 +1,21 @@
 package client_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	_ "github.com/golang/mock/mockgen/model"
 	"github.com/kardolus/chatgpt-cli/client"
 	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/kardolus/chatgpt-cli/types"
 	"github.com/kardolus/chatgpt-cli/utils"
-	"os"
-	"strings"
-	"testing"
 
 	. "github.com/onsi/gomega"
 	"github.com/sclevine/spec"
@@ -151,7 +155,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 				respBytes, err := tt.setupPostReturn()
 				Expect(err).NotTo(HaveOccurred())
-				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, body, false).Return(respBytes, tt.postError)
+				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, body).Return(io.NopCloser(bytes.NewReader(respBytes)), tt.postError)
 
 				_, _, err = subject.Query(query)
 				Expect(err).To(HaveOccurred())
@@ -189,7 +193,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 				respBytes, err := json.Marshal(response)
 				Expect(err).NotTo(HaveOccurred())
-				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(respBytes, nil)
+				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody).Return(io.NopCloser(bytes.NewReader(respBytes)), nil)
 
 				var request types.CompletionsRequest
 				err = json.Unmarshal(expectedBody, &request)
@@ -337,7 +341,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).NotTo(HaveOccurred())
 
 			errorMsg := "error message"
-			mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, body, true).Return(nil, errors.New(errorMsg))
+			mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, body).Return(nil, errors.New(errorMsg))
 
 			err := subject.Stream(query)
 			Expect(err).To(HaveOccurred())
@@ -345,13 +349,14 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		})
 		when("a valid http response is received", func() {
 			const answer = "answer"
+			streamPayload := fmt.Sprintf(`data: {"choices":[{"delta":{"content":"%s"}}]}`, answer)
 
 			testValidHTTPResponse := func(subject *client.Client, history []types.Message, expectedBody []byte) {
 				messages = createMessages(nil, query)
 				body, err = createBody(messages, true)
 				Expect(err).NotTo(HaveOccurred())
 
-				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, true).Return([]byte(answer), nil)
+				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody).Return(io.NopCloser(strings.NewReader(streamPayload)), nil)
 
 				messages = createMessages(history, query)
 

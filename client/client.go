@@ -44,7 +44,8 @@ func New(callerFactory http.CallerFactory, cs config.ConfigStore, hs history.His
 		err      error
 	)
 	switch configuration.Provider {
-	case types.OpenAI:
+	// default to OpenAI to be compatible with old configs
+	case "", types.OpenAI:
 		caller := callerFactory(configuration)
 		provider = &OpenAIProvider{caller: caller}
 	case types.Cohere:

@@ -2,6 +2,8 @@ package client
 
 import (
 	"errors"
+	"io"
+	"os"
 	"strings"
 	"unicode/utf8"
 
@@ -88,7 +90,7 @@ func (c *Client) ProvideContext(context string) {
 func (c *Client) Query(input string) (string, int, error) {
 	c.prepareQuery(input)
 
-	response, usage, err := c.provider.Generate(c.History, c.Config, false)
+	response, usage, err := c.provider.Generate(c.History, c.Config)
 	if err != nil {
 		return "", 0, err
 	}
@@ -106,12 +108,18 @@ func (c *Client) Query(input string) (string, int, error) {
 func (c *Client) Stream(input string) error {
 	c.prepareQuery(input)
 
-	result, _, err := c.provider.Generate(c.History, c.Config, true)
+	r, err := c.provider.Stream(c.History, c.Config)
 	if err != nil {
 		return err
 	}
 
-	c.updateHistory(string(result))
+	r = io.TeeReader(r, os.Stdout)
+
+	response, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	c.updateHistory(string(response))
 
 	return nil
 }

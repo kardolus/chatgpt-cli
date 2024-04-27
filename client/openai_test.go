@@ -1,8 +1,7 @@
-package http_test
+package client
 
 import (
-	"bytes"
-	"github.com/kardolus/chatgpt-cli/http"
+	"io"
 	"strings"
 	"testing"
 
@@ -22,19 +21,20 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 
 	when("ProcessResponse()", func() {
 		it("parses a stream as expected", func() {
-			buf := &bytes.Buffer{}
-			http.ProcessResponse(strings.NewReader(stream), buf)
-			output := buf.String()
+			reader := newStreamReader(strings.NewReader(stream))
+			buf, err := io.ReadAll(reader)
+			Expect(err).To(BeNil())
+			output := string(buf)
 			Expect(output).To(Equal("a b c\n"))
 		})
 		it("throws an error when the json is invalid", func() {
 			input := `data: {"invalid":"json"` // missing closing brace
 			expectedOutput := "Error: unexpected end of JSON input\n"
 
-			var buf bytes.Buffer
-			http.ProcessResponse(strings.NewReader(input), &buf)
-			output := buf.String()
-
+			reader := newStreamReader(strings.NewReader(input))
+			buf, err := io.ReadAll(reader)
+			Expect(err).To(BeNil())
+			output := string(buf)
 			Expect(output).To(Equal(expectedOutput))
 		})
 	})

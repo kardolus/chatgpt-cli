@@ -5,6 +5,7 @@
 package client_test
 
 import (
+	io "io"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -49,16 +50,16 @@ func (mr *MockCallerMockRecorder) Get(arg0 interface{}) *gomock.Call {
 }
 
 // Post mocks base method.
-func (m *MockCaller) Post(arg0 string, arg1 []byte, arg2 bool) ([]byte, error) {
+func (m *MockCaller) Post(arg0 string, arg1 []byte) (io.ReadCloser, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Post", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]byte)
+	ret := m.ctrl.Call(m, "Post", arg0, arg1)
+	ret0, _ := ret[0].(io.ReadCloser)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Post indicates an expected call of Post.
-func (mr *MockCallerMockRecorder) Post(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockCallerMockRecorder) Post(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Post", reflect.TypeOf((*MockCaller)(nil).Post), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Post", reflect.TypeOf((*MockCaller)(nil).Post), arg0, arg1)
 }

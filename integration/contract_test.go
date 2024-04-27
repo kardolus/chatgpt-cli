@@ -2,6 +2,10 @@ package integration_test
 
 import (
 	"encoding/json"
+	"io"
+	"os"
+	"testing"
+
 	"github.com/kardolus/chatgpt-cli/client"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/configmanager"
@@ -10,8 +14,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
-	"os"
-	"testing"
 )
 
 func TestContract(t *testing.T) {
@@ -51,7 +53,9 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			bytes, err := json.Marshal(body)
 			Expect(err).NotTo(HaveOccurred())
 
-			resp, err := restCaller.Post(cfg.URL+cfg.CompletionsPath, bytes, false)
+			r, err := restCaller.Post(cfg.URL+cfg.CompletionsPath, bytes)
+			Expect(err).NotTo(HaveOccurred())
+			resp, err := io.ReadAll(r)
 			Expect(err).NotTo(HaveOccurred())
 
 			var data types.CompletionsResponse
@@ -79,8 +83,10 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			bytes, err := json.Marshal(body)
 			Expect(err).NotTo(HaveOccurred())
 
-			resp, err := restCaller.Post(cfg.URL+cfg.CompletionsPath, bytes, false)
+			r, err := restCaller.Post(cfg.URL+cfg.CompletionsPath, bytes)
 			Expect(err).To(HaveOccurred())
+			resp, err := io.ReadAll(r)
+			Expect(err).NotTo(HaveOccurred())
 
 			var errorData types.ErrorResponse
 			err = json.Unmarshal(resp, &errorData)

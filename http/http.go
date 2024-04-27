@@ -85,7 +85,7 @@ func (r *RestCaller) doRequest(method, url string, body []byte) (io.ReadCloser, 
 			return nil, fmt.Errorf(errHTTPStatus, response.StatusCode)
 		}
 
-		return nil, fmt.Errorf(errHTTP, response.StatusCode, errorData.Error.Message)
+		return io.NopCloser(bytes.NewReader(errorResponse)), fmt.Errorf(errHTTP, response.StatusCode, errorData.Error.Message)
 	}
 	return response.Body, nil
 }

@@ -26,6 +26,7 @@ const (
 	openAITopP             = 1.0
 	openAIFrequencyPenalty = 0.0
 	openAIPresencePenalty  = 0.0
+	openAIPrompt           = ""
 )
 
 type ConfigStore interface {
@@ -114,6 +115,7 @@ func (f *FileIO) ReadDefaults() types.Config {
 		TopP:             openAITopP,
 		FrequencyPenalty: openAIFrequencyPenalty,
 		PresencePenalty:  openAIPresencePenalty,
+		Prompt:           openAIPrompt,
 	}
 }
 

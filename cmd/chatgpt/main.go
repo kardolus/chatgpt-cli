@@ -66,7 +66,7 @@ func main() {
 	viper.AutomaticEnv()
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
@@ -245,7 +245,7 @@ func run(cmd *cobra.Command, args []string) error {
 				}
 			} else {
 				if err := client.Stream(line); err != nil {
-					fmt.Println("Error:", err)
+					fmt.Fprintln(os.Stderr, "Error:", err)
 				} else {
 					fmt.Println()
 					qNum++

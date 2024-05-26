@@ -331,7 +331,7 @@ max_tokens: 100
 
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
-			output := string(session.Out.Contents())
+			output := string(session.Err.Contents())
 			Expect(output).To(ContainSubstring(apiKeyEnvVar))
 		})
 
@@ -352,7 +352,7 @@ max_tokens: 100
 
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
-			output := string(session.Out.Contents())
+			output := string(session.Err.Contents())
 			Expect(output).To(ContainSubstring(".chatgpt-cli/history: no such file or directory"))
 		})
 
@@ -363,7 +363,7 @@ max_tokens: 100
 
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
-			output := string(session.Out.Contents())
+			output := string(session.Err.Contents())
 			Expect(output).To(ContainSubstring("flag needs an argument: --set-model"))
 		})
 
@@ -374,7 +374,7 @@ max_tokens: 100
 
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
-			output := string(session.Out.Contents())
+			output := string(session.Err.Contents())
 			Expect(output).To(ContainSubstring("flag needs an argument: --set-thread"))
 		})
 
@@ -385,7 +385,7 @@ max_tokens: 100
 
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
-			output := string(session.Out.Contents())
+			output := string(session.Err.Contents())
 			Expect(output).To(ContainSubstring("flag needs an argument: --set-max-tokens"))
 		})
 
@@ -396,7 +396,7 @@ max_tokens: 100
 
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
-			output := string(session.Out.Contents())
+			output := string(session.Err.Contents())
 			Expect(output).To(ContainSubstring("flag needs an argument: --set-context-window"))
 		})
 
@@ -409,7 +409,7 @@ max_tokens: 100
 
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
-			output := string(session.Out.Contents())
+			output := string(session.Err.Contents())
 			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
 			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
 		})
@@ -423,7 +423,7 @@ max_tokens: 100
 
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
-			output := string(session.Out.Contents())
+			output := string(session.Err.Contents())
 			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
 			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
 		})
@@ -437,7 +437,7 @@ max_tokens: 100
 
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
-			output := string(session.Out.Contents())
+			output := string(session.Err.Contents())
 			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
 			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
 		})
@@ -451,7 +451,7 @@ max_tokens: 100
 
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
-			output := string(session.Out.Contents())
+			output := string(session.Err.Contents())
 			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
 			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
 		})
@@ -486,7 +486,7 @@ max_tokens: 100
 
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
-			output := string(session.Out.Contents())
+			output := string(session.Err.Contents())
 
 			// see error.json
 			Expect(output).To(Equal("http status 401: Incorrect API key provided\n"))

@@ -18,5 +18,5 @@ type Config struct {
 	ModelsPath       string  `yaml:"models_path"`
 	AuthHeader       string  `yaml:"auth_header"`
 	AuthTokenPrefix  string  `yaml:"auth_token_prefix"`
-	Prompt           string  `yaml:"prompt"`
+	CommandPrompt    string  `yaml:"command_prompt"`
 }

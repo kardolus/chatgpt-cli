@@ -210,7 +210,12 @@ func run(cmd *cobra.Command, args []string) error {
 		defer rl.Close()
 
 		prompt := func(counter string) string {
-			return fmt.Sprintf("[%s] [%s]: ", time.Now().Format("2006-01-02 15:04:05"), counter)
+			cm := configmanager.New(config.New())
+			if len(cm.Config.CommandPrompt) != 0 {
+				return cm.Config.CommandPrompt
+			} else {
+				return fmt.Sprintf("[%s] [%s]: ", time.Now().Format("2006-01-02 15:04:05"), counter)
+			}
 		}
 
 		qNum, usage := 1, 0

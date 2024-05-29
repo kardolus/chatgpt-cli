@@ -192,7 +192,7 @@ Configuration variables:
 | `models_path`       | The API endpoint for accessing model information.                                                                                                      | '/v1/models'                   |
 | `auth_header`       | The header used for authorization in API requests.                                                                                                     | 'Authorization'                |
 | `auth_token_prefix` | The prefix to be added before the token in the `auth_header`.                                                                                          | 'Bearer '                      |
-| `command_prompt`    | Defaults to `[YYYY-MM-DD HH:MM:SS] [Q1]: `.
+| `command_prompt`    | The command prompt in interactive mode.                                                                                                                | '[YYYY-MM-DD HH:MM:SS] [Q#]: ' |
 
 The defaults can be overridden by providing your own values in the user configuration file,
 named `.chatgpt-cli/config.yaml`, located in your home directory.

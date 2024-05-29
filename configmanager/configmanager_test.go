@@ -40,6 +40,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		defaultTopP             = 2.2
 		defaultFrequencyPenalty = 3.3
 		defaultPresencePenalty  = 4.4
+		defaultCommandPrompt    = "default-command-prompt"
 	)
 
 	var (
@@ -72,6 +73,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			TopP:             defaultTopP,
 			FrequencyPenalty: defaultFrequencyPenalty,
 			PresencePenalty:  defaultPresencePenalty,
+			CommandPrompt:    defaultCommandPrompt,
 		}
 
 		envPrefix = strings.ToUpper(defaultConfig.Name) + "_"
@@ -105,6 +107,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.TopP).To(Equal(defaultTopP))
 		Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
 		Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
+		Expect(subject.Config.CommandPrompt).To(Equal(defaultCommandPrompt))
 	})
 
 	it("should prioritize user-provided config over defaults", func() {
@@ -124,6 +127,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			TopP:             3.5,
 			FrequencyPenalty: 4.5,
 			PresencePenalty:  5.5,
+			CommandPrompt:    "user-command-prompt",
 		}
 
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
@@ -146,6 +150,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.TopP).To(Equal(3.5))
 		Expect(subject.Config.FrequencyPenalty).To(Equal(4.5))
 		Expect(subject.Config.PresencePenalty).To(Equal(5.5))
+		Expect(subject.Config.CommandPrompt).To(Equal("user-command-prompt"))
 	})
 
 	it("should prioritize environment variables over default config", func() {
@@ -165,6 +170,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"TOP_P", "3.3")
 		os.Setenv(envPrefix+"FREQUENCY_PENALTY", "4.4")
 		os.Setenv(envPrefix+"PRESENCE_PENALTY", "5.5")
+		os.Setenv(envPrefix+"COMMAND_PROMPT", "env-command-prompt")
 
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 		mockConfigStore.EXPECT().Read().Return(types.Config{}, errors.New("config error")).Times(1)
@@ -187,6 +193,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.TopP).To(Equal(3.3))
 		Expect(subject.Config.FrequencyPenalty).To(Equal(4.4))
 		Expect(subject.Config.PresencePenalty).To(Equal(5.5))
+		Expect(subject.Config.CommandPrompt).To(Equal("env-command-prompt"))
 	})
 
 	it("should prioritize environment variables over user-provided config", func() {
@@ -206,6 +213,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"TOP_P", "3.3")
 		os.Setenv(envPrefix+"FREQUENCY_PENALTY", "4.4")
 		os.Setenv(envPrefix+"PRESENCE_PENALTY", "5.5")
+		os.Setenv(envPrefix+"COMMAND_PROMPT", "env-command-prompt")
 
 		userConfig := types.Config{
 			APIKey:           "user-api-key",
@@ -224,6 +232,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			TopP:             2.5,
 			FrequencyPenalty: 3.5,
 			PresencePenalty:  4.5,
+			CommandPrompt:    "user-command-prompt",
 		}
 
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
@@ -247,6 +256,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.TopP).To(Equal(3.3))
 		Expect(subject.Config.FrequencyPenalty).To(Equal(4.4))
 		Expect(subject.Config.PresencePenalty).To(Equal(5.5))
+		Expect(subject.Config.CommandPrompt).To(Equal("env-command-prompt"))
 	})
 
 	it("should write the max tokens as expected", func() {
@@ -378,7 +388,7 @@ func setValue(config *types.Config, fieldName string, value interface{}) {
 }
 
 func unsetEnvironmentVariables(envPrefix string) {
-	variables := []string{"API_KEY", "MODEL", "MAX_TOKENS", "CONTEXT_WINDOW", "URL", "COMPLETIONS_PATH", "MODELS_PATH", "AUTH_HEADER", "AUTH_TOKEN_PREFIX", "OMIT_HISTORY", "ROLE", "THREAD", "TEMPERATURE", "TOP_P", "FREQUENCY_PENALTY", "PRESENCE_PENALTY"}
+	variables := []string{"API_KEY", "MODEL", "MAX_TOKENS", "CONTEXT_WINDOW", "URL", "COMPLETIONS_PATH", "MODELS_PATH", "AUTH_HEADER", "AUTH_TOKEN_PREFIX", "OMIT_HISTORY", "ROLE", "THREAD", "TEMPERATURE", "TOP_P", "FREQUENCY_PENALTY", "PRESENCE_PENALTY", "COMMAND_PROMPT"}
 	for _, variable := range variables {
 		Expect(os.Unsetenv(envPrefix + variable)).To(Succeed())
 	}

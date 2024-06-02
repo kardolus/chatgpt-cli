@@ -73,7 +73,10 @@ func main() {
 func run(cmd *cobra.Command, args []string) error {
 	// Flags that do not require an API key
 	if showVersion {
-		fmt.Printf("ChatGPT CLI version %s (commit %s)\n", GitVersion, GitCommit)
+		if GitCommit != "homebrew" {
+			GitCommit = "commit " + GitCommit
+		}
+		fmt.Printf("ChatGPT CLI version %s (%s)\n", GitVersion, GitCommit)
 		return nil
 	}
 

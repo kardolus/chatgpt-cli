@@ -26,7 +26,7 @@ const (
 	openAITopP             = 1.0
 	openAIFrequencyPenalty = 0.0
 	openAIPresencePenalty  = 0.0
-	openAICommandPrompt    = ""
+	openAICommandPrompt    = "[%datetime] [Q%counter]"
 )
 
 type ConfigStore interface {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -209,25 +208,21 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 		defer rl.Close()
 
-		prompt := func(counter string) string {
+		prompt := func(counter int) string {
 			cm := configmanager.New(config.New())
-			if len(cm.Config.CommandPrompt) != 0 {
-				return cm.Config.CommandPrompt
-			} else {
-				return fmt.Sprintf("[%s] [%s]: ", time.Now().Format("2006-01-02 15:04:05"), counter)
-			}
+			return config.FormatPrompt(cm.Config.CommandPrompt, counter, 0, time.Now())
 		}
 
 		qNum, usage := 1, 0
 		for {
 			if queryMode {
-				rl.SetPrompt(prompt(strconv.Itoa(usage)))
+				rl.SetPrompt(prompt(usage))
 			} else {
-				rl.SetPrompt(prompt(fmt.Sprintf("Q%d", qNum)))
+				rl.SetPrompt(prompt(qNum))
 			}
 
 			line, err := rl.Readline()
-			if err == readline.ErrInterrupt || err == io.EOF {
+			if errors.Is(err, readline.ErrInterrupt) || err == io.EOF {
 				fmt.Println("Bye!")
 				break
 			}

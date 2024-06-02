@@ -17,6 +17,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
         - [macOS Intel chips](#macos-intel-chips)
         - [Linux (amd64)](#linux-amd64)
         - [Linux (arm64)](#linux-arm64)
+        - [Linux (386)](#linux-386)
         - [Windows (amd64)](#windows-amd64)
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
@@ -91,6 +92,12 @@ curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/latest/downl
 
 ```shell
 curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/latest/download/chatgpt-linux-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+```
+
+#### Linux (386)
+
+```shell
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/latest/download/chatgpt-linux-386 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 #### Windows (amd64)
@@ -272,6 +279,7 @@ completions_path: /openai/deployments/<your_deployment>/chat/completions?api-ver
 models_path: /v1/models
 auth_header: api-key
 auth_token_prefix: " "
+command_prompt: '[%datetime] [Q%counter]'
 ```
 
 You can set the API key either in the `config.yaml` file as shown above or export it as an environment variable:

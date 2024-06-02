@@ -13,6 +13,7 @@ TARGETS=(
   "darwin:arm64"
   "linux:amd64"
   "linux:arm64"
+  "linux:386"
   "windows:amd64"
 )
 

@@ -193,15 +193,15 @@ Configuration variables:
 | `models_path`       | The API endpoint for accessing model information.                                                                                                      | '/v1/models'                   |
 | `auth_header`       | The header used for authorization in API requests.                                                                                                     | 'Authorization'                |
 | `auth_token_prefix` | The prefix to be added before the token in the `auth_header`.                                                                                          | 'Bearer '                      |
-| `command_prompt`    | The command prompt in interactive mode.                                                                                                                | '[%datetime] [Q%counter]'      |
+| `command_prompt`    | The command prompt in interactive mode. Should be single-quoted.                                                                                       | '[%datetime] [Q%counter]'      |
 
 #### Variables for interactive mode:
 
 - `%date`: The current date in the format `YYYY-MM-DD`.
 - `%time`: The current time in the format `HH:MM:SS`.
 - `%datetime`: The current date and time in the format `YYYY-MM-DD HH:MM:SS`.
-- `%counter`: The current counter value.
-- `%usage`: The current usage value.
+- `%counter`: The total number of queries in the current session.
+- `%usage`: The usage in total tokens used (only works in query mode).
 
 The defaults can be overridden by providing your own values in the user configuration file,
 named `.chatgpt-cli/config.yaml`, located in your home directory.

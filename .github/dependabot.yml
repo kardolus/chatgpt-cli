@@ -6,4 +6,5 @@ updates:
       interval: daily
       time: '01:00'
     open-pull-requests-limit: 5
+    rebase-strategy: "auto"
 

@@ -105,7 +105,7 @@ github.com/subosito/gotenv
 # go.uber.org/multierr v1.11.0
 ## explicit; go 1.19
 go.uber.org/multierr
-# golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8
+# golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8
 ## explicit; go 1.20
 golang.org/x/exp/constraints
 golang.org/x/exp/slices

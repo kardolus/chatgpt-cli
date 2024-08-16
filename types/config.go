@@ -20,4 +20,5 @@ type Config struct {
 	AuthTokenPrefix     string  `yaml:"auth_token_prefix"`
 	CommandPrompt       string  `yaml:"command_prompt"`
 	AutoCreateNewThread bool    `yaml:"auto_create_new_thread"`
+	TrackTokenUsage     bool    `yaml:"track_token_usage"`
 }

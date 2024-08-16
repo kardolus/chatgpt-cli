@@ -37,6 +37,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		defaultAuthTokenPrefix     = "default-auth-token-prefix"
 		defaultOmitHistory         = false
 		defaultAutoCreateNewThread = false
+		defaultTrackTokenUsage     = false
 		defaultTemperature         = 1.1
 		defaultTopP                = 2.2
 		defaultFrequencyPenalty    = 3.3
@@ -76,6 +77,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			PresencePenalty:     defaultPresencePenalty,
 			CommandPrompt:       defaultCommandPrompt,
 			AutoCreateNewThread: defaultAutoCreateNewThread,
+			TrackTokenUsage:     defaultTrackTokenUsage,
 		}
 
 		envPrefix = strings.ToUpper(defaultConfig.Name) + "_"
@@ -111,6 +113,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		Expect(subject.Config.CommandPrompt).To(Equal(defaultCommandPrompt))
 		Expect(subject.Config.AutoCreateNewThread).To(Equal(defaultAutoCreateNewThread))
+		Expect(subject.Config.TrackTokenUsage).To(Equal(defaultTrackTokenUsage))
 	})
 
 	it("should prioritize user-provided config over defaults", func() {
@@ -132,6 +135,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			PresencePenalty:     5.5,
 			CommandPrompt:       "user-command-prompt",
 			AutoCreateNewThread: true,
+			TrackTokenUsage:     true,
 		}
 
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
@@ -149,6 +153,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.AuthTokenPrefix).To(Equal("user-auth-token-prefix"))
 		Expect(subject.Config.OmitHistory).To(BeTrue())
 		Expect(subject.Config.AutoCreateNewThread).To(BeTrue())
+		Expect(subject.Config.TrackTokenUsage).To(BeTrue())
 		Expect(subject.Config.Role).To(Equal("user-role"))
 		Expect(subject.Config.Thread).To(Equal("user-thread"))
 		Expect(subject.Config.Temperature).To(Equal(2.5))
@@ -170,6 +175,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"AUTH_TOKEN_PREFIX", "env-auth-token-prefix")
 		os.Setenv(envPrefix+"OMIT_HISTORY", "true")
 		os.Setenv(envPrefix+"AUTO_CREATE_NEW_THREAD", "true")
+		os.Setenv(envPrefix+"TRACK_TOKEN_USAGE", "true")
 		os.Setenv(envPrefix+"ROLE", "env-role")
 		os.Setenv(envPrefix+"THREAD", "env-thread")
 		os.Setenv(envPrefix+"TEMPERATURE", "2.2")
@@ -194,6 +200,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.AuthTokenPrefix).To(Equal("env-auth-token-prefix"))
 		Expect(subject.Config.OmitHistory).To(BeTrue())
 		Expect(subject.Config.AutoCreateNewThread).To(BeTrue())
+		Expect(subject.Config.TrackTokenUsage).To(BeTrue())
 		Expect(subject.Config.Role).To(Equal("env-role"))
 		Expect(subject.Config.Thread).To(Equal("env-thread"))
 		Expect(subject.Config.Temperature).To(Equal(2.2))
@@ -215,6 +222,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"AUTH_TOKEN_PREFIX", "env-auth-token-prefix")
 		os.Setenv(envPrefix+"OMIT_HISTORY", "true")
 		os.Setenv(envPrefix+"AUTO_CREATE_NEW_THREAD", "true")
+		os.Setenv(envPrefix+"TRACK_TOKEN_USAGE", "true")
 		os.Setenv(envPrefix+"ROLE", "env-role")
 		os.Setenv(envPrefix+"THREAD", "env-thread")
 		os.Setenv(envPrefix+"TEMPERATURE", "2.2")
@@ -235,6 +243,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			AuthTokenPrefix:     "user-auth-token-prefix",
 			OmitHistory:         false,
 			AutoCreateNewThread: false,
+			TrackTokenUsage:     false,
 			Role:                "user-role",
 			Thread:              "user-thread",
 			Temperature:         1.5,
@@ -260,6 +269,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.AuthTokenPrefix).To(Equal("env-auth-token-prefix"))
 		Expect(subject.Config.OmitHistory).To(BeTrue())
 		Expect(subject.Config.AutoCreateNewThread).To(BeTrue())
+		Expect(subject.Config.TrackTokenUsage).To(BeTrue())
 		Expect(subject.Config.Role).To(Equal("env-role"))
 		Expect(subject.Config.Thread).To(Equal("env-thread"))
 		Expect(subject.Config.Temperature).To(Equal(2.2))
@@ -398,7 +408,28 @@ func setValue(config *types.Config, fieldName string, value interface{}) {
 }
 
 func unsetEnvironmentVariables(envPrefix string) {
-	variables := []string{"API_KEY", "MODEL", "MAX_TOKENS", "CONTEXT_WINDOW", "URL", "COMPLETIONS_PATH", "MODELS_PATH", "AUTH_HEADER", "AUTH_TOKEN_PREFIX", "OMIT_HISTORY", "ROLE", "THREAD", "TEMPERATURE", "TOP_P", "FREQUENCY_PENALTY", "PRESENCE_PENALTY", "COMMAND_PROMPT", "AUTO_CREATE_NEW_THREAD"}
+	variables := []string{
+		"API_KEY",
+		"MODEL",
+		"MAX_TOKENS",
+		"CONTEXT_WINDOW",
+		"URL",
+		"COMPLETIONS_PATH",
+		"MODELS_PATH",
+		"AUTH_HEADER",
+		"AUTH_TOKEN_PREFIX",
+		"OMIT_HISTORY",
+		"ROLE",
+		"THREAD",
+		"TEMPERATURE",
+		"TOP_P",
+		"FREQUENCY_PENALTY",
+		"PRESENCE_PENALTY",
+		"COMMAND_PROMPT",
+		"AUTO_CREATE_NEW_THREAD",
+		"TRACK_TOKEN_USAGE",
+	}
+
 	for _, variable := range variables {
 		Expect(os.Unsetenv(envPrefix + variable)).To(Succeed())
 	}

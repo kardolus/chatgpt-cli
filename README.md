@@ -205,6 +205,7 @@ Configuration variables:
 | `auth_token_prefix`      | The prefix to be added before the token in the `auth_header`.                                                                                                                                         | 'Bearer '                      |
 | `command_prompt`         | The command prompt in interactive mode. Should be single-quoted.                                                                                                                                      | '[%datetime] [Q%counter]'      |
 | `auto_create_new_thread` | If set to `true`, a new thread with a unique identifier (e.g., `int_a1b2`) will be created for each interactive session. If `false`, the CLI will use the thread specified by the `thread` parameter. | `false`                        |
+| `track_token_usage`      | If set to true, displays the total token usage after each query in --query mode, helping you monitor API usage.                                                                                       | `false`                        |
 
 #### Variables for interactive mode:
 
@@ -285,6 +286,7 @@ auth_header: api-key
 auth_token_prefix: " "
 command_prompt: '[%datetime] [Q%counter]'
 auto_create_new_thread: false
+track_token_usage: false
 ```
 
 You can set the API key either in the `config.yaml` file as shown above or export it as an environment variable:

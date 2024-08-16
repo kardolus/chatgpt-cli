@@ -471,10 +471,20 @@ max_tokens: 100
 		})
 
 		it("should return the expected result for the --query flag", func() {
+			Expect(os.Setenv("OPENAI_TRACK_TOKEN_USAGE", "false")).To(Succeed())
+
 			output := runCommand("--query", "some-query")
 
 			expectedResponse := `I don't have personal opinions about bars, but here are some popular bars in Red Hook, Brooklyn:`
 			Expect(output).To(ContainSubstring(expectedResponse))
+			Expect(output).NotTo(ContainSubstring("Token Usage:"))
+		})
+
+		it("should display token usage after a query when configured to do so", func() {
+			Expect(os.Setenv("OPENAI_TRACK_TOKEN_USAGE", "true")).To(Succeed())
+
+			output := runCommand("--query", "tell me a 5 line joke")
+			Expect(output).To(ContainSubstring("Token Usage:"))
 		})
 
 		it("should assemble http errors as expected", func() {

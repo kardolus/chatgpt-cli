@@ -211,17 +211,16 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 		defer rl.Close()
 
-		prompt := func(counter int) string {
-			cm := configmanager.New(config.New())
-			return config.FormatPrompt(cm.Config.CommandPrompt, counter, 0, time.Now())
+		prompt := func(counter, usage int) string {
+			return config.FormatPrompt(client.Config.CommandPrompt, counter, usage, time.Now())
 		}
 
 		qNum, usage := 1, 0
 		for {
 			if queryMode {
-				rl.SetPrompt(prompt(usage))
+				rl.SetPrompt(prompt(qNum, usage))
 			} else {
-				rl.SetPrompt(prompt(qNum))
+				rl.SetPrompt(prompt(qNum, usage))
 			}
 
 			line, err := rl.Readline()
@@ -245,6 +244,7 @@ func run(cmd *cobra.Command, args []string) error {
 				} else {
 					fmt.Printf("%s\n\n", result)
 					usage += qUsage
+					qNum++
 				}
 			} else {
 				if err := client.Stream(line); err != nil {
@@ -260,11 +260,15 @@ func run(cmd *cobra.Command, args []string) error {
 			return errors.New("you must specify your query")
 		}
 		if queryMode {
-			result, _, err := client.Query(strings.Join(args, " "))
+			result, usage, err := client.Query(strings.Join(args, " "))
 			if err != nil {
 				return err
 			}
 			fmt.Println(result)
+
+			if client.Config.TrackTokenUsage {
+				fmt.Printf("\n[Token Usage: %d]\n", usage)
+			}
 		} else {
 			if err := client.Stream(strings.Join(args, " ")); err != nil {
 				return err

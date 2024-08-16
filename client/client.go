@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/history"
@@ -20,6 +21,7 @@ const (
 	MaxTokenBufferPercentage = 20
 	SystemRole               = "system"
 	UserRole                 = "user"
+	InteractiveThreadPrefix  = "int_"
 	gptPrefix                = "gpt"
 )
 
@@ -30,7 +32,7 @@ type Client struct {
 	historyStore history.HistoryStore
 }
 
-func New(callerFactory http.CallerFactory, cs config.ConfigStore, hs history.HistoryStore) (*Client, error) {
+func New(callerFactory http.CallerFactory, cs config.ConfigStore, hs history.HistoryStore, interactiveMode bool) (*Client, error) {
 	cm := configmanager.New(cs).WithEnvironment()
 	configuration := cm.Config
 
@@ -40,7 +42,11 @@ func New(callerFactory http.CallerFactory, cs config.ConfigStore, hs history.His
 
 	caller := callerFactory(configuration)
 
-	hs.SetThread(configuration.Thread)
+	if interactiveMode && cm.Config.AutoCreateNewThread {
+		hs.SetThread(generateUniqueSlug())
+	} else {
+		hs.SetThread(configuration.Thread)
+	}
 
 	return &Client{
 		Config:       configuration,
@@ -305,4 +311,9 @@ func createMessagesFromString(input string) []types.Message {
 	}
 
 	return messages
+}
+
+func generateUniqueSlug() string {
+	guid := uuid.New()
+	return InteractiveThreadPrefix + guid.String()[:4]
 }

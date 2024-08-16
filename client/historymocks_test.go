@@ -34,6 +34,20 @@ func (m *MockHistoryStore) EXPECT() *MockHistoryStoreMockRecorder {
 	return m.recorder
 }
 
+// GetThread mocks base method.
+func (m *MockHistoryStore) GetThread() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetThread")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetThread indicates an expected call of GetThread.
+func (mr *MockHistoryStoreMockRecorder) GetThread() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetThread", reflect.TypeOf((*MockHistoryStore)(nil).GetThread))
+}
+
 // Read mocks base method.
 func (m *MockHistoryStore) Read() ([]types.Message, error) {
 	m.ctrl.T.Helper()

@@ -172,7 +172,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Flags that require an API key
 	hs, _ := history.New() // do not error out
-	client, err := client.New(http.RealCallerFactory, config.New(), hs)
+	client, err := client.New(http.RealCallerFactory, config.New(), hs, interactiveMode)
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if interactiveMode {
-		fmt.Printf("Entering interactive mode. Type 'exit' and press Enter or press Ctrl+C to quit.\n\n")
+		fmt.Printf("Entering interactive mode. Using thread '%s'. Type 'exit' and press Enter or press Ctrl+C to quit.\n\n", hs.GetThread())
 		rl, err := readline.New("")
 		if err != nil {
 			return err

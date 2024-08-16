@@ -23,24 +23,25 @@ func TestUnitConfigManager(t *testing.T) {
 
 func testConfig(t *testing.T, when spec.G, it spec.S) {
 	const (
-		defaultMaxTokens        = 10
-		defaultContextWindow    = 20
-		defaultName             = "default-name"
-		defaultURL              = "default-url"
-		defaultModel            = "default-model"
-		defaultRole             = "default-role"
-		defaultApiKey           = "default-api-key"
-		defaultThread           = "default-thread"
-		defaultCompletionsPath  = "default-completions-path"
-		defaultModelsPath       = "default-models-path"
-		defaultAuthHeader       = "default-auth-header"
-		defaultAuthTokenPrefix  = "default-auth-token-prefix"
-		defaultOmitHistory      = false
-		defaultTemperature      = 1.1
-		defaultTopP             = 2.2
-		defaultFrequencyPenalty = 3.3
-		defaultPresencePenalty  = 4.4
-		defaultCommandPrompt    = "default-command-prompt"
+		defaultMaxTokens           = 10
+		defaultContextWindow       = 20
+		defaultName                = "default-name"
+		defaultURL                 = "default-url"
+		defaultModel               = "default-model"
+		defaultRole                = "default-role"
+		defaultApiKey              = "default-api-key"
+		defaultThread              = "default-thread"
+		defaultCompletionsPath     = "default-completions-path"
+		defaultModelsPath          = "default-models-path"
+		defaultAuthHeader          = "default-auth-header"
+		defaultAuthTokenPrefix     = "default-auth-token-prefix"
+		defaultOmitHistory         = false
+		defaultAutoCreateNewThread = false
+		defaultTemperature         = 1.1
+		defaultTopP                = 2.2
+		defaultFrequencyPenalty    = 3.3
+		defaultPresencePenalty     = 4.4
+		defaultCommandPrompt       = "default-command-prompt"
 	)
 
 	var (
@@ -56,24 +57,25 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		mockConfigStore = NewMockConfigStore(mockCtrl)
 
 		defaultConfig = types.Config{
-			Name:             defaultName,
-			APIKey:           defaultApiKey,
-			Model:            defaultModel,
-			MaxTokens:        defaultMaxTokens,
-			ContextWindow:    defaultContextWindow,
-			URL:              defaultURL,
-			CompletionsPath:  defaultCompletionsPath,
-			ModelsPath:       defaultModelsPath,
-			AuthHeader:       defaultAuthHeader,
-			AuthTokenPrefix:  defaultAuthTokenPrefix,
-			OmitHistory:      defaultOmitHistory,
-			Role:             defaultRole,
-			Thread:           defaultThread,
-			Temperature:      defaultTemperature,
-			TopP:             defaultTopP,
-			FrequencyPenalty: defaultFrequencyPenalty,
-			PresencePenalty:  defaultPresencePenalty,
-			CommandPrompt:    defaultCommandPrompt,
+			Name:                defaultName,
+			APIKey:              defaultApiKey,
+			Model:               defaultModel,
+			MaxTokens:           defaultMaxTokens,
+			ContextWindow:       defaultContextWindow,
+			URL:                 defaultURL,
+			CompletionsPath:     defaultCompletionsPath,
+			ModelsPath:          defaultModelsPath,
+			AuthHeader:          defaultAuthHeader,
+			AuthTokenPrefix:     defaultAuthTokenPrefix,
+			OmitHistory:         defaultOmitHistory,
+			Role:                defaultRole,
+			Thread:              defaultThread,
+			Temperature:         defaultTemperature,
+			TopP:                defaultTopP,
+			FrequencyPenalty:    defaultFrequencyPenalty,
+			PresencePenalty:     defaultPresencePenalty,
+			CommandPrompt:       defaultCommandPrompt,
+			AutoCreateNewThread: defaultAutoCreateNewThread,
 		}
 
 		envPrefix = strings.ToUpper(defaultConfig.Name) + "_"
@@ -108,26 +110,28 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
 		Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		Expect(subject.Config.CommandPrompt).To(Equal(defaultCommandPrompt))
+		Expect(subject.Config.AutoCreateNewThread).To(Equal(defaultAutoCreateNewThread))
 	})
 
 	it("should prioritize user-provided config over defaults", func() {
 		userConfig := types.Config{
-			Model:            "user-model",
-			MaxTokens:        20,
-			ContextWindow:    30,
-			URL:              "user-url",
-			CompletionsPath:  "user-completions-path",
-			ModelsPath:       "user-models-path",
-			AuthHeader:       "user-auth-header",
-			AuthTokenPrefix:  "user-auth-token-prefix",
-			OmitHistory:      true,
-			Role:             "user-role",
-			Thread:           "user-thread",
-			Temperature:      2.5,
-			TopP:             3.5,
-			FrequencyPenalty: 4.5,
-			PresencePenalty:  5.5,
-			CommandPrompt:    "user-command-prompt",
+			Model:               "user-model",
+			MaxTokens:           20,
+			ContextWindow:       30,
+			URL:                 "user-url",
+			CompletionsPath:     "user-completions-path",
+			ModelsPath:          "user-models-path",
+			AuthHeader:          "user-auth-header",
+			AuthTokenPrefix:     "user-auth-token-prefix",
+			OmitHistory:         true,
+			Role:                "user-role",
+			Thread:              "user-thread",
+			Temperature:         2.5,
+			TopP:                3.5,
+			FrequencyPenalty:    4.5,
+			PresencePenalty:     5.5,
+			CommandPrompt:       "user-command-prompt",
+			AutoCreateNewThread: true,
 		}
 
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
@@ -144,6 +148,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.AuthHeader).To(Equal("user-auth-header"))
 		Expect(subject.Config.AuthTokenPrefix).To(Equal("user-auth-token-prefix"))
 		Expect(subject.Config.OmitHistory).To(BeTrue())
+		Expect(subject.Config.AutoCreateNewThread).To(BeTrue())
 		Expect(subject.Config.Role).To(Equal("user-role"))
 		Expect(subject.Config.Thread).To(Equal("user-thread"))
 		Expect(subject.Config.Temperature).To(Equal(2.5))
@@ -164,6 +169,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"AUTH_HEADER", "env-auth-header")
 		os.Setenv(envPrefix+"AUTH_TOKEN_PREFIX", "env-auth-token-prefix")
 		os.Setenv(envPrefix+"OMIT_HISTORY", "true")
+		os.Setenv(envPrefix+"AUTO_CREATE_NEW_THREAD", "true")
 		os.Setenv(envPrefix+"ROLE", "env-role")
 		os.Setenv(envPrefix+"THREAD", "env-thread")
 		os.Setenv(envPrefix+"TEMPERATURE", "2.2")
@@ -187,6 +193,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.AuthHeader).To(Equal("env-auth-header"))
 		Expect(subject.Config.AuthTokenPrefix).To(Equal("env-auth-token-prefix"))
 		Expect(subject.Config.OmitHistory).To(BeTrue())
+		Expect(subject.Config.AutoCreateNewThread).To(BeTrue())
 		Expect(subject.Config.Role).To(Equal("env-role"))
 		Expect(subject.Config.Thread).To(Equal("env-thread"))
 		Expect(subject.Config.Temperature).To(Equal(2.2))
@@ -207,6 +214,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"AUTH_HEADER", "env-auth-header")
 		os.Setenv(envPrefix+"AUTH_TOKEN_PREFIX", "env-auth-token-prefix")
 		os.Setenv(envPrefix+"OMIT_HISTORY", "true")
+		os.Setenv(envPrefix+"AUTO_CREATE_NEW_THREAD", "true")
 		os.Setenv(envPrefix+"ROLE", "env-role")
 		os.Setenv(envPrefix+"THREAD", "env-thread")
 		os.Setenv(envPrefix+"TEMPERATURE", "2.2")
@@ -216,23 +224,24 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"COMMAND_PROMPT", "env-command-prompt")
 
 		userConfig := types.Config{
-			APIKey:           "user-api-key",
-			Model:            "user-model",
-			MaxTokens:        20,
-			ContextWindow:    30,
-			URL:              "user-url",
-			CompletionsPath:  "user-completions-path",
-			ModelsPath:       "user-models-path",
-			AuthHeader:       "user-auth-header",
-			AuthTokenPrefix:  "user-auth-token-prefix",
-			OmitHistory:      false,
-			Role:             "user-role",
-			Thread:           "user-thread",
-			Temperature:      1.5,
-			TopP:             2.5,
-			FrequencyPenalty: 3.5,
-			PresencePenalty:  4.5,
-			CommandPrompt:    "user-command-prompt",
+			APIKey:              "user-api-key",
+			Model:               "user-model",
+			MaxTokens:           20,
+			ContextWindow:       30,
+			URL:                 "user-url",
+			CompletionsPath:     "user-completions-path",
+			ModelsPath:          "user-models-path",
+			AuthHeader:          "user-auth-header",
+			AuthTokenPrefix:     "user-auth-token-prefix",
+			OmitHistory:         false,
+			AutoCreateNewThread: false,
+			Role:                "user-role",
+			Thread:              "user-thread",
+			Temperature:         1.5,
+			TopP:                2.5,
+			FrequencyPenalty:    3.5,
+			PresencePenalty:     4.5,
+			CommandPrompt:       "user-command-prompt",
 		}
 
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
@@ -250,6 +259,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.AuthHeader).To(Equal("env-auth-header"))
 		Expect(subject.Config.AuthTokenPrefix).To(Equal("env-auth-token-prefix"))
 		Expect(subject.Config.OmitHistory).To(BeTrue())
+		Expect(subject.Config.AutoCreateNewThread).To(BeTrue())
 		Expect(subject.Config.Role).To(Equal("env-role"))
 		Expect(subject.Config.Thread).To(Equal("env-thread"))
 		Expect(subject.Config.Temperature).To(Equal(2.2))
@@ -388,7 +398,7 @@ func setValue(config *types.Config, fieldName string, value interface{}) {
 }
 
 func unsetEnvironmentVariables(envPrefix string) {
-	variables := []string{"API_KEY", "MODEL", "MAX_TOKENS", "CONTEXT_WINDOW", "URL", "COMPLETIONS_PATH", "MODELS_PATH", "AUTH_HEADER", "AUTH_TOKEN_PREFIX", "OMIT_HISTORY", "ROLE", "THREAD", "TEMPERATURE", "TOP_P", "FREQUENCY_PENALTY", "PRESENCE_PENALTY", "COMMAND_PROMPT"}
+	variables := []string{"API_KEY", "MODEL", "MAX_TOKENS", "CONTEXT_WINDOW", "URL", "COMPLETIONS_PATH", "MODELS_PATH", "AUTH_HEADER", "AUTH_TOKEN_PREFIX", "OMIT_HISTORY", "ROLE", "THREAD", "TEMPERATURE", "TOP_P", "FREQUENCY_PENALTY", "PRESENCE_PENALTY", "COMMAND_PROMPT", "AUTO_CREATE_NEW_THREAD"}
 	for _, variable := range variables {
 		Expect(os.Unsetenv(envPrefix + variable)).To(Succeed())
 	}

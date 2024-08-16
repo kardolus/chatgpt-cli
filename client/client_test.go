@@ -36,6 +36,7 @@ const (
 	defaultTopP             = 2.2
 	defaultFrequencyPenalty = 3.3
 	defaultPresencePenalty  = 4.4
+	defaultInteractiveMode  = false
 	envApiKey               = "api-key"
 )
 
@@ -78,10 +79,65 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			mockConfigStore.EXPECT().Read().Return(types.Config{}, nil).Times(1)
 
-			_, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore)
+			_, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore, defaultInteractiveMode)
 
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(apiKeyEnvVar))
+		})
+		it("should set a unique thread slug in interactive mode when AutoCreateNewThread is true", func() {
+			mockConfigStore.EXPECT().Read().Return(types.Config{
+				AutoCreateNewThread: true,
+				Thread:              defaultThread,
+			}, nil).Times(1)
+
+			var capturedThread string
+			mockHistoryStore.EXPECT().SetThread(gomock.Any()).DoAndReturn(func(thread string) {
+				capturedThread = thread
+			}).Times(1)
+
+			interactiveMode := true
+			_, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore, interactiveMode)
+
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(capturedThread).To(HavePrefix(client.InteractiveThreadPrefix)) // Assuming `InteractiveThreadPrefix` is "int_"
+			Expect(len(capturedThread)).To(Equal(8))                              // "int_" (4 chars) + 4 random characters
+		})
+		it("should not overwrite the thread in interactive mode when AutoCreateNewThread is false", func() {
+			mockConfigStore.EXPECT().Read().Return(types.Config{
+				AutoCreateNewThread: false,
+				Thread:              defaultThread,
+			}, nil).Times(1)
+
+			var capturedThread string
+			mockHistoryStore.EXPECT().SetThread(defaultThread).DoAndReturn(func(thread string) {
+				capturedThread = thread
+			}).Times(1)
+
+			interactiveMode := true
+			_, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore, interactiveMode)
+
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(capturedThread).To(Equal(defaultThread))
+		})
+		it("should never overwrite the thread in non-interactive mode", func() {
+			mockConfigStore.EXPECT().Read().Return(types.Config{
+				AutoCreateNewThread: true,
+				Thread:              defaultThread,
+			}, nil).Times(1)
+
+			var capturedThread string
+			mockHistoryStore.EXPECT().SetThread(defaultThread).DoAndReturn(func(thread string) {
+				capturedThread = thread
+			}).Times(1)
+
+			interactiveMode := false
+			_, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore, interactiveMode)
+
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(capturedThread).To(Equal(defaultThread))
 		})
 	})
 
@@ -260,7 +316,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				mockHistoryStore.EXPECT().SetThread(defaultThread).Times(1)
 				mockConfigStore.EXPECT().Read().Return(types.Config{OmitHistory: true}, nil).Times(1)
 
-				subject, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore)
+				subject, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore, defaultInteractiveMode)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Read and Write are never called on the history store
@@ -549,7 +605,7 @@ func (f *clientFactory) buildClientWithoutConfig() *client.Client {
 	f.mockHistoryStore.EXPECT().SetThread(defaultThread).Times(1)
 	f.mockConfigStore.EXPECT().Read().Return(types.Config{}, nil).Times(1)
 
-	c, err := client.New(mockCallerFactory, f.mockConfigStore, f.mockHistoryStore)
+	c, err := client.New(mockCallerFactory, f.mockConfigStore, f.mockHistoryStore, defaultInteractiveMode)
 	Expect(err).NotTo(HaveOccurred())
 
 	return c.WithContextWindow(defaultContextWindow)
@@ -559,7 +615,7 @@ func (f *clientFactory) buildClientWithConfig(config types.Config) *client.Clien
 	f.mockHistoryStore.EXPECT().SetThread(defaultThread).Times(1)
 	f.mockConfigStore.EXPECT().Read().Return(config, nil).Times(1)
 
-	c, err := client.New(mockCallerFactory, f.mockConfigStore, f.mockHistoryStore)
+	c, err := client.New(mockCallerFactory, f.mockConfigStore, f.mockHistoryStore, defaultInteractiveMode)
 	Expect(err).NotTo(HaveOccurred())
 
 	return c.WithContextWindow(defaultContextWindow)

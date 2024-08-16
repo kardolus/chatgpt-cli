@@ -18,6 +18,7 @@ type HistoryStore interface {
 	Read() ([]types.Message, error)
 	Write([]types.Message) error
 	SetThread(thread string)
+	GetThread() string
 }
 
 // Ensure FileIO implements the HistoryStore interface
@@ -51,6 +52,10 @@ func New() (*FileIO, error) {
 	return &FileIO{
 		historyDir: dir,
 	}, err
+}
+
+func (f *FileIO) GetThread() string {
+	return f.thread
 }
 
 func (f *FileIO) SetThread(thread string) {

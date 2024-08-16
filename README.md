@@ -22,7 +22,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
     - [General Configuration](#general-configuration)
-      - [Variables for interactive mode](#variables-for-interactive-mode)
+        - [Variables for interactive mode](#variables-for-interactive-mode)
     - [Azure Configuration](#azure-configuration)
     - [Command-Line Autocompletion](#command-line-autocompletion)
         - [Enabling Autocompletion](#enabling-autocompletion)
@@ -147,6 +147,9 @@ Choose the appropriate command for your system, which will download the binary, 
     chatgpt --interactive
     ```
 
+   If you want the CLI to automatically create a new thread for each session, ensure that the `auto_create_new_thread`
+   configuration variable is set to `true`. This will create a unique thread identifier for each interactive session.
+
 5. To use the pipe feature, create a text file containing some context. For example, create a file named context.txt
    with the following content:
 
@@ -181,26 +184,27 @@ values, the `config.yaml` file, and environment variables, in that respective or
 
 Configuration variables:
 
-| Variable            | Description                                                                                                                                            | Default                        |
-|---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------|
-| `name`              | The prefix for environment variable overrides.                                                                                                         | 'openai'                       |
-| `api_key`           | Your OpenAI API key.                                                                                                                                   | (none for security)            |
-| `model`             | The GPT model used by the application.                                                                                                                 | 'gpt-3.5-turbo'                |
-| `max_tokens`        | The maximum number of tokens that can be used in a single API call.                                                                                    | 4096                           |
-| `context_window`    | The memory limit for how much of the conversation can be remembered at one time.                                                                       | 8192                           |
-| `role`              | The system role                                                                                                                                        | 'You are a helpful assistant.' |
-| `temperature`       | What sampling temperature to use, between 0 and 2. Higher values make the output more random; lower values make it more focused and deterministic.     | 1.0                            |
-| `frequency_penalty` | Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far.                                 | 0.0                            |
-| `top_p`             | An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. | 1.0                            |
-| `presence_penalty`  | Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far.                                      | 0.0                            |
-| `thread`            | The name of the current chat thread. Each unique thread name has its own context.                                                                      | 'default'                      |
-| `omit_history`      | If true, the chat history will not be used to provide context for the GPT model.                                                                       | false                          |
-| `url`               | The base URL for the OpenAI API.                                                                                                                       | 'https://api.openai.com'       |
-| `completions_path`  | The API endpoint for completions.                                                                                                                      | '/v1/chat/completions'         |
-| `models_path`       | The API endpoint for accessing model information.                                                                                                      | '/v1/models'                   |
-| `auth_header`       | The header used for authorization in API requests.                                                                                                     | 'Authorization'                |
-| `auth_token_prefix` | The prefix to be added before the token in the `auth_header`.                                                                                          | 'Bearer '                      |
-| `command_prompt`    | The command prompt in interactive mode. Should be single-quoted.                                                                                       | '[%datetime] [Q%counter]'      |
+| Variable                 | Description                                                                                                                                                                                           | Default                        |
+|--------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------|
+| `name`                   | The prefix for environment variable overrides.                                                                                                                                                        | 'openai'                       |
+| `api_key`                | Your OpenAI API key.                                                                                                                                                                                  | (none for security)            |
+| `model`                  | The GPT model used by the application.                                                                                                                                                                | 'gpt-3.5-turbo'                |
+| `max_tokens`             | The maximum number of tokens that can be used in a single API call.                                                                                                                                   | 4096                           |
+| `context_window`         | The memory limit for how much of the conversation can be remembered at one time.                                                                                                                      | 8192                           |
+| `role`                   | The system role                                                                                                                                                                                       | 'You are a helpful assistant.' |
+| `temperature`            | What sampling temperature to use, between 0 and 2. Higher values make the output more random; lower values make it more focused and deterministic.                                                    | 1.0                            |
+| `frequency_penalty`      | Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far.                                                                                | 0.0                            |
+| `top_p`                  | An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass.                                                | 1.0                            |
+| `presence_penalty`       | Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far.                                                                                     | 0.0                            |
+| `thread`                 | The name of the current chat thread. Each unique thread name has its own context.                                                                                                                     | 'default'                      |
+| `omit_history`           | If true, the chat history will not be used to provide context for the GPT model.                                                                                                                      | false                          |
+| `url`                    | The base URL for the OpenAI API.                                                                                                                                                                      | 'https://api.openai.com'       |
+| `completions_path`       | The API endpoint for completions.                                                                                                                                                                     | '/v1/chat/completions'         |
+| `models_path`            | The API endpoint for accessing model information.                                                                                                                                                     | '/v1/models'                   |
+| `auth_header`            | The header used for authorization in API requests.                                                                                                                                                    | 'Authorization'                |
+| `auth_token_prefix`      | The prefix to be added before the token in the `auth_header`.                                                                                                                                         | 'Bearer '                      |
+| `command_prompt`         | The command prompt in interactive mode. Should be single-quoted.                                                                                                                                      | '[%datetime] [Q%counter]'      |
+| `auto_create_new_thread` | If set to `true`, a new thread with a unique identifier (e.g., `int_a1b2`) will be created for each interactive session. If `false`, the CLI will use the thread specified by the `thread` parameter. | `false`                        |
 
 #### Variables for interactive mode:
 
@@ -280,6 +284,7 @@ models_path: /v1/models
 auth_header: api-key
 auth_token_prefix: " "
 command_prompt: '[%datetime] [Q%counter]'
+auto_create_new_thread: false
 ```
 
 You can set the API key either in the `config.yaml` file as shown above or export it as an environment variable:

@@ -74,7 +74,17 @@ func (c *Client) WithServiceURL(url string) *Client {
 func (c *Client) ListModels() ([]string, error) {
 	var result []string
 
+	endpoint := c.getEndpoint(c.Config.ModelsPath)
+
+	if c.Config.Debug {
+		c.printRequestDebugInfo(endpoint, nil)
+	}
+
 	raw, err := c.caller.Get(c.getEndpoint(c.Config.ModelsPath))
+	if c.Config.Debug {
+		c.printResponseDebugInfo(raw)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -335,13 +345,20 @@ func generateUniqueSlug() string {
 }
 
 func (c *Client) printRequestDebugInfo(endpoint string, body []byte) {
-	bodyString := strings.ReplaceAll(string(body), "'", "'\"'\"'") // Escape single quotes
-
 	fmt.Printf("\nGenerated cURL command:\n\n")
-	fmt.Printf("curl --location --insecure --request POST '%s' \\\n", endpoint)
+	method := "POST"
+	if body == nil {
+		method = "GET"
+	}
+	fmt.Printf("curl --location --insecure --request %s '%s' \\\n", method, endpoint)
 	fmt.Printf("  --header \"Authorization: Bearer ${%s_API_KEY}\" \\\n", strings.ToUpper(c.Config.Name))
-	fmt.Printf("  --header 'Content-Type: application/json' \\\n")
-	fmt.Printf("  --data-raw '%s'\n\n", bodyString)
+	fmt.Printf("  --header 'Content-Type: application/json'")
+
+	if body != nil {
+		bodyString := strings.ReplaceAll(string(body), "'", "'\"'\"'") // Escape single quotes
+		fmt.Printf(" \\\n  --data-raw '%s'", bodyString)
+	}
+	fmt.Println() // Print a newline at the end
 }
 
 func (c *Client) printResponseDebugInfo(raw []byte) {

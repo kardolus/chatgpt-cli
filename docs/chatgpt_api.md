@@ -2,7 +2,13 @@
 
 ## OpenAI
 
-### cURL gpt-turbo
+### Documentation
+
+https://platform.openai.com/docs/api-reference/chat/create
+
+### CURLS
+
+Request:
 
 ```shell
 curl --location --insecure --request POST 'https://api.openai.com/v1/chat/completions' \
@@ -15,7 +21,7 @@ curl --location --insecure --request POST 'https://api.openai.com/v1/chat/comple
   }' | jq .
 ```
 
-Output:
+Response:
 
 ```json
 {
@@ -284,6 +290,8 @@ Output:
 
 ## Azure
 
+Request:
+
 ```shell
 curl "https://[resource].openai.azure.com/openai/deployments/[deployment]/chat/completions?api-version=[model]" \
 -H "Content-Type: application/json" \
@@ -300,7 +308,7 @@ curl "https://[resource].openai.azure.com/openai/deployments/[deployment]/chat/c
 }'
 ```
 
-Output:
+Response:
 
 ```shell
 {

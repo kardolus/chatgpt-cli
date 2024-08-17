@@ -52,7 +52,7 @@ system and architecture.
 
 ## 5. Bump the version
 
-Bump the version in the Homebrew formulae (`kardolus/homebrew-chatgpt-cli/HomebrewFormula/chatgpt-cli.rb`). Update the
+Change the URL in the Homebrew formulae (`kardolus/homebrew-chatgpt-cli/HomebrewFormula/chatgpt-cli.rb`). Update the
 sha256 of the tar file using:
 
 ```shell

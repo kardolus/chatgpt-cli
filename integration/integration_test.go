@@ -487,6 +487,22 @@ max_tokens: 100
 			Expect(output).To(ContainSubstring("Token Usage:"))
 		})
 
+		it("prints debug information with the --debug flag", func() {
+			Expect(os.Setenv("OPENAI_DEBUG", "true")).To(Succeed())
+
+			output := runCommand("--query", "tell me a joke")
+
+			Expect(output).To(ContainSubstring("Generated cURL command"))
+			Expect(output).To(ContainSubstring("/v1/chat/completions"))
+			Expect(output).To(ContainSubstring("--header \"Authorization: Bearer ${OPENAI_API_KEY}\""))
+			Expect(output).To(ContainSubstring("--header 'Content-Type: application/json'"))
+			Expect(output).To(ContainSubstring("\"model\":\"gpt-3.5-turbo\""))
+			Expect(output).To(ContainSubstring("\"messages\":"))
+			Expect(output).To(ContainSubstring("Response"))
+
+			Expect(os.Unsetenv("OPENAI_DEBUG")).To(Succeed())
+		})
+
 		it("should assemble http errors as expected", func() {
 			Expect(os.Setenv(apiKeyEnvVar, "wrong-token")).To(Succeed())
 

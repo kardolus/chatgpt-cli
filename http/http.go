@@ -56,12 +56,22 @@ func (r *RestCaller) Post(url string, body []byte, stream bool) ([]byte, error) 
 	return r.doRequest(http.MethodPost, url, body, stream)
 }
 
-func ProcessResponse(r io.Reader, w io.Writer) []byte {
+func (r *RestCaller) ProcessResponse(reader io.Reader, writer io.Writer) []byte {
 	var result []byte
 
-	scanner := bufio.NewScanner(r)
+	if r.config.Debug {
+		fmt.Printf("\nResponse\n\n")
+	}
+
+	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
+
+		if r.config.Debug {
+			fmt.Println(line)
+			continue
+		}
+
 		if strings.HasPrefix(line, "data:") {
 			line = line[6:] // Skip the "data: " prefix
 			if len(line) < 6 {
@@ -69,7 +79,7 @@ func ProcessResponse(r io.Reader, w io.Writer) []byte {
 			}
 
 			if line == "[DONE]" {
-				_, _ = w.Write([]byte("\n"))
+				_, _ = writer.Write([]byte("\n"))
 				result = append(result, []byte("\n")...)
 				break
 			}
@@ -77,13 +87,13 @@ func ProcessResponse(r io.Reader, w io.Writer) []byte {
 			var data types.Data
 			err := json.Unmarshal([]byte(line), &data)
 			if err != nil {
-				_, _ = fmt.Fprintf(w, "Error: %s\n", err.Error())
+				_, _ = fmt.Fprintf(writer, "Error: %s\n", err.Error())
 				continue
 			}
 
 			for _, choice := range data.Choices {
 				if content, ok := choice.Delta["content"]; ok {
-					_, _ = w.Write([]byte(content))
+					_, _ = writer.Write([]byte(content))
 					result = append(result, []byte(content)...)
 				}
 			}
@@ -119,7 +129,7 @@ func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]
 	}
 
 	if stream {
-		return ProcessResponse(response.Body, os.Stdout), nil
+		return r.ProcessResponse(response.Body, os.Stdout), nil
 	}
 
 	result, err := io.ReadAll(response.Body)

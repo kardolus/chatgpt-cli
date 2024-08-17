@@ -38,6 +38,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		defaultOmitHistory         = false
 		defaultAutoCreateNewThread = false
 		defaultTrackTokenUsage     = false
+		defaultDebug               = false
 		defaultTemperature         = 1.1
 		defaultTopP                = 2.2
 		defaultFrequencyPenalty    = 3.3
@@ -78,6 +79,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			CommandPrompt:       defaultCommandPrompt,
 			AutoCreateNewThread: defaultAutoCreateNewThread,
 			TrackTokenUsage:     defaultTrackTokenUsage,
+			Debug:               defaultDebug,
 		}
 
 		envPrefix = strings.ToUpper(defaultConfig.Name) + "_"
@@ -114,6 +116,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.CommandPrompt).To(Equal(defaultCommandPrompt))
 		Expect(subject.Config.AutoCreateNewThread).To(Equal(defaultAutoCreateNewThread))
 		Expect(subject.Config.TrackTokenUsage).To(Equal(defaultTrackTokenUsage))
+		Expect(subject.Config.Debug).To(Equal(defaultDebug))
 	})
 
 	it("should prioritize user-provided config over defaults", func() {
@@ -136,6 +139,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			CommandPrompt:       "user-command-prompt",
 			AutoCreateNewThread: true,
 			TrackTokenUsage:     true,
+			Debug:               true,
 		}
 
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
@@ -154,6 +158,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.OmitHistory).To(BeTrue())
 		Expect(subject.Config.AutoCreateNewThread).To(BeTrue())
 		Expect(subject.Config.TrackTokenUsage).To(BeTrue())
+		Expect(subject.Config.Debug).To(BeTrue())
 		Expect(subject.Config.Role).To(Equal("user-role"))
 		Expect(subject.Config.Thread).To(Equal("user-thread"))
 		Expect(subject.Config.Temperature).To(Equal(2.5))
@@ -176,6 +181,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"OMIT_HISTORY", "true")
 		os.Setenv(envPrefix+"AUTO_CREATE_NEW_THREAD", "true")
 		os.Setenv(envPrefix+"TRACK_TOKEN_USAGE", "true")
+		os.Setenv(envPrefix+"DEBUG", "true")
 		os.Setenv(envPrefix+"ROLE", "env-role")
 		os.Setenv(envPrefix+"THREAD", "env-thread")
 		os.Setenv(envPrefix+"TEMPERATURE", "2.2")
@@ -201,6 +207,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.OmitHistory).To(BeTrue())
 		Expect(subject.Config.AutoCreateNewThread).To(BeTrue())
 		Expect(subject.Config.TrackTokenUsage).To(BeTrue())
+		Expect(subject.Config.Debug).To(BeTrue())
 		Expect(subject.Config.Role).To(Equal("env-role"))
 		Expect(subject.Config.Thread).To(Equal("env-thread"))
 		Expect(subject.Config.Temperature).To(Equal(2.2))
@@ -223,6 +230,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"OMIT_HISTORY", "true")
 		os.Setenv(envPrefix+"AUTO_CREATE_NEW_THREAD", "true")
 		os.Setenv(envPrefix+"TRACK_TOKEN_USAGE", "true")
+		os.Setenv(envPrefix+"DEBUG", "false")
 		os.Setenv(envPrefix+"ROLE", "env-role")
 		os.Setenv(envPrefix+"THREAD", "env-thread")
 		os.Setenv(envPrefix+"TEMPERATURE", "2.2")
@@ -244,6 +252,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			OmitHistory:         false,
 			AutoCreateNewThread: false,
 			TrackTokenUsage:     false,
+			Debug:               true,
 			Role:                "user-role",
 			Thread:              "user-thread",
 			Temperature:         1.5,
@@ -270,6 +279,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.OmitHistory).To(BeTrue())
 		Expect(subject.Config.AutoCreateNewThread).To(BeTrue())
 		Expect(subject.Config.TrackTokenUsage).To(BeTrue())
+		Expect(subject.Config.Debug).To(BeFalse())
 		Expect(subject.Config.Role).To(Equal("env-role"))
 		Expect(subject.Config.Thread).To(Equal("env-thread"))
 		Expect(subject.Config.Temperature).To(Equal(2.2))
@@ -428,6 +438,7 @@ func unsetEnvironmentVariables(envPrefix string) {
 		"COMMAND_PROMPT",
 		"AUTO_CREATE_NEW_THREAD",
 		"TRACK_TOKEN_USAGE",
+		"DEBUG",
 	}
 
 	for _, variable := range variables {

@@ -122,7 +122,17 @@ func (c *Client) Query(input string) (string, int, error) {
 		return "", 0, err
 	}
 
-	raw, err := c.caller.Post(c.getEndpoint(c.Config.CompletionsPath), body, false)
+	endpoint := c.getEndpoint(c.Config.CompletionsPath)
+
+	if c.Config.Debug {
+		c.printRequestDebugInfo(endpoint, body)
+	}
+
+	raw, err := c.caller.Post(endpoint, body, false)
+	if c.Config.Debug {
+		c.printResponseDebugInfo(raw)
+	}
+
 	if err != nil {
 		return "", 0, err
 	}
@@ -154,7 +164,13 @@ func (c *Client) Stream(input string) error {
 		return err
 	}
 
-	result, err := c.caller.Post(c.getEndpoint(c.Config.CompletionsPath), body, true)
+	endpoint := c.getEndpoint(c.Config.CompletionsPath)
+
+	if c.Config.Debug {
+		c.printRequestDebugInfo(endpoint, body)
+	}
+
+	result, err := c.caller.Post(endpoint, body, true)
 	if err != nil {
 		return err
 	}
@@ -316,4 +332,19 @@ func createMessagesFromString(input string) []types.Message {
 func generateUniqueSlug() string {
 	guid := uuid.New()
 	return InteractiveThreadPrefix + guid.String()[:4]
+}
+
+func (c *Client) printRequestDebugInfo(endpoint string, body []byte) {
+	bodyString := strings.ReplaceAll(string(body), "'", "'\"'\"'") // Escape single quotes
+
+	fmt.Printf("\nGenerated cURL command:\n\n")
+	fmt.Printf("curl --location --insecure --request POST '%s' \\\n", endpoint)
+	fmt.Printf("  --header \"Authorization: Bearer ${OPENAI_API_KEY}\" \\\n")
+	fmt.Printf("  --header 'Content-Type: application/json' \\\n")
+	fmt.Printf("  --data-raw '%s'\n\n", bodyString)
+}
+
+func (c *Client) printResponseDebugInfo(raw []byte) {
+	fmt.Printf("\nResponse\n\n")
+	fmt.Printf("%s\n\n", raw)
 }

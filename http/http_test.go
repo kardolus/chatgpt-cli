@@ -16,14 +16,17 @@ func TestUnitHTTP(t *testing.T) {
 }
 
 func testHTTP(t *testing.T, when spec.G, it spec.S) {
+	var subject http.RestCaller
+
 	it.Before(func() {
 		RegisterTestingT(t)
+		subject = http.RestCaller{}
 	})
 
 	when("ProcessResponse()", func() {
 		it("parses a stream as expected", func() {
 			buf := &bytes.Buffer{}
-			http.ProcessResponse(strings.NewReader(stream), buf)
+			subject.ProcessResponse(strings.NewReader(stream), buf)
 			output := buf.String()
 			Expect(output).To(Equal("a b c\n"))
 		})
@@ -32,7 +35,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 			expectedOutput := "Error: unexpected end of JSON input\n"
 
 			var buf bytes.Buffer
-			http.ProcessResponse(strings.NewReader(input), &buf)
+			subject.ProcessResponse(strings.NewReader(input), &buf)
 			output := buf.String()
 
 			Expect(output).To(Equal(expectedOutput))

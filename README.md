@@ -292,6 +292,7 @@ auth_token_prefix: " "
 command_prompt: '[%datetime] [Q%counter]'
 auto_create_new_thread: false
 track_token_usage: false
+debug: false
 ```
 
 You can set the API key either in the config.yaml file as shown above or export it as an environment variable:
@@ -325,6 +326,7 @@ auth_token_prefix: 'Bearer '
 command_prompt: '[%datetime] [Q%counter] [%usage]'
 auto_create_new_thread: true
 track_token_usage: true
+debug: false
 ```
 
 You can set the API key either in the config.yaml file as shown above or export it as an environment variable:
@@ -492,10 +494,12 @@ data. If you have any concerns about this, please feel free to delete this direc
 
 ## Useful Links
 
-* [ChatGPT API Documentation](https://platform.openai.com/docs/introduction/overview)
-* [OpenAI API Reference](https://platform.openai.com/docs/api-reference/introduction)
-* [Key Usage Dashboard](https://platform.openai.com/account/usage)
+* [OpenAI API Reference](https://platform.openai.com/docs/api-reference/chat/create)
+* [OpenAI Key Usage Dashboard](https://platform.openai.com/account/usage)
 * [OpenAI Pricing Page](https://openai.com/pricing)
+* [Perplexity API Reference](https://docs.perplexity.ai/reference/post_chat_completions)
+* [Perplexity Key Usage Dashboard](https://www.perplexity.ai/settings/api)
+* [Perplexity Models](https://docs.perplexity.ai/docs/model-cards)
 
 ## Additional Resources
 

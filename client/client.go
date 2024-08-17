@@ -339,7 +339,7 @@ func (c *Client) printRequestDebugInfo(endpoint string, body []byte) {
 
 	fmt.Printf("\nGenerated cURL command:\n\n")
 	fmt.Printf("curl --location --insecure --request POST '%s' \\\n", endpoint)
-	fmt.Printf("  --header \"Authorization: Bearer ${OPENAI_API_KEY}\" \\\n")
+	fmt.Printf("  --header \"Authorization: Bearer ${%s_API_KEY}\" \\\n", strings.ToUpper(c.Config.Name))
 	fmt.Printf("  --header 'Content-Type: application/json' \\\n")
 	fmt.Printf("  --data-raw '%s'\n\n", bodyString)
 }

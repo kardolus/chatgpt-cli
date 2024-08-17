@@ -1,12 +1,25 @@
 package types
 
+import "encoding/json"
+
+// Float64 is a custom type that wraps float64 and implements a custom YAML marshaller.
+type Float64 float64
+
+// MarshalJSON omits the field if the value is 0.0.
+func (f Float64) MarshalJSON() ([]byte, error) {
+	if f == 0.0 {
+		return []byte("null"), nil // Returning null to omit the field
+	}
+	return json.Marshal(float64(f))
+}
+
 type CompletionsRequest struct {
 	Model            string    `json:"model"`
 	Temperature      float64   `json:"temperature"`
 	TopP             float64   `json:"top_p"`
-	FrequencyPenalty float64   `json:"frequency_penalty"`
+	FrequencyPenalty float64   `json:"frequency_penalty,omitempty"`
 	MaxTokens        int       `json:"max_tokens"`
-	PresencePenalty  float64   `json:"presence_penalty"`
+	PresencePenalty  float64   `json:"presence_penalty,omitempty"`
 	Messages         []Message `json:"messages"`
 	Stream           bool      `json:"stream"`
 }

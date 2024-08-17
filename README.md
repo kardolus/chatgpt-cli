@@ -2,6 +2,8 @@
 
 ![Test Workflow](https://github.com/kardolus/chatgpt-cli/actions/workflows/test.yml/badge.svg?branch=main)
 
+**Tested and Compatible with OpenAI ChatGPT, Azure OpenAI Service, and Perplexity AI!**
+
 ChatGPT CLI provides a powerful command-line interface for seamless interaction with ChatGPT models via OpenAI and
 Azure, featuring streaming capabilities and extensive configuration options.
 
@@ -24,6 +26,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
     - [General Configuration](#general-configuration)
         - [Variables for interactive mode](#variables-for-interactive-mode)
     - [Azure Configuration](#azure-configuration)
+    - [Perplexity Configuration](#perplexity-configuration)
     - [Command-Line Autocompletion](#command-line-autocompletion)
         - [Enabling Autocompletion](#enabling-autocompletion)
         - [Persistent Autocompletion](#persistent-autocompletion)
@@ -52,8 +55,9 @@ Azure, featuring streaming capabilities and extensive configuration options.
 * **Advanced configuration options**: The CLI supports a layered configuration system where settings can be specified
   through default values, a `config.yaml` file, and environment variables. For quick adjustments,
   various `--set-<value>` flags are provided. To verify your current settings, use the `--config` or `-c` flag.
-* **Availability Note**: This CLI supports both gpt-4 and gpt-3.5-turbo models. However, the specific ChatGPT model used
-  on chat.openai.com may not be available via the OpenAI API.
+* **Availability Note**: This CLI supports gpt-4, gpt-3.5-turbo, and Perplexity’s models (e.g.,
+  llama-3.1-sonar-small-128k-online). However, the specific ChatGPT model used on chat.openai.com may not be available
+  via the OpenAI API.
 
 ## Installation
 
@@ -288,6 +292,45 @@ auth_token_prefix: " "
 command_prompt: '[%datetime] [Q%counter]'
 auto_create_new_thread: false
 track_token_usage: false
+```
+
+You can set the API key either in the config.yaml file as shown above or export it as an environment variable:
+
+```shell
+export AZURE_API_KEY=<your_key>
+```
+
+### Perplexity Configuration
+
+For Perplexity, use a configuration similar to:
+
+```yaml
+name: perplexity
+api_key: ""
+model: llama-3.1-sonar-small-128k-online
+max_tokens: 4096
+context_window: 8192
+role: Be precise and concise.
+temperature: 1
+top_p: 1
+frequency_penalty: 0
+presence_penalty: 0
+thread: test
+omit_history: false
+url: https://api.perplexity.ai
+completions_path: /chat/completions
+models_path: /models
+auth_header: Authorization
+auth_token_prefix: 'Bearer '
+command_prompt: '[%datetime] [Q%counter] [%usage]'
+auto_create_new_thread: true
+track_token_usage: true
+```
+
+You can set the API key either in the config.yaml file as shown above or export it as an environment variable:
+
+```shell
+export PERPLEXITY_API_KEY=<your_key>
 ```
 
 You can set the API key either in the `config.yaml` file as shown above or export it as an environment variable:

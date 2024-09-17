@@ -3,6 +3,7 @@ package http
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/types"
@@ -36,8 +37,20 @@ type RestCaller struct {
 var _ Caller = &RestCaller{}
 
 func New(cfg types.Config) *RestCaller {
+	var client *http.Client
+	if cfg.SkipTLSVerify {
+		transport := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client = &http.Client{
+			Transport: transport,
+		}
+	} else {
+		client = &http.Client{}
+	}
+
 	return &RestCaller{
-		client: &http.Client{},
+		client: client,
 		config: cfg,
 	}
 }

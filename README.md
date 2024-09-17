@@ -2,7 +2,7 @@
 
 ![Test Workflow](https://github.com/kardolus/chatgpt-cli/actions/workflows/test.yml/badge.svg?branch=main)
 
-**Tested and Compatible with OpenAI ChatGPT, Azure OpenAI Service, and Perplexity AI!**
+**Tested and Compatible with OpenAI ChatGPT, Azure OpenAI Service, Perplexity AI and Llama!**
 
 ChatGPT CLI provides a powerful command-line interface for seamless interaction with ChatGPT models via OpenAI and
 Azure, featuring streaming capabilities and extensive configuration options.
@@ -211,6 +211,7 @@ Configuration variables:
 | `auto_create_new_thread` | If set to `true`, a new thread with a unique identifier (e.g., `int_a1b2`) will be created for each interactive session. If `false`, the CLI will use the thread specified by the `thread` parameter. | `false`                        |
 | `track_token_usage`      | If set to true, displays the total token usage after each query in --query mode, helping you monitor API usage.                                                                                       | `false`                        |
 | `debug`                  | If set to true, prints the raw request and response data during API calls, useful for debugging.                                                                                                      | `false`                        |
+| `skip_tls_verify`        | If set to true, skips TLS certificate verification, allowing insecure HTTPS requests.                                                                                                                 | `false`                        |
 
 #### Variables for interactive mode:
 

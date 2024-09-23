@@ -15,6 +15,8 @@ TARGETS=(
   "linux:arm64"
   "linux:386"
   "windows:amd64"
+  "freebsd:amd64"
+  "freebsd:arm64"
 )
 
 for b in $(ls cmd); do

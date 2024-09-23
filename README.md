@@ -20,6 +20,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
         - [Linux (amd64)](#linux-amd64)
         - [Linux (arm64)](#linux-arm64)
         - [Linux (386)](#linux-386)
+        - [FreeBSD (amd64)](#freebsd-amd64)
+        - [FreeBSD (arm64)](#freebsd-arm64)
         - [Windows (amd64)](#windows-amd64)
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
@@ -102,6 +104,18 @@ curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/latest/downl
 
 ```shell
 curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/latest/download/chatgpt-linux-386 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+```
+
+#### FreeBSD (amd64)
+
+```shell
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/latest/download/chatgpt-freebsd-amd64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
+```
+
+#### FreeBSD (arm64)
+
+```shell
+curl -L -o chatgpt https://github.com/kardolus/chatgpt-cli/releases/latest/download/chatgpt-freebsd-arm64 && chmod +x chatgpt && sudo mv chatgpt /usr/local/bin/
 ```
 
 #### Windows (amd64)

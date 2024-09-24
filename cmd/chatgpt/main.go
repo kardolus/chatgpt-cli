@@ -217,11 +217,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 		qNum, usage := 1, 0
 		for {
-			if queryMode {
-				rl.SetPrompt(prompt(qNum, usage))
-			} else {
-				rl.SetPrompt(prompt(qNum, usage))
-			}
+			rl.SetPrompt(prompt(qNum, usage))
 
 			line, err := rl.Readline()
 			if errors.Is(err, readline.ErrInterrupt) || err == io.EOF {

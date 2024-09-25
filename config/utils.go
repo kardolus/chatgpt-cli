@@ -25,5 +25,7 @@ func FormatPrompt(str string, counter, usage int, now time.Time) string {
 		str += " "
 	}
 
+	str = strings.ReplaceAll(str, "\\n", "\n")
+
 	return str
 }

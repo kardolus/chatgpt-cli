@@ -45,6 +45,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		defaultFrequencyPenalty    = 3.3
 		defaultPresencePenalty     = 4.4
 		defaultCommandPrompt       = "default-command-prompt"
+		defaultOutputPrompt        = "default-output-prompt"
 	)
 
 	var (
@@ -78,6 +79,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			FrequencyPenalty:    defaultFrequencyPenalty,
 			PresencePenalty:     defaultPresencePenalty,
 			CommandPrompt:       defaultCommandPrompt,
+			OutputPrompt:        defaultOutputPrompt,
 			AutoCreateNewThread: defaultAutoCreateNewThread,
 			TrackTokenUsage:     defaultTrackTokenUsage,
 			Debug:               defaultDebug,
@@ -116,6 +118,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.FrequencyPenalty).To(Equal(defaultFrequencyPenalty))
 		Expect(subject.Config.PresencePenalty).To(Equal(defaultPresencePenalty))
 		Expect(subject.Config.CommandPrompt).To(Equal(defaultCommandPrompt))
+		Expect(subject.Config.OutputPrompt).To(Equal(defaultOutputPrompt))
 		Expect(subject.Config.AutoCreateNewThread).To(Equal(defaultAutoCreateNewThread))
 		Expect(subject.Config.TrackTokenUsage).To(Equal(defaultTrackTokenUsage))
 		Expect(subject.Config.Debug).To(Equal(defaultDebug))
@@ -140,6 +143,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			FrequencyPenalty:    4.5,
 			PresencePenalty:     5.5,
 			CommandPrompt:       "user-command-prompt",
+			OutputPrompt:        "user-output-prompt",
 			AutoCreateNewThread: true,
 			TrackTokenUsage:     true,
 			Debug:               true,
@@ -171,6 +175,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.FrequencyPenalty).To(Equal(4.5))
 		Expect(subject.Config.PresencePenalty).To(Equal(5.5))
 		Expect(subject.Config.CommandPrompt).To(Equal("user-command-prompt"))
+		Expect(subject.Config.OutputPrompt).To(Equal("user-output-prompt"))
 	})
 
 	it("should prioritize environment variables over default config", func() {
@@ -195,6 +200,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"FREQUENCY_PENALTY", "4.4")
 		os.Setenv(envPrefix+"PRESENCE_PENALTY", "5.5")
 		os.Setenv(envPrefix+"COMMAND_PROMPT", "env-command-prompt")
+		os.Setenv(envPrefix+"OUTPUT_PROMPT", "env-output-prompt")
 
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 		mockConfigStore.EXPECT().Read().Return(types.Config{}, errors.New("config error")).Times(1)
@@ -222,6 +228,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.FrequencyPenalty).To(Equal(4.4))
 		Expect(subject.Config.PresencePenalty).To(Equal(5.5))
 		Expect(subject.Config.CommandPrompt).To(Equal("env-command-prompt"))
+		Expect(subject.Config.OutputPrompt).To(Equal("env-output-prompt"))
 	})
 
 	it("should prioritize environment variables over user-provided config", func() {
@@ -246,6 +253,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		os.Setenv(envPrefix+"FREQUENCY_PENALTY", "4.4")
 		os.Setenv(envPrefix+"PRESENCE_PENALTY", "5.5")
 		os.Setenv(envPrefix+"COMMAND_PROMPT", "env-command-prompt")
+		os.Setenv(envPrefix+"OUTPUT_PROMPT", "env-output-prompt")
 
 		userConfig := types.Config{
 			APIKey:              "user-api-key",
@@ -269,6 +277,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			FrequencyPenalty:    3.5,
 			PresencePenalty:     4.5,
 			CommandPrompt:       "user-command-prompt",
+			OutputPrompt:        "user-output-prompt",
 		}
 
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
@@ -297,6 +306,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.FrequencyPenalty).To(Equal(4.4))
 		Expect(subject.Config.PresencePenalty).To(Equal(5.5))
 		Expect(subject.Config.CommandPrompt).To(Equal("env-command-prompt"))
+		Expect(subject.Config.OutputPrompt).To(Equal("env-output-prompt"))
 	})
 
 	it("should write the max tokens as expected", func() {
@@ -446,6 +456,7 @@ func unsetEnvironmentVariables(envPrefix string) {
 		"FREQUENCY_PENALTY",
 		"PRESENCE_PENALTY",
 		"COMMAND_PROMPT",
+		"OUTPUT_PROMPT",
 		"AUTO_CREATE_NEW_THREAD",
 		"TRACK_TOKEN_USAGE",
 		"DEBUG",

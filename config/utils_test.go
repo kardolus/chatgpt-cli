@@ -77,5 +77,11 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			expected := fmt.Sprintf("command_prompt: [%s] [Q%d] ", now.Format("15:04:05"), counter)
 			Expect(config.FormatPrompt(input, counter, usage, now)).To(Equal(expected))
 		})
+
+		it("should replace \\n with an actual newline", func() {
+			input := "Line 1\\nLine 2"
+			expected := "Line 1\nLine 2 "
+			Expect(config.FormatPrompt(input, counter, usage, now)).To(Equal(expected))
+		})
 	})
 }

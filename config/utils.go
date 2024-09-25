@@ -21,7 +21,7 @@ func FormatPrompt(str string, counter, usage int, now time.Time) string {
 	}
 
 	// Ensure the last character is a space
-	if !strings.HasSuffix(str, " ") {
+	if str != "" && !strings.HasSuffix(str, " ") {
 		str += " "
 	}
 

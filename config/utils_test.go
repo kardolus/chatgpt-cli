@@ -35,7 +35,7 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 
 		it("should handle empty input as expected", func() {
 			input := ""
-			expected := " "
+			expected := ""
 			Expect(config.FormatPrompt(input, counter, usage, now)).To(Equal(expected))
 		})
 

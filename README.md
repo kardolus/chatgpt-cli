@@ -27,6 +27,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
 - [Configuration](#configuration)
     - [General Configuration](#general-configuration)
         - [Variables for interactive mode](#variables-for-interactive-mode)
+    - [Custom Config and Data Directory](#custom-config-and-data-directory)
+      - [Example for Custom Directories](#example-for-custom-directories)
     - [Azure Configuration](#azure-configuration)
     - [Perplexity Configuration](#perplexity-configuration)
     - [Command-Line Autocompletion](#command-line-autocompletion)
@@ -228,6 +230,30 @@ Configuration variables:
 | `debug`                  | If set to true, prints the raw request and response data during API calls, useful for debugging.                                                                                                      | `false`                        |
 | `skip_tls_verify`        | If set to true, skips TLS certificate verification, allowing insecure HTTPS requests.                                                                                                                 | `false`                        |
 
+### Custom Config and Data Directory
+
+By default, ChatGPT CLI stores configuration and history files in the `~/.chatgpt-cli` directory. However, you can
+easily
+override these locations by setting environment variables, allowing you to store configuration and history in custom
+directories.
+
+| Environment Variable | Description                                  | Default Location         |
+|----------------------|----------------------------------------------|--------------------------|
+| `OPENAI_CONFIG_HOME` | Overrides the default config directory path. | `~/.chatgpt-cli`         |
+| `OPENAI_DATA_HOME`   | Overrides the default data directory path.   | `~/.chatgpt-cli/history` |
+
+#### Example for Custom Directories
+
+To change the default configuration or data directories, set the appropriate environment variables:
+
+```
+export OPENAI_CONFIG_HOME="/custom/config/path"
+export OPENAI_DATA_HOME="/custom/data/path"
+```
+
+If these environment variables are not set, the application defaults to ~/.chatgpt-cli for configuration files and ~
+/.chatgpt-cli/history for history.
+
 #### Variables for interactive mode:
 
 - `%date`: The current date in the format `YYYY-MM-DD`.
@@ -236,10 +262,8 @@ Configuration variables:
 - `%counter`: The total number of queries in the current session.
 - `%usage`: The usage in total tokens used (only works in query mode).
 
-The defaults can be overridden by providing your own values in the user configuration file,
-named `.chatgpt-cli/config.yaml`, located in your home directory.
-
-The structure of the user configuration file mirrors that of the default configuration. For instance, to override
+The defaults can be overridden by providing your own values in the user configuration file. The structure of this file
+mirrors that of the default configuration. For instance, to override
 the `model` and `max_tokens` parameters, your file might look like this:
 
 ```yaml

@@ -32,12 +32,12 @@ type FileIO struct {
 func New() (*FileIO, error) {
 	_ = migrate()
 
-	dir, err := utils.GetHistoryDir()
+	dir, err := utils.GetDataHome()
 	if err != nil {
 		return nil, err
 	}
 
-	chatGPTDir, err := utils.GetChatGPTDirectory()
+	chatGPTDir, err := utils.GetConfigHome()
 	if err != nil {
 		return nil, err
 	}
@@ -86,12 +86,12 @@ func (f *FileIO) getPath() string {
 
 // migrate moves the legacy "history" file in ~/.chatgpt-cli to "history/default.json"
 func migrate() error {
-	hiddenDir, err := utils.GetChatGPTDirectory()
+	hiddenDir, err := utils.GetConfigHome()
 	if err != nil {
 		return err
 	}
 
-	historyFile, err := utils.GetHistoryDir()
+	historyFile, err := utils.GetDataHome()
 	if err != nil {
 		return err
 	}

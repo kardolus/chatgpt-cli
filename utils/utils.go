@@ -6,23 +6,42 @@ import (
 )
 
 const (
-	cliDirName     = ".chatgpt-cli"
-	historyDirName = "history"
+	ConfigHomeEnv    = "OPENAI_CONFIG_HOME"
+	DataHomeEnv      = "OPENAI_DATA_HOME"
+	DefaultConfigDir = ".chatgpt-cli"
+	DefaultDataDir   = "history"
 )
 
-func GetChatGPTDirectory() (string, error) {
+func GetConfigHome() (string, error) {
+	var result string
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(homeDir, cliDirName), nil
+
+	result = filepath.Join(homeDir, DefaultConfigDir)
+
+	if tmp := os.Getenv(ConfigHomeEnv); tmp != "" {
+		result = tmp
+	}
+
+	return result, nil
 }
 
-func GetHistoryDir() (string, error) {
-	homeDir, err := GetChatGPTDirectory()
+func GetDataHome() (string, error) {
+	var result string
+
+	configHome, err := GetConfigHome()
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(homeDir, historyDirName), nil
+	result = filepath.Join(configHome, DefaultDataDir)
+
+	if tmp := os.Getenv(DataHomeEnv); tmp != "" {
+		result = tmp
+	}
+
+	return result, nil
 }

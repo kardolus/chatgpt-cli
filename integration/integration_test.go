@@ -44,6 +44,8 @@ func TestIntegration(t *testing.T) {
 func testIntegration(t *testing.T, when spec.G, it spec.S) {
 	it.Before(func() {
 		RegisterTestingT(t)
+		Expect(os.Unsetenv(utils.ConfigHomeEnv)).To(Succeed())
+		Expect(os.Unsetenv(utils.DataHomeEnv)).To(Succeed())
 	})
 
 	when("Read and Write History", func() {

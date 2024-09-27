@@ -47,7 +47,7 @@ type FileIO struct {
 
 func New() *FileIO {
 	configPath, _ := getPath()
-	historyPath, _ := utils.GetHistoryDir()
+	historyPath, _ := utils.GetDataHome()
 
 	return &FileIO{
 		configFilePath:  configPath,
@@ -154,7 +154,7 @@ func (f *FileIO) readNode() (yaml.Node, error) {
 }
 
 func getPath() (string, error) {
-	homeDir, err := utils.GetChatGPTDirectory()
+	homeDir, err := utils.GetConfigHome()
 	if err != nil {
 		return "", err
 	}

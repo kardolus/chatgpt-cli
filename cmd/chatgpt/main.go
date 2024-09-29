@@ -204,7 +204,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if interactiveMode {
-		fmt.Printf("Entering interactive mode. Using thread '%s'. Type 'exit' and press Enter or press Ctrl+C to quit.\n\n", hs.GetThread())
+		fmt.Printf("Entering interactive mode. Using thread '%s'. Type 'clear' to clear the screen, 'exit' and press Enter or press Ctrl+C to quit.\n\n", hs.GetThread())
 		rl, err := readline.New("")
 		if err != nil {
 			return err
@@ -223,6 +223,12 @@ func run(cmd *cobra.Command, args []string) error {
 			if errors.Is(err, readline.ErrInterrupt) || err == io.EOF {
 				fmt.Println("Bye!")
 				break
+			}
+
+			if line == "clear" {
+				ansiClearScreenCode := "\033[H\033[2J"
+				fmt.Print(ansiClearScreenCode)
+				continue
 			}
 
 			if line == "exit" || line == "/q" {

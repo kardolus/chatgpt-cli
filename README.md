@@ -1,6 +1,6 @@
 # ChatGPT CLI
 
-![Test Workflow](https://github.com/kardolus/chatgpt-cli/actions/workflows/test.yml/badge.svg?branch=main)
+![Test Workflow](https://github.com/kardolus/chatgpt-cli/actions/workflows/test.yml/badge.svg?branch=main) [![Public Backlog](https://img.shields.io/badge/public%20backlog-808080)](https://github.com/users/kardolus/projects/2)
 
 **Tested and Compatible with OpenAI ChatGPT, Azure OpenAI Service, Perplexity AI and Llama!**
 

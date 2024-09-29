@@ -204,7 +204,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if interactiveMode {
-		fmt.Printf("Entering interactive mode. Using thread '%s'. Type 'clear' to clear the screen, 'exit' and press Enter or press Ctrl+C to quit.\n\n", hs.GetThread())
+		fmt.Printf("Entering interactive mode. Using thread ‘%s’. Type ‘clear’ to clear the screen, ‘exit’ to quit, or press Ctrl+C.\n\n", hs.GetThread())
 		rl, err := readline.New("")
 		if err != nil {
 			return err

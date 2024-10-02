@@ -26,6 +26,7 @@ var (
 	interactiveMode bool
 	listModels      bool
 	listThreads     bool
+	hasPipe         bool
 	modelName       string
 	threadName      string
 	maxTokens       int
@@ -188,7 +189,13 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to read from pipe: %w", err)
 		}
-		client.ProvideContext(string(pipeContent))
+
+		context := string(pipeContent)
+
+		if strings.Trim(context, "\n ") != "" {
+			hasPipe = true
+		}
+		client.ProvideContext(context)
 	}
 
 	if listModels {
@@ -261,8 +268,8 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 		}
 	} else {
-		if len(args) == 0 {
-			return errors.New("you must specify your query")
+		if len(args) == 0 && !hasPipe {
+			return errors.New("you must specify your query or provide input via a pipe")
 		}
 		if queryMode {
 			result, usage, err := client.Query(strings.Join(args, " "))

@@ -281,8 +281,12 @@ max_tokens: 100
 		runCommand := func(args ...string) string {
 			command := exec.Command(binaryPath, args...)
 			session, err := gexec.Start(command, io.Discard, io.Discard)
+
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 			<-session.Exited
+
+			fmt.Printf("%+v\n", string(session.Out.Contents()))
+
 			ExpectWithOffset(1, session).Should(gexec.Exit(0))
 			return string(session.Out.Contents())
 		}
@@ -334,7 +338,7 @@ max_tokens: 100
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
 			output := string(session.Err.Contents())
-			Expect(output).To(ContainSubstring(apiKeyEnvVar))
+			Expect(output).To(ContainSubstring("API key is required."))
 		})
 
 		it("should not require an API key for the --version flag", func() {
@@ -412,7 +416,7 @@ max_tokens: 100
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
 			output := string(session.Err.Contents())
-			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
+			Expect(output).To(ContainSubstring("config directory does not exist:"))
 			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
 		})
 
@@ -426,7 +430,7 @@ max_tokens: 100
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
 			output := string(session.Err.Contents())
-			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
+			Expect(output).To(ContainSubstring("config directory does not exist:"))
 			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
 		})
 
@@ -440,7 +444,7 @@ max_tokens: 100
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
 			output := string(session.Err.Contents())
-			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
+			Expect(output).To(ContainSubstring("config directory does not exist:"))
 			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
 		})
 
@@ -454,7 +458,7 @@ max_tokens: 100
 			Eventually(session).Should(gexec.Exit(exitFailure))
 
 			output := string(session.Err.Contents())
-			Expect(output).To(ContainSubstring(".chatgpt-cli/config.yaml: no such file or directory"))
+			Expect(output).To(ContainSubstring("config directory does not exist:"))
 			Expect(output).NotTo(ContainSubstring(apiKeyEnvVar))
 		})
 
@@ -715,6 +719,9 @@ max_tokens: 100
 
 					// Verify updated model through --list-models
 					output = runCommand("--list-models")
+
+					fmt.Println("here4")
+
 					Expect(output).To(ContainSubstring("* " + newModel + " (current)"))
 				})
 

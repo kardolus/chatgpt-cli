@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/kardolus/chatgpt-cli/types"
 	"github.com/kardolus/chatgpt-cli/utils"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
@@ -35,6 +36,7 @@ var (
 	threadName      string
 	ServiceURL      string
 	shell           string
+	cfg             types.Config
 )
 
 type ConfigMetadata struct {
@@ -45,16 +47,17 @@ type ConfigMetadata struct {
 }
 
 var configMetadata = []ConfigMetadata{
-	{"model", "set-model", "gpt-4", "Set a new default GPT model by specifying the model name"},
+	{"model", "set-model", "gpt-3.5-turbo", "Set a new default GPT model by specifying the model name"},
 	{"max_tokens", "set-max-tokens", 4096, "Set a new default max token size"},
 	{"context_window", "set-context-window", 8192, "Set a new default context window size"},
 	{"thread", "set-thread", "default", "Set a new active thread by specifying the thread name"},
 	{"api_key", "set-api-key", "", "Set the API key for authentication"},
+	{"role", "set-role", "You are a helpful assistant.", "Set the role of the AI assistant"},
 	{"url", "set-url", "https://api.openai.com", "Set the API base URL"},
 	{"completions_path", "set-completions-path", "/v1/chat/completions", "Set the completions API endpoint"},
 	{"models_path", "set-models-path", "/v1/models", "Set the models API endpoint"},
 	{"auth_header", "set-auth-header", "Authorization", "Set the authorization header"},
-	{"auth_token_prefix", "set-auth-token-prefix", "Bearer", "Set the authorization token prefix"},
+	{"auth_token_prefix", "set-auth-token-prefix", "Bearer ", "Set the authorization token prefix"},
 	{"command_prompt", "set-command-prompt", "[%datetime] [Q%counter] [%usage]", "Set the command prompt format"},
 	{"output_prompt", "set-output-prompt", "", "Set the output prompt format"},
 	{"temperature", "set-temperature", 1.0, "Set the sampling temperature"},
@@ -66,6 +69,7 @@ var configMetadata = []ConfigMetadata{
 	{"track_token_usage", "set-track-token-usage", true, "Track token usage"},
 	{"skip_tls_verify", "set-skip-tls-verify", false, "Skip TLS certificate verification"},
 	{"debug", "set-debug", false, "Enable debug mode"},
+	{"name", "set-name", "openai", "The prefix for environment variable overrides"},
 }
 
 func main() {
@@ -81,18 +85,10 @@ func main() {
 	}
 
 	setCustomHelp(rootCmd)
+	setupFlags(rootCmd)
 
-	rootCmd.PersistentFlags().BoolVarP(&interactiveMode, "interactive", "i", false, "Use interactive mode")
-	rootCmd.PersistentFlags().BoolVarP(&queryMode, "query", "q", false, "Use query mode instead of stream mode")
-	rootCmd.PersistentFlags().BoolVar(&clearHistory, "clear-history", false, "Clear all prior conversation context for the current thread")
-	rootCmd.PersistentFlags().BoolVarP(&showConfig, "config", "c", false, "Display the configuration")
-	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
-	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
-	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
-	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
-	rootCmd.PersistentFlags().StringVar(&shell, "set-completions", "", "Generate autocompletion script for your current shell")
-
-	if err := initConfig(rootCmd); err != nil {
+	var err error
+	if cfg, err = initConfig(rootCmd); err != nil {
 		fmt.Fprintf(os.Stderr, "Config initialization failed: %v\n", err)
 		os.Exit(1)
 	}
@@ -104,47 +100,11 @@ func main() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	// Sync flag values to Viper manually for the keys in configMetadata, keeping the correct type
-	for _, meta := range configMetadata {
-		aliasFlagName := strings.ReplaceAll(meta.Key, "_", "-")
-		var value interface{}
-		var err error
-
-		// Check if either the set-* flag or its alias is changed
-		if cmd.Flag(meta.FlagName).Changed || cmd.Flag(aliasFlagName).Changed {
-			switch meta.DefaultValue.(type) {
-			case string:
-				value = cmd.Flag(meta.FlagName).Value.String()
-				if cmd.Flag(aliasFlagName).Changed {
-					value = cmd.Flag(aliasFlagName).Value.String()
-				}
-			case int:
-				value, err = cmd.Flags().GetInt(meta.FlagName)
-				if cmd.Flag(aliasFlagName).Changed {
-					value, err = cmd.Flags().GetInt(aliasFlagName)
-				}
-			case bool:
-				value, err = cmd.Flags().GetBool(meta.FlagName)
-				if cmd.Flag(aliasFlagName).Changed {
-					value, err = cmd.Flags().GetBool(aliasFlagName)
-				}
-			case float64:
-				value, err = cmd.Flags().GetFloat64(meta.FlagName)
-				if cmd.Flag(aliasFlagName).Changed {
-					value, err = cmd.Flags().GetFloat64(aliasFlagName)
-				}
-			default:
-				return fmt.Errorf("unsupported type for %s", meta.FlagName)
-			}
-
-			if err != nil {
-				return fmt.Errorf("failed to parse value for %s: %w", meta.FlagName, err)
-			}
-
-			// Set the value in Viper for runtime use
-			viper.Set(meta.Key, value)
-		}
+	if err := syncFlagsWithViper(cmd); err != nil {
+		return err
 	}
+
+	cfg = createConfigFromViper()
 
 	changedValues := map[string]interface{}{}
 	for _, meta := range configMetadata {
@@ -216,12 +176,12 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Flags that require an API key
-	hs, _ := history.New() // do not error out
-	client, err := client.New(http.RealCallerFactory, config.New(), hs, interactiveMode)
-	if err != nil {
-		return err
+	if viper.GetString("api_key") == "" {
+		return errors.New("API key is required. Please set it using the --set-api-key flag, with the runtime flag --api-key or via environment variables")
 	}
+
+	hs, _ := history.New() // do not error out
+	client := client.New(http.RealCallerFactory, hs, cfg, interactiveMode)
 
 	if ServiceURL != "" {
 		client = client.WithServiceURL(ServiceURL)
@@ -335,36 +295,14 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func initConfig(rootCmd *cobra.Command) error {
+func initConfig(rootCmd *cobra.Command) (types.Config, error) {
 	cm := configmanager.New(config.New()).WithEnvironment()
 
 	viper.SetEnvPrefix(cm.Config.Name)
 	viper.AutomaticEnv()
 
 	for _, meta := range configMetadata {
-		// Convert the key from snake_case to kebab-case for the alias flag
-		aliasFlagName := strings.ReplaceAll(meta.Key, "_", "-")
-
-		// Add both regular and "set-" flags based on its type
-		switch v := meta.DefaultValue.(type) {
-		case string:
-			rootCmd.PersistentFlags().String(meta.FlagName, v, meta.Description)
-			rootCmd.PersistentFlags().String(aliasFlagName, v, fmt.Sprintf("Alias for setting %s", meta.Key))
-		case int:
-			rootCmd.PersistentFlags().Int(meta.FlagName, v, meta.Description)
-			rootCmd.PersistentFlags().Int(aliasFlagName, v, fmt.Sprintf("Alias for setting %s", meta.Key))
-		case bool:
-			rootCmd.PersistentFlags().Bool(meta.FlagName, v, meta.Description)
-			rootCmd.PersistentFlags().Bool(aliasFlagName, v, fmt.Sprintf("Alias for setting %s", meta.Key))
-		case float64:
-			rootCmd.PersistentFlags().Float64(meta.FlagName, v, meta.Description)
-			rootCmd.PersistentFlags().Float64(aliasFlagName, v, fmt.Sprintf("Alias for setting %s", meta.Key))
-		}
-
-		// Bind each "set-" flag and regular alias flag to the corresponding viper key
-		viper.BindPFlag(meta.Key, rootCmd.PersistentFlags().Lookup(meta.FlagName))
-		viper.BindPFlag(meta.Key, rootCmd.PersistentFlags().Lookup(aliasFlagName))
-		viper.SetDefault(meta.Key, meta.DefaultValue)
+		setupConfigFlags(rootCmd, meta)
 	}
 
 	viper.SetConfigName("config")
@@ -372,56 +310,136 @@ func initConfig(rootCmd *cobra.Command) error {
 
 	configHome, err := utils.GetConfigHome()
 	if err != nil {
-		return err
+		return types.Config{}, err
 	}
 	viper.AddConfigPath(configHome)
 
 	if err := viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
-		if errors.As(err, &configFileNotFoundError) {
-			return nil
-		} else {
-			return err
+		if !errors.As(err, &configFileNotFoundError) {
+			return types.Config{}, err
+		}
+	}
+
+	return createConfigFromViper(), nil
+}
+
+func readConfigWithComments(configPath string) (*yaml.Node, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var rootNode yaml.Node
+	if err := yaml.Unmarshal(data, &rootNode); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
+	}
+	return &rootNode, nil
+}
+
+func updateConfig(node *yaml.Node, changes map[string]interface{}) error {
+	// If the node is not a document or has no content, create an empty mapping node.
+	if node.Kind != yaml.DocumentNode || len(node.Content) == 0 {
+		node.Kind = yaml.DocumentNode
+		node.Content = []*yaml.Node{
+			{
+				Kind:    yaml.MappingNode,
+				Content: []*yaml.Node{},
+			},
+		}
+	}
+
+	// Assume the root is now a mapping node.
+	mapNode := node.Content[0]
+	if mapNode.Kind != yaml.MappingNode {
+		return errors.New("expected a mapping node at the root of the YAML document")
+	}
+
+	// Update the values in the mapNode.
+	for i := 0; i < len(mapNode.Content); i += 2 {
+		keyNode := mapNode.Content[i]
+		valueNode := mapNode.Content[i+1]
+
+		key := keyNode.Value
+		if newValue, ok := changes[key]; ok {
+			newValueStr := fmt.Sprintf("%v", newValue)
+			valueNode.Value = newValueStr
+		}
+	}
+
+	// Add any new keys that don't exist in the current mapNode.
+	for key, value := range changes {
+		if !keyExistsInNode(mapNode, key) {
+			mapNode.Content = append(mapNode.Content, &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Value: key,
+			}, &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Value: fmt.Sprintf("%v", value),
+			})
 		}
 	}
 
 	return nil
 }
 
+// Helper function to check if a key already exists in a YAML mapping node.
+func keyExistsInNode(mapNode *yaml.Node, key string) bool {
+	for i := 0; i < len(mapNode.Content); i += 2 {
+		if mapNode.Content[i].Value == key {
+			return true
+		}
+	}
+	return false
+}
+
+func saveConfigWithComments(configPath string, node *yaml.Node) error {
+	out, err := yaml.Marshal(node)
+	if err != nil {
+		return fmt.Errorf("failed to marshal YAML: %w", err)
+	}
+	return os.WriteFile(configPath, out, 0644)
+}
+
 func saveConfig(changedValues map[string]interface{}) error {
-	if len(changedValues) == 0 {
-		return nil
+	configFile := viper.ConfigFileUsed()
+	configHome, err := utils.GetConfigHome()
+	if err != nil {
+		return fmt.Errorf("failed to get config home: %w", err)
 	}
 
-	configFile := viper.ConfigFileUsed()
+	// If the config file is not specified, assume it's supposed to be in the default location.
 	if configFile == "" {
-		configHome, err := utils.GetConfigHome()
-		if err != nil {
-			return err
-		}
 		configFile = fmt.Sprintf("%s/config.yaml", configHome)
 	}
 
-	// Load the existing config to merge changes
-	existingConfig := map[string]interface{}{}
-	fileData, err := os.ReadFile(configFile)
-	if err == nil {
-		_ = yaml.Unmarshal(fileData, &existingConfig)
+	// Check if the config directory exists.
+	if _, err := os.Stat(configHome); os.IsNotExist(err) {
+		return fmt.Errorf("config directory does not exist: %s", configHome)
 	}
 
-	// Merge the changed values
-	for key, value := range changedValues {
-		key = strings.ReplaceAll(key, "-", "_") // Ensure keys are in the correct format
-		existingConfig[key] = value
+	// Check if the config file itself exists, and create it if it doesn't.
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		file, err := os.Create(configFile)
+		if err != nil {
+			return fmt.Errorf("failed to create config file: %w", err)
+		}
+		defer file.Close()
 	}
 
-	// Write the updated config back to the file
-	yamlData, err := yaml.Marshal(existingConfig)
+	// Read the existing config with comments.
+	rootNode, err := readConfigWithComments(configFile)
 	if err != nil {
-		return fmt.Errorf("failed to marshal config to YAML: %w", err)
+		return fmt.Errorf("failed to read config with comments: %w", err)
 	}
 
-	return os.WriteFile(configFile, yamlData, 0644)
+	// Update the config with the new values.
+	if err := updateConfig(rootNode, changedValues); err != nil {
+		return fmt.Errorf("failed to update config: %w", err)
+	}
+
+	// Write back the updated config with preserved comments.
+	return saveConfigWithComments(configFile, rootNode)
 }
 
 func setCustomHelp(rootCmd *cobra.Command) {
@@ -443,7 +461,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--set-completions", "Generate autocompletion script for your current shell")
 		fmt.Println()
 
-		fmt.Println("Configuration Setters:")
+		fmt.Println("Persistent Configuration Setters:")
 		cmd.Flags().VisitAll(func(f *pflag.Flag) {
 			if strings.HasPrefix(f.Name, "set-") && !isNonConfigSetter(f.Name) {
 				printFlagWithPadding("--"+f.Name, f.Usage)
@@ -471,12 +489,46 @@ func setCustomHelp(rootCmd *cobra.Command) {
 	})
 }
 
-// Helper function to check if a flag is a non-config-specific setter
+func setupFlags(rootCmd *cobra.Command) {
+	rootCmd.PersistentFlags().BoolVarP(&interactiveMode, "interactive", "i", false, "Use interactive mode")
+	rootCmd.PersistentFlags().BoolVarP(&queryMode, "query", "q", false, "Use query mode instead of stream mode")
+	rootCmd.PersistentFlags().BoolVar(&clearHistory, "clear-history", false, "Clear all prior conversation context for the current thread")
+	rootCmd.PersistentFlags().BoolVarP(&showConfig, "config", "c", false, "Display the configuration")
+	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
+	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
+	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
+	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
+	rootCmd.PersistentFlags().StringVar(&shell, "set-completions", "", "Generate autocompletion script for your current shell")
+}
+
+func setupConfigFlags(rootCmd *cobra.Command, meta ConfigMetadata) {
+	aliasFlagName := strings.ReplaceAll(meta.Key, "_", "-")
+
+	switch meta.DefaultValue.(type) {
+	case string:
+		rootCmd.PersistentFlags().String(meta.FlagName, viper.GetString(meta.Key), meta.Description)
+		rootCmd.PersistentFlags().String(aliasFlagName, viper.GetString(meta.Key), fmt.Sprintf("Alias for setting %s", meta.Key))
+	case int:
+		rootCmd.PersistentFlags().Int(meta.FlagName, viper.GetInt(meta.Key), meta.Description)
+		rootCmd.PersistentFlags().Int(aliasFlagName, viper.GetInt(meta.Key), fmt.Sprintf("Alias for setting %s", meta.Key))
+	case bool:
+		rootCmd.PersistentFlags().Bool(meta.FlagName, viper.GetBool(meta.Key), meta.Description)
+		rootCmd.PersistentFlags().Bool(aliasFlagName, viper.GetBool(meta.Key), fmt.Sprintf("Alias for setting %s", meta.Key))
+	case float64:
+		rootCmd.PersistentFlags().Float64(meta.FlagName, viper.GetFloat64(meta.Key), meta.Description)
+		rootCmd.PersistentFlags().Float64(aliasFlagName, viper.GetFloat64(meta.Key), fmt.Sprintf("Alias for setting %s", meta.Key))
+	}
+
+	// Bind the flags directly to Viper keys
+	viper.BindPFlag(meta.Key, rootCmd.PersistentFlags().Lookup(meta.FlagName))
+	viper.BindPFlag(meta.Key, rootCmd.PersistentFlags().Lookup(aliasFlagName))
+	viper.SetDefault(meta.Key, meta.DefaultValue)
+}
+
 func isNonConfigSetter(name string) bool {
 	return name == "set-completions"
 }
 
-// Helper function to check if a flag is a general flag
 func isGeneralFlag(name string) bool {
 	switch name {
 	case "query", "interactive", "config", "version", "list-models", "list-threads", "clear-history", "delete-thread", "set-completions", "help":
@@ -486,7 +538,6 @@ func isGeneralFlag(name string) bool {
 	}
 }
 
-// Helper function to check if a flag is a config alias
 func isConfigAlias(name string) bool {
 	return !strings.HasPrefix(name, "set-") && !isGeneralFlag(name)
 }
@@ -496,6 +547,83 @@ func printFlagWithPadding(name, description string) {
 	fmt.Printf("  %-*s %s\n", padding, name, description)
 }
 
-// TODO populate the config struct and pass it to the client
+func syncFlagsWithViper(cmd *cobra.Command) error {
+	for _, meta := range configMetadata {
+		aliasFlagName := strings.ReplaceAll(meta.Key, "_", "-")
+		if err := syncFlag(cmd, meta, aliasFlagName); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func syncFlag(cmd *cobra.Command, meta ConfigMetadata, alias string) error {
+	var value interface{}
+	var err error
+
+	if cmd.Flag(meta.FlagName).Changed || cmd.Flag(alias).Changed {
+		switch meta.DefaultValue.(type) {
+		case string:
+			value = cmd.Flag(meta.FlagName).Value.String()
+			if cmd.Flag(alias).Changed {
+				value = cmd.Flag(alias).Value.String()
+			}
+		case int:
+			value, err = cmd.Flags().GetInt(meta.FlagName)
+			if cmd.Flag(alias).Changed {
+				value, err = cmd.Flags().GetInt(alias)
+			}
+		case bool:
+			value, err = cmd.Flags().GetBool(meta.FlagName)
+			if cmd.Flag(alias).Changed {
+				value, err = cmd.Flags().GetBool(alias)
+			}
+		case float64:
+			value, err = cmd.Flags().GetFloat64(meta.FlagName)
+			if cmd.Flag(alias).Changed {
+				value, err = cmd.Flags().GetFloat64(alias)
+			}
+		default:
+			return fmt.Errorf("unsupported type for %s", meta.FlagName)
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to parse value for %s: %w", meta.FlagName, err)
+		}
+
+		viper.Set(meta.Key, value)
+	}
+	return nil
+}
+
+func createConfigFromViper() types.Config {
+	return types.Config{
+		Name:                viper.GetString("name"),
+		APIKey:              viper.GetString("api_key"),
+		Model:               viper.GetString("model"),
+		MaxTokens:           viper.GetInt("max_tokens"),
+		ContextWindow:       viper.GetInt("context_window"),
+		Role:                viper.GetString("role"),
+		Temperature:         viper.GetFloat64("temperature"),
+		TopP:                viper.GetFloat64("top_p"),
+		FrequencyPenalty:    viper.GetFloat64("frequency_penalty"),
+		PresencePenalty:     viper.GetFloat64("presence_penalty"),
+		Thread:              viper.GetString("thread"),
+		OmitHistory:         viper.GetBool("omit_history"),
+		URL:                 viper.GetString("url"),
+		CompletionsPath:     viper.GetString("completions_path"),
+		ModelsPath:          viper.GetString("models_path"),
+		AuthHeader:          viper.GetString("auth_header"),
+		AuthTokenPrefix:     viper.GetString("auth_token_prefix"),
+		CommandPrompt:       viper.GetString("command_prompt"),
+		OutputPrompt:        viper.GetString("output_prompt"),
+		AutoCreateNewThread: viper.GetBool("auto_create_new_thread"),
+		TrackTokenUsage:     viper.GetBool("track_token_usage"),
+		SkipTLSVerify:       viper.GetBool("skip_tls_verify"),
+		Debug:               viper.GetBool("debug"),
+	}
+}
+
 // TODO get rid of your own config parsing logic
+// TODO move some code back to config so we can unit test
 // TODO update README

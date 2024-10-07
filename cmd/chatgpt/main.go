@@ -22,6 +22,8 @@ import (
 )
 
 var (
+	GitCommit       string
+	GitVersion      string
 	queryMode       bool
 	clearHistory    bool
 	showVersion     bool
@@ -157,6 +159,14 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if cmd.Flag("set-completions").Changed {
 		return config.GenCompletions(cmd, shell)
+	}
+
+	if showVersion {
+		if GitCommit != "homebrew" {
+			GitCommit = "commit " + GitCommit
+		}
+		fmt.Printf("ChatGPT CLI version %s (%s)\n", GitVersion, GitCommit)
+		return nil
 	}
 
 	if cmd.Flag("delete-thread").Changed {
@@ -419,7 +429,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		fmt.Println("ChatGPT CLI - A powerful client for interacting with GPT models.")
 
 		fmt.Println("\nUsage:")
-		fmt.Println("  chatgpt [flags]\n")
+		fmt.Printf("  chatgpt [flags]\n\n")
 
 		fmt.Println("General Flags:")
 		printFlagWithPadding("-q, --query", "Use query mode instead of stream mode")

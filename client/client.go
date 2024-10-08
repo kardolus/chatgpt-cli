@@ -8,8 +8,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
-	"github.com/kardolus/chatgpt-cli/config"
-	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/kardolus/chatgpt-cli/types"
@@ -32,27 +30,20 @@ type Client struct {
 	historyStore history.HistoryStore
 }
 
-func New(callerFactory http.CallerFactory, cs config.ConfigStore, hs history.HistoryStore, interactiveMode bool) (*Client, error) {
-	cm := configmanager.New(cs).WithEnvironment()
-	configuration := cm.Config
+func New(callerFactory http.CallerFactory, hs history.HistoryStore, cfg types.Config, interactiveMode bool) *Client {
+	caller := callerFactory(cfg)
 
-	if configuration.APIKey == "" {
-		return nil, errors.New("missing environment variable: " + cm.APIKeyEnvVarName())
-	}
-
-	caller := callerFactory(configuration)
-
-	if interactiveMode && cm.Config.AutoCreateNewThread {
+	if interactiveMode && cfg.AutoCreateNewThread {
 		hs.SetThread(generateUniqueSlug())
 	} else {
-		hs.SetThread(configuration.Thread)
+		hs.SetThread(cfg.Thread)
 	}
 
 	return &Client{
-		Config:       configuration,
+		Config:       cfg,
 		caller:       caller,
 		historyStore: hs,
-	}, nil
+	}
 }
 
 func (c *Client) WithContextWindow(window int) *Client {

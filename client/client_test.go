@@ -20,33 +20,20 @@ import (
 
 //go:generate mockgen -destination=callermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/http Caller
 //go:generate mockgen -destination=historymocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/history HistoryStore
-//go:generate mockgen -destination=configmocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/config ConfigStore
 
 const (
-	defaultMaxTokens        = 100
-	defaultContextWindow    = 50
-	defaultURL              = "https://default.openai.com"
-	defaultName             = "default-name"
-	defaultModel            = "gpt-3.5-turbo"
-	defaultCompletionsPath  = "/default/completions"
-	defaultModelsPath       = "/default/models"
-	defaultThread           = "default-thread"
-	defaultRole             = "You are a great default-role"
-	defaultTemperature      = 1.1
-	defaultTopP             = 2.2
-	defaultFrequencyPenalty = 3.3
-	defaultPresencePenalty  = 4.4
-	defaultInteractiveMode  = false
-	envApiKey               = "api-key"
+	envApiKey       = "api-key"
+	commandLineMode = false
+	interactiveMode = true
 )
 
 var (
 	mockCtrl         *gomock.Controller
 	mockCaller       *MockCaller
 	mockHistoryStore *MockHistoryStore
-	mockConfigStore  *MockConfigStore
 	factory          *clientFactory
 	apiKeyEnvVar     string
+	config           types.Config
 )
 
 func TestUnitClient(t *testing.T) {
@@ -61,11 +48,11 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		mockCtrl = gomock.NewController(t)
 		mockCaller = NewMockCaller(mockCtrl)
 		mockHistoryStore = NewMockHistoryStore(mockCtrl)
-		mockConfigStore = NewMockConfigStore(mockCtrl)
+		config = MockConfig()
 
-		factory = newClientFactory(mockConfigStore, mockHistoryStore)
+		factory = newClientFactory(mockHistoryStore)
 
-		apiKeyEnvVar = strings.ToUpper(defaultName) + "_API_KEY"
+		apiKeyEnvVar = strings.ToUpper(config.Name) + "_API_KEY"
 		Expect(os.Setenv(apiKeyEnvVar, envApiKey)).To(Succeed())
 	})
 
@@ -74,70 +61,39 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 	})
 
 	when("New()", func() {
-		it("fails to construct when the API key is missing", func() {
-			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
-
-			mockConfigStore.EXPECT().Read().Return(types.Config{}, nil).Times(1)
-
-			_, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore, defaultInteractiveMode)
-
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(apiKeyEnvVar))
-		})
 		it("should set a unique thread slug in interactive mode when AutoCreateNewThread is true", func() {
-			mockConfigStore.EXPECT().Read().Return(types.Config{
-				AutoCreateNewThread: true,
-				Thread:              defaultThread,
-			}, nil).Times(1)
-
 			var capturedThread string
 			mockHistoryStore.EXPECT().SetThread(gomock.Any()).DoAndReturn(func(thread string) {
 				capturedThread = thread
 			}).Times(1)
 
-			interactiveMode := true
-			_, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore, interactiveMode)
-
-			Expect(err).NotTo(HaveOccurred())
+			client.New(mockCallerFactory, mockHistoryStore, MockConfig(), interactiveMode)
 
 			Expect(capturedThread).To(HavePrefix(client.InteractiveThreadPrefix)) // Assuming `InteractiveThreadPrefix` is "int_"
 			Expect(len(capturedThread)).To(Equal(8))                              // "int_" (4 chars) + 4 random characters
 		})
 		it("should not overwrite the thread in interactive mode when AutoCreateNewThread is false", func() {
-			mockConfigStore.EXPECT().Read().Return(types.Config{
-				AutoCreateNewThread: false,
-				Thread:              defaultThread,
-			}, nil).Times(1)
-
 			var capturedThread string
-			mockHistoryStore.EXPECT().SetThread(defaultThread).DoAndReturn(func(thread string) {
+			mockHistoryStore.EXPECT().SetThread(gomock.Any()).DoAndReturn(func(thread string) {
 				capturedThread = thread
 			}).Times(1)
 
-			interactiveMode := true
-			_, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore, interactiveMode)
+			cfg := MockConfig()
+			cfg.AutoCreateNewThread = false
 
-			Expect(err).NotTo(HaveOccurred())
+			client.New(mockCallerFactory, mockHistoryStore, cfg, interactiveMode)
 
-			Expect(capturedThread).To(Equal(defaultThread))
+			Expect(capturedThread).To(Equal(config.Thread))
 		})
 		it("should never overwrite the thread in non-interactive mode", func() {
-			mockConfigStore.EXPECT().Read().Return(types.Config{
-				AutoCreateNewThread: true,
-				Thread:              defaultThread,
-			}, nil).Times(1)
-
 			var capturedThread string
-			mockHistoryStore.EXPECT().SetThread(defaultThread).DoAndReturn(func(thread string) {
+			mockHistoryStore.EXPECT().SetThread(config.Thread).DoAndReturn(func(thread string) {
 				capturedThread = thread
 			}).Times(1)
 
-			interactiveMode := false
-			_, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore, interactiveMode)
+			client.New(mockCallerFactory, mockHistoryStore, MockConfig(), commandLineMode)
 
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(capturedThread).To(Equal(defaultThread))
+			Expect(capturedThread).To(Equal(config.Thread))
 		})
 	})
 
@@ -263,36 +219,11 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				Expect(result).To(Equal(answer))
 				Expect(usage).To(Equal(tokens))
 			}
-			it("uses the values specified by the configuration instead of the default values", func() {
-				const (
-					model            = "overwritten"
-					temperature      = 100.1
-					topP             = 200.2
-					frequencyPenalty = 300.3
-					presencePenalty  = 400.4
-					maxTokens        = 12345
-				)
-
-				messages = createMessages(nil, query)
-				factory.withoutHistory()
-				subject := factory.buildClientWithConfig(types.Config{
-					Model:            model,
-					Temperature:      temperature,
-					TopP:             topP,
-					FrequencyPenalty: frequencyPenalty,
-					PresencePenalty:  presencePenalty,
-					MaxTokens:        maxTokens,
-				})
-
-				body, err = createBodyWithConfig(messages, false, model, maxTokens, temperature, topP, frequencyPenalty, presencePenalty)
-				Expect(err).NotTo(HaveOccurred())
-				testValidHTTPResponse(subject, nil, body, false)
-			})
 			it("returns the expected result for a non-empty history", func() {
 				history := []types.Message{
 					{
 						Role:    client.SystemRole,
-						Content: defaultRole,
+						Content: config.Role,
 					},
 					{
 						Role:    client.UserRole,
@@ -313,10 +244,12 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				testValidHTTPResponse(subject, history, body, false)
 			})
 			it("ignores history when configured to do so", func() {
-				mockHistoryStore.EXPECT().SetThread(defaultThread).Times(1)
-				mockConfigStore.EXPECT().Read().Return(types.Config{OmitHistory: true}, nil).Times(1)
+				mockHistoryStore.EXPECT().SetThread(config.Thread).Times(1)
 
-				subject, err := client.New(mockCallerFactory, mockConfigStore, mockHistoryStore, defaultInteractiveMode)
+				config := MockConfig()
+				config.OmitHistory = true
+
+				subject := client.New(mockCallerFactory, mockHistoryStore, config, commandLineMode)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Read and Write are never called on the history store
@@ -334,7 +267,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				history := []types.Message{
 					{
 						Role:    client.SystemRole,
-						Content: defaultRole,
+						Content: config.Role,
 					},
 					{
 						Role:    client.UserRole,
@@ -434,7 +367,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				history := []types.Message{
 					{
 						Role:    client.SystemRole,
-						Content: defaultRole,
+						Content: config.Role,
 					},
 					{
 						Role:    client.UserRole,
@@ -497,7 +430,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			result, err := subject.ListModels()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).NotTo(BeEmpty())
-			Expect(result).To(HaveLen(2))
+			Expect(result).To(HaveLen(3))
 			Expect(result[0]).To(Equal("* gpt-3.5-turbo (current)"))
 			Expect(result[1]).To(Equal("- gpt-3.5-turbo-0301"))
 		})
@@ -515,7 +448,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			systemMessage := subject.History[0]
 			Expect(systemMessage.Role).To(Equal(client.SystemRole))
-			Expect(systemMessage.Content).To(Equal(defaultRole))
+			Expect(systemMessage.Content).To(Equal(config.Role))
 
 			contextMessage := subject.History[1]
 			Expect(contextMessage.Role).To(Equal(client.UserRole))
@@ -526,29 +459,14 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 func createBody(messages []types.Message, stream bool) ([]byte, error) {
 	req := types.CompletionsRequest{
-		Model:            defaultModel,
+		Model:            config.Model,
 		Messages:         messages,
 		Stream:           stream,
-		Temperature:      defaultTemperature,
-		TopP:             defaultTopP,
-		FrequencyPenalty: defaultFrequencyPenalty,
-		MaxTokens:        defaultMaxTokens,
-		PresencePenalty:  defaultPresencePenalty,
-	}
-
-	return json.Marshal(req)
-}
-
-func createBodyWithConfig(messages []types.Message, stream bool, model string, maxTokens int, temperature float64, topP float64, frequencyPenalty float64, presencePenalty float64) ([]byte, error) {
-	req := types.CompletionsRequest{
-		Model:            model,
-		Messages:         messages,
-		Stream:           stream,
-		Temperature:      temperature,
-		MaxTokens:        maxTokens,
-		TopP:             topP,
-		FrequencyPenalty: frequencyPenalty,
-		PresencePenalty:  presencePenalty,
+		Temperature:      config.Temperature,
+		TopP:             config.TopP,
+		FrequencyPenalty: config.FrequencyPenalty,
+		MaxTokens:        config.MaxTokens,
+		PresencePenalty:  config.PresencePenalty,
 	}
 
 	return json.Marshal(req)
@@ -560,7 +478,7 @@ func createMessages(history []types.Message, query string) []types.Message {
 	if len(history) == 0 {
 		messages = append(messages, types.Message{
 			Role:    client.SystemRole,
-			Content: defaultRole,
+			Content: config.Role,
 		})
 	} else {
 		messages = history
@@ -575,50 +493,26 @@ func createMessages(history []types.Message, query string) []types.Message {
 }
 
 type clientFactory struct {
-	mockConfigStore  *MockConfigStore
 	mockHistoryStore *MockHistoryStore
 }
 
-func newClientFactory(mcs *MockConfigStore, mhs *MockHistoryStore) *clientFactory {
-	mockConfigStore.EXPECT().ReadDefaults().Return(types.Config{
-		Name:             defaultName,
-		Model:            defaultModel,
-		MaxTokens:        defaultMaxTokens,
-		URL:              defaultURL,
-		CompletionsPath:  defaultCompletionsPath,
-		ModelsPath:       defaultModelsPath,
-		Role:             defaultRole,
-		Thread:           defaultThread,
-		Temperature:      defaultTemperature,
-		PresencePenalty:  defaultPresencePenalty,
-		TopP:             defaultTopP,
-		FrequencyPenalty: defaultFrequencyPenalty,
-	}).Times(1)
-
+func newClientFactory(mhs *MockHistoryStore) *clientFactory {
 	return &clientFactory{
-		mockConfigStore:  mcs,
 		mockHistoryStore: mhs,
 	}
 }
 
 func (f *clientFactory) buildClientWithoutConfig() *client.Client {
-	f.mockHistoryStore.EXPECT().SetThread(defaultThread).Times(1)
-	f.mockConfigStore.EXPECT().Read().Return(types.Config{}, nil).Times(1)
+	f.mockHistoryStore.EXPECT().SetThread(config.Thread).Times(1)
 
-	c, err := client.New(mockCallerFactory, f.mockConfigStore, f.mockHistoryStore, defaultInteractiveMode)
-	Expect(err).NotTo(HaveOccurred())
+	c := client.New(mockCallerFactory, f.mockHistoryStore, MockConfig(), commandLineMode)
 
-	return c.WithContextWindow(defaultContextWindow)
+	return c.WithContextWindow(config.ContextWindow)
 }
 
 func (f *clientFactory) buildClientWithConfig(config types.Config) *client.Client {
-	f.mockHistoryStore.EXPECT().SetThread(defaultThread).Times(1)
-	f.mockConfigStore.EXPECT().Read().Return(config, nil).Times(1)
-
-	c, err := client.New(mockCallerFactory, f.mockConfigStore, f.mockHistoryStore, defaultInteractiveMode)
-	Expect(err).NotTo(HaveOccurred())
-
-	return c.WithContextWindow(defaultContextWindow)
+	c := client.New(mockCallerFactory, f.mockHistoryStore, config, commandLineMode)
+	return c.WithContextWindow(config.ContextWindow)
 }
 
 func (f *clientFactory) withoutHistory() {
@@ -631,4 +525,32 @@ func (f *clientFactory) withHistory(history []types.Message) {
 
 func mockCallerFactory(cfg types.Config) http.Caller {
 	return mockCaller
+}
+
+func MockConfig() types.Config {
+	return types.Config{
+		Name:                "mock-openai",
+		APIKey:              "mock-api-key",
+		Model:               "gpt-3.5-turbo",
+		MaxTokens:           100,
+		ContextWindow:       50,
+		Role:                "You are a test assistant.",
+		Temperature:         0.7,
+		TopP:                0.9,
+		FrequencyPenalty:    0.1,
+		PresencePenalty:     0.2,
+		Thread:              "mock-thread",
+		OmitHistory:         false,
+		URL:                 "https://api.mock-openai.com",
+		CompletionsPath:     "/v1/test/completions",
+		ModelsPath:          "/v1/test/models",
+		AuthHeader:          "MockAuthorization",
+		AuthTokenPrefix:     "MockBearer ",
+		CommandPrompt:       "[mock-datetime] [Q%counter] [%usage]",
+		OutputPrompt:        "[mock-output]",
+		AutoCreateNewThread: true,
+		TrackTokenUsage:     true,
+		SkipTLSVerify:       false,
+		Debug:               false,
+	}
 }

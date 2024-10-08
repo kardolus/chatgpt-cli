@@ -28,7 +28,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
     - [General Configuration](#general-configuration)
         - [Variables for interactive mode](#variables-for-interactive-mode)
     - [Custom Config and Data Directory](#custom-config-and-data-directory)
-      - [Example for Custom Directories](#example-for-custom-directories)
+        - [Example for Custom Directories](#example-for-custom-directories)
     - [Azure Configuration](#azure-configuration)
     - [Perplexity Configuration](#perplexity-configuration)
     - [Command-Line Autocompletion](#command-line-autocompletion)
@@ -197,8 +197,17 @@ Choose the appropriate command for your system, which will download the binary, 
 
 ## Configuration
 
-The ChatGPT CLI adopts a three-tier configuration strategy, with different levels of precedence assigned to default
-values, the `config.yaml` file, and environment variables, in that respective order.
+The ChatGPT CLI adopts a four-tier configuration strategy, with different levels of precedence assigned to flags,
+environment variables, a config.yaml file, and default values, in that respective order:
+
+1. Flags: Command-line flags have the highest precedence. Any value provided through a flag will override other
+   configurations.
+2. Environment Variables: If a setting is not specified by a flag, the corresponding environment variable (prefixed with
+   the name field from the config) will be checked.
+3. Config file (config.yaml): If neither a flag nor a environment variable is set, the value from the config.yaml file
+   will be used.
+4. Default Values: If no value is specified through flags, config.yaml, or environment variables, the CLI will fall back
+   to its built-in default values.
 
 ### General Configuration
 

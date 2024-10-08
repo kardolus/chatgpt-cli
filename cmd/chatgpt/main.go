@@ -224,7 +224,7 @@ func run(cmd *cobra.Command, args []string) error {
 		defer rl.Close()
 
 		commandPrompt := func(counter, usage int) string {
-			return config.FormatPrompt(client.Config.CommandPrompt, counter, usage, time.Now())
+			return utils.FormatPrompt(client.Config.CommandPrompt, counter, usage, time.Now())
 		}
 
 		qNum, usage := 1, 0
@@ -251,7 +251,7 @@ func run(cmd *cobra.Command, args []string) error {
 				break
 			}
 
-			fmtOutputPrompt := config.FormatPrompt(client.Config.OutputPrompt, qNum, usage, time.Now())
+			fmtOutputPrompt := utils.FormatPrompt(client.Config.OutputPrompt, qNum, usage, time.Now())
 
 			if queryMode {
 				result, qUsage, err := client.Query(line)
@@ -628,6 +628,3 @@ func createConfigFromViper() types.Config {
 		Debug:               viper.GetBool("debug"),
 	}
 }
-
-// TODO move code to a utils class so you can unit test it
-// TODO you may be able to do some stuff with Viper in the contract/integration tests

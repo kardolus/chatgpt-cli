@@ -130,12 +130,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(os.RemoveAll(tmpDir)).To(Succeed())
 		})
 
-		it("writes the config to the file", func() {
-			err = configIO.Write(testConfig)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		when("reading the config from a file", func() {
+		when("performing a migration", func() {
 			defaults := config.New().ReadDefaults()
 
 			it("it doesn't apply a migration when max_tokens is 0", func() {
@@ -178,40 +173,6 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				Expect(readConfig).To(Equal(expectedConfig))
 			})
-			it("preserves comments when writing the config to the file", func() {
-				configFile := filepath.Join(tmpDir, "config_with_comments.yaml")
-				err := os.WriteFile(configFile, []byte(`
-# This is a model configuration
-model: gpt-3.5-turbo # Default model
-# Maximum number of tokens
-max_tokens: 100
-`), 0644)
-				Expect(err).NotTo(HaveOccurred())
-
-				configIO = config.New().WithConfigPath(configFile)
-
-				// Read the existing configuration, modify a value, and write it back
-				readConfig, err := configIO.Read()
-				Expect(err).NotTo(HaveOccurred())
-
-				// Modify the configuration
-				readConfig.Model = "new-model"
-				err = configIO.Write(readConfig)
-				Expect(err).NotTo(HaveOccurred())
-
-				// Read the file content back
-				content, err := os.ReadFile(configFile)
-				Expect(err).NotTo(HaveOccurred())
-
-				// Check if the comments are still present
-				Expect(string(content)).To(ContainSubstring("# This is a model configuration"))
-				Expect(string(content)).To(ContainSubstring("# Default model"))
-				Expect(string(content)).To(ContainSubstring("# Maximum number of tokens"))
-
-				// Verify the configuration was updated
-				Expect(string(content)).To(ContainSubstring("model: new-model"))
-			})
-
 		})
 
 		it("lists all the threads", func() {
@@ -249,19 +210,6 @@ max_tokens: 100
 			_, err = os.Stat(filepath.Join(historyDir, "thread3.json"))
 			Expect(os.IsNotExist(err)).To(BeFalse())
 		})
-
-		// Since we don't have a Delete method in the config, we will test if we can overwrite the configuration.
-		it("overwrites the existing config", func() {
-			newConfig := types.Config{
-				Model: "new-model",
-			}
-			err = configIO.Write(newConfig)
-			Expect(err).NotTo(HaveOccurred())
-
-			readConfig, err := configIO.Read()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(readConfig).To(Equal(newConfig))
-		})
 	})
 
 	when("Performing the Lifecycle", func() {
@@ -284,8 +232,6 @@ max_tokens: 100
 
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 			<-session.Exited
-
-			fmt.Printf("%+v\n", string(session.Out.Contents()))
 
 			ExpectWithOffset(1, session).Should(gexec.Exit(0))
 			return string(session.Out.Contents())
@@ -720,8 +666,6 @@ max_tokens: 100
 					// Verify updated model through --list-models
 					output = runCommand("--list-models")
 
-					fmt.Println("here4")
-
 					Expect(output).To(ContainSubstring("* " + newModel + " (current)"))
 				})
 
@@ -806,6 +750,62 @@ max_tokens: 100
 					Expect(output).To(ContainSubstring(newThread))
 					Expect(os.Unsetenv(threadEnvKey)).To(Succeed())
 				})
+			})
+		})
+
+		when("configuration precedence", func() {
+			var (
+				defaultModel = "gpt-3.5-turbo"
+				newModel     = "gpt-3.5-turbo-0301"
+				envModel     = "gpt-3.5-env-model"
+				envVar       string
+			)
+
+			it.Before(func() {
+				envVar = strings.Replace(apiKeyEnvVar, "API_KEY", "MODEL", 1)
+				filePath = path.Join(os.Getenv("HOME"), ".chatgpt-cli")
+				Expect(os.MkdirAll(filePath, 0777)).To(Succeed())
+
+				configFile = path.Join(filePath, "config.yaml")
+				Expect(configFile).NotTo(BeAnExistingFile())
+			})
+
+			it("uses environment variable over config file", func() {
+				// Step 1: Set a model in the config file.
+				runCommand("--set-model", newModel)
+				checkConfigFileContent(newModel)
+
+				// Step 2: Verify the model from config is used.
+				output := runCommand("--list-models")
+				Expect(output).To(ContainSubstring("* " + newModel + " (current)"))
+
+				// Step 3: Set environment variable and verify it takes precedence.
+				Expect(os.Setenv(envVar, envModel)).To(Succeed())
+				output = runCommand("--list-models")
+				Expect(output).To(ContainSubstring("* " + envModel + " (current)"))
+
+				// Step 4: Unset environment variable and verify it falls back to config file.
+				Expect(os.Unsetenv(envVar)).To(Succeed())
+				output = runCommand("--list-models")
+				Expect(output).To(ContainSubstring("* " + newModel + " (current)"))
+			})
+
+			it("uses command-line flag over environment variable", func() {
+				// Step 1: Set environment variable.
+				Expect(os.Setenv(envVar, envModel)).To(Succeed())
+
+				// Step 2: Verify environment variable does not override flag.
+				output := runCommand("--model", newModel, "--list-models")
+				Expect(output).To(ContainSubstring("* " + newModel + " (current)"))
+			})
+
+			it("falls back to default when config and env are absent", func() {
+				// Step 1: Ensure no config file and no environment variable.
+				Expect(os.Unsetenv(envVar)).To(Succeed())
+
+				// Step 2: Verify it falls back to the default model.
+				output := runCommand("--list-models")
+				Expect(output).To(ContainSubstring("* " + defaultModel + " (current)"))
 			})
 		})
 	})

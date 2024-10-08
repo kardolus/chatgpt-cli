@@ -309,38 +309,6 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.OutputPrompt).To(Equal("env-output-prompt"))
 	})
 
-	it("should write the max tokens as expected", func() {
-		maxTokens := 123
-		performWriteTest(mockConfigStore, defaultConfig, maxTokens, "MaxTokens", func() {
-			subject := configmanager.New(mockConfigStore).WithEnvironment()
-			subject.WriteMaxTokens(maxTokens)
-		})
-	})
-
-	it("should write the context window as expected", func() {
-		window := 12345
-		performWriteTest(mockConfigStore, defaultConfig, window, "ContextWindow", func() {
-			subject := configmanager.New(mockConfigStore).WithEnvironment()
-			subject.WriteContextWindow(window)
-		})
-	})
-
-	it("should write the model as expected", func() {
-		model := "user-model"
-		performWriteTest(mockConfigStore, defaultConfig, model, "Model", func() {
-			subject := configmanager.New(mockConfigStore).WithEnvironment()
-			subject.WriteModel(model)
-		})
-	})
-
-	it("should write the thread as expected", func() {
-		thread := "user-thread"
-		performWriteTest(mockConfigStore, defaultConfig, thread, "Thread", func() {
-			subject := configmanager.New(mockConfigStore).WithEnvironment()
-			subject.WriteThread(thread)
-		})
-	})
-
 	when("DeleteThread()", func() {
 		var subject *configmanager.ConfigManager
 

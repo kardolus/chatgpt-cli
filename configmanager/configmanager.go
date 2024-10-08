@@ -76,38 +76,6 @@ func (c *ConfigManager) ShowConfig() (string, error) {
 	return string(data), nil
 }
 
-// WriteMaxTokens updates the maximum number of tokens in the current configuration.
-// It writes the updated configuration to the config store and returns an error if the write fails.
-func (c *ConfigManager) WriteMaxTokens(tokens int) error {
-	c.Config.MaxTokens = tokens
-
-	return c.configStore.Write(c.Config)
-}
-
-// WriteContextWindow updates context window in the current configuration.
-// It writes the updated configuration to the config store and returns an error if the write fails.
-func (c *ConfigManager) WriteContextWindow(window int) error {
-	c.Config.ContextWindow = window
-
-	return c.configStore.Write(c.Config)
-}
-
-// WriteModel updates the model in the current configuration.
-// It writes the updated configuration to the config store and returns an error if the write fails.
-func (c *ConfigManager) WriteModel(model string) error {
-	c.Config.Model = model
-
-	return c.configStore.Write(c.Config)
-}
-
-// WriteThread updates the current thread in the configuration.
-// It writes the updated configuration to the config store and returns an error if the write fails.
-func (c *ConfigManager) WriteThread(thread string) error {
-	c.Config.Thread = thread
-
-	return c.configStore.Write(c.Config)
-}
-
 func replaceByConfigFile(defaultConfig, userConfig types.Config) types.Config {
 	t := reflect.TypeOf(defaultConfig)
 	vDefault := reflect.ValueOf(&defaultConfig).Elem()

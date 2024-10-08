@@ -430,7 +430,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			result, err := subject.ListModels()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).NotTo(BeEmpty())
-			Expect(result).To(HaveLen(2))
+			Expect(result).To(HaveLen(3))
 			Expect(result[0]).To(Equal("* gpt-3.5-turbo (current)"))
 			Expect(result[1]).To(Equal("- gpt-3.5-turbo-0301"))
 		})

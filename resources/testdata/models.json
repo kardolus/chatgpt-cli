@@ -1130,6 +1130,30 @@
       "parent": null
     },
     {
+      "id": "gpt-3.5-env-model",
+      "object": "model",
+      "created": 1677649963,
+      "owned_by": "openai",
+      "permission": [
+        {
+          "id": "modelperm-pvjOAsmQhwelYZvz8BlX18w0",
+          "object": "model_permission",
+          "created": 1684521457,
+          "allow_create_engine": false,
+          "allow_sampling": true,
+          "allow_logprobs": true,
+          "allow_search_indices": false,
+          "allow_view": true,
+          "allow_fine_tuning": false,
+          "organization": "*",
+          "group": null,
+          "is_blocking": false
+        }
+      ],
+      "root": "gpt-3.5-turbo-0301",
+      "parent": null
+    },
+    {
       "id": "text-similarity-davinci-001",
       "object": "model",
       "created": 1651172505,

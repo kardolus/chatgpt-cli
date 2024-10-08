@@ -156,7 +156,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if clearHistory {
 		cm := configmanager.New(config.New())
 
-		if err := cm.DeleteThread(cm.Config.Thread); err != nil {
+		if err := cm.DeleteThread(cfg.Thread); err != nil {
 			return err
 		}
 
@@ -296,29 +296,34 @@ func run(cmd *cobra.Command, args []string) error {
 }
 
 func initConfig(rootCmd *cobra.Command) (types.Config, error) {
-	cm := configmanager.New(config.New()).WithEnvironment()
+	// Set default name for environment variables if no config is loaded yet.
+	viper.SetDefault("name", "openai")
 
-	viper.SetEnvPrefix(cm.Config.Name)
-	viper.AutomaticEnv()
-
-	for _, meta := range configMetadata {
-		setupConfigFlags(rootCmd, meta)
-	}
-
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-
+	// Read only the `name` field from the config to determine the environment prefix.
 	configHome, err := utils.GetConfigHome()
 	if err != nil {
 		return types.Config{}, err
 	}
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
 	viper.AddConfigPath(configHome)
 
+	// Attempt to read the configuration file to get the `name` before setting env prefix.
 	if err := viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
 		if !errors.As(err, &configFileNotFoundError) {
 			return types.Config{}, err
 		}
+	}
+
+	// Retrieve the name from Viper to set the environment prefix.
+	envPrefix := viper.GetString("name")
+	viper.SetEnvPrefix(envPrefix)
+	viper.AutomaticEnv()
+
+	// Now, set up the flags using the fully loaded configuration metadata.
+	for _, meta := range configMetadata {
+		setupConfigFlags(rootCmd, meta)
 	}
 
 	return createConfigFromViper(), nil
@@ -624,6 +629,5 @@ func createConfigFromViper() types.Config {
 	}
 }
 
-// TODO get rid of your own config parsing logic
-// TODO move some code back to config so we can unit test
-// TODO update README
+// TODO move code to a utils class so you can unit test it
+// TODO you may be able to do some stuff with Viper in the contract/integration tests

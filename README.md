@@ -68,10 +68,6 @@ Azure, featuring streaming capabilities and extensive configuration options.
   llama-3.1-sonar-small-128k-online). However, the specific ChatGPT model used on chat.openai.com may not be available
   via the OpenAI API.
 
-Here's an updated README section for the new `--prompt` flag, including a dedicated "Prompt" section to highlight the
-feature. I added a description of how to use the `--prompt` flag and provided an example command using it, along with a
-link to the prompts repository for further exploration.
-
 ### Prompt Support
 
 We’re excited to introduce support for prompt files with the `--prompt` flag in **version 1.7.1**! This feature

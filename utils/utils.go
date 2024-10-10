@@ -72,3 +72,12 @@ func GetDataHome() (string, error) {
 
 	return result, nil
 }
+
+func FileToString(fileName string) (string, error) {
+	bytes, err := os.ReadFile(fileName)
+	if err != nil {
+		return "", err
+	}
+
+	return string(bytes), nil
+}

@@ -33,6 +33,7 @@ var (
 	listModels      bool
 	listThreads     bool
 	hasPipe         bool
+	promptFile      string
 	threadName      string
 	ServiceURL      string
 	shell           string
@@ -185,6 +186,14 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if ServiceURL != "" {
 		client = client.WithServiceURL(ServiceURL)
+	}
+
+	if cmd.Flag("prompt").Changed {
+		prompt, err := utils.FileToString(promptFile)
+		if err != nil {
+			return err
+		}
+		client.ProvideContext(prompt)
 	}
 
 	// Check if there is input from the pipe (stdin)
@@ -503,6 +512,7 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
 	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
 	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
+	rootCmd.PersistentFlags().StringVar(&promptFile, "prompt", "", "Provide a prompt file")
 	rootCmd.PersistentFlags().StringVar(&shell, "set-completions", "", "Generate autocompletion script for your current shell")
 }
 
@@ -536,7 +546,7 @@ func isNonConfigSetter(name string) bool {
 
 func isGeneralFlag(name string) bool {
 	switch name {
-	case "query", "interactive", "config", "version", "list-models", "list-threads", "clear-history", "delete-thread", "set-completions", "help":
+	case "query", "interactive", "config", "version", "list-models", "list-threads", "clear-history", "delete-thread", "prompt", "set-completions", "help":
 		return true
 	default:
 		return false

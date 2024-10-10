@@ -12,6 +12,10 @@ Azure, featuring streaming capabilities and extensive configuration options.
 ## Table of Contents
 
 - [Features](#features)
+  - [Prompt Support](#prompt-support)
+    - [Using the prompt flag](#using-the---prompt-flag)
+    - [Example](#example)
+    - [Explore More Prompts](#explore-more-prompts)
 - [Installation](#installation)
     - [Using Homebrew (macOS)](#using-homebrew-macos)
     - [Direct Download](#direct-download)
@@ -62,6 +66,46 @@ Azure, featuring streaming capabilities and extensive configuration options.
 * **Availability Note**: This CLI supports gpt-4, gpt-3.5-turbo, and Perplexity’s models (e.g.,
   llama-3.1-sonar-small-128k-online). However, the specific ChatGPT model used on chat.openai.com may not be available
   via the OpenAI API.
+
+Here's an updated README section for the new `--prompt` flag, including a dedicated "Prompt" section to highlight the
+feature. I added a description of how to use the `--prompt` flag and provided an example command using it, along with a
+link to the prompts repository for further exploration.
+
+### Prompt Support
+
+We’re excited to introduce support for prompt files with the `--prompt` flag in **version 1.7.1**! This feature
+allows you to provide a rich and detailed context for your conversations directly from a file.
+
+#### Using the `--prompt` Flag
+
+The `--prompt` flag lets you specify a file containing the initial context or instructions for your ChatGPT
+conversation. This is especially useful when you have detailed instructions or context that you want to reuse across
+different conversations.
+
+To use the `--prompt` flag, pass the path of your prompt file like this:
+
+```shell
+chatgpt --prompt path/to/your/prompt.md "Your follow-up question here"
+```
+
+The contents of `prompt.md` will be read and used as the initial context for the conversation, while the query you
+provide directly will serve as the specific question or task you want to address.
+
+#### Example
+
+Here’s a fun example where you can use the output of a `git diff` command as a prompt:
+
+```shell
+git diff | chatgpt --prompt ../prompts/write_pull-request.md
+```
+
+In this example, the content from the `write_pull-request.md` prompt file is used to guide the model's response based on
+the diff data from `git diff`.
+
+#### Explore More Prompts
+
+For a variety of ready-to-use prompts, check out this [awesome prompts repository](https://github.com/kardolus/prompts).
+These can serve as great starting points or inspiration for your own custom prompts!
 
 ## Installation
 
@@ -543,6 +587,7 @@ data. If you have any concerns about this, please feel free to delete this direc
 
 ## Useful Links
 
+* [Amazing Prompts!](https://github.com/kardolus/prompts)
 * [OpenAI API Reference](https://platform.openai.com/docs/api-reference/chat/create)
 * [OpenAI Key Usage Dashboard](https://platform.openai.com/account/usage)
 * [OpenAI Pricing Page](https://openai.com/pricing)

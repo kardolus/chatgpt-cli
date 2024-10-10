@@ -86,7 +86,7 @@ different conversations.
 To use the `--prompt` flag, pass the path of your prompt file like this:
 
 ```shell
-chatgpt --prompt path/to/your/prompt.md "Your follow-up question here"
+chatgpt --prompt path/to/your/prompt.md "Use a pipe or provide a query here"
 ```
 
 The contents of `prompt.md` will be read and used as the initial context for the conversation, while the query you

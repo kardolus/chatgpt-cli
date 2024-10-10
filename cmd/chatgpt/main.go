@@ -466,6 +466,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		fmt.Println("General Flags:")
 		printFlagWithPadding("-q, --query", "Use query mode instead of stream mode")
 		printFlagWithPadding("-i, --interactive", "Use interactive mode")
+		printFlagWithPadding("-p, --prompt", "Provide a prompt file for context")
 		printFlagWithPadding("-c, --config", "Display the configuration")
 		printFlagWithPadding("-v, --version", "Display the version information")
 		printFlagWithPadding("-l, --list-models", "List available models")
@@ -510,9 +511,9 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().BoolVarP(&showConfig, "config", "c", false, "Display the configuration")
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
+	rootCmd.PersistentFlags().StringVarP(&promptFile, "prompt", "p", "", "Provide a prompt file")
 	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
 	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
-	rootCmd.PersistentFlags().StringVar(&promptFile, "prompt", "", "Provide a prompt file")
 	rootCmd.PersistentFlags().StringVar(&shell, "set-completions", "", "Generate autocompletion script for your current shell")
 }
 

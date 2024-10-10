@@ -28,6 +28,7 @@ var (
 	queryMode       bool
 	clearHistory    bool
 	showVersion     bool
+	newThread       bool
 	showConfig      bool
 	interactiveMode bool
 	listModels      bool
@@ -48,7 +49,7 @@ type ConfigMetadata struct {
 }
 
 var configMetadata = []ConfigMetadata{
-	{"model", "set-model", "gpt-3.5-turbo", "Set a new default GPT model by specifying the model name"},
+	{"model", "set-model", "gpt-3.5-turbo", "Set a new default model by specifying the model name"},
 	{"max_tokens", "set-max-tokens", 4096, "Set a new default max token size"},
 	{"context_window", "set-context-window", 8192, "Set a new default context window size"},
 	{"thread", "set-thread", "default", "Set a new active thread by specifying the thread name"},
@@ -106,6 +107,10 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	cfg = createConfigFromViper()
+
+	if newThread && (cmd.Flag("set-thread").Changed || cmd.Flag("thread").Changed) {
+		return errors.New("the --new-thread flag cannot be used with the --set-thread or --thread flags")
+	}
 
 	changedValues := map[string]interface{}{}
 	for _, meta := range configMetadata {
@@ -186,6 +191,16 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if ServiceURL != "" {
 		client = client.WithServiceURL(ServiceURL)
+	}
+
+	if hs != nil && newThread {
+		slug := utils.GenerateUniqueSlug("cmd_")
+
+		hs.SetThread(slug)
+
+		if err := saveConfig(map[string]interface{}{"thread": slug}); err != nil {
+			return fmt.Errorf("failed to save new thread to config: %w", err)
+		}
 	}
 
 	if cmd.Flag("prompt").Changed {
@@ -467,6 +482,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("-q, --query", "Use query mode instead of stream mode")
 		printFlagWithPadding("-i, --interactive", "Use interactive mode")
 		printFlagWithPadding("-p, --prompt", "Provide a prompt file for context")
+		printFlagWithPadding("-n, --new-thread", "Create a new thread with a random name and target it")
 		printFlagWithPadding("-c, --config", "Display the configuration")
 		printFlagWithPadding("-v, --version", "Display the version information")
 		printFlagWithPadding("-l, --list-models", "List available models")
@@ -510,6 +526,7 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().BoolVar(&clearHistory, "clear-history", false, "Clear all prior conversation context for the current thread")
 	rootCmd.PersistentFlags().BoolVarP(&showConfig, "config", "c", false, "Display the configuration")
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
+	rootCmd.PersistentFlags().BoolVarP(&newThread, "new-thread", "n", false, "Create a new thread with a random name and target it")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
 	rootCmd.PersistentFlags().StringVarP(&promptFile, "prompt", "p", "", "Provide a prompt file")
 	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
@@ -547,7 +564,7 @@ func isNonConfigSetter(name string) bool {
 
 func isGeneralFlag(name string) bool {
 	switch name {
-	case "query", "interactive", "config", "version", "list-models", "list-threads", "clear-history", "delete-thread", "prompt", "set-completions", "help":
+	case "query", "interactive", "config", "version", "new-thread", "list-models", "list-threads", "clear-history", "delete-thread", "prompt", "set-completions", "help":
 		return true
 	default:
 		return false

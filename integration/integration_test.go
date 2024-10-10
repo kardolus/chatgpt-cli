@@ -308,6 +308,28 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(output).To(ContainSubstring(".chatgpt-cli/history: no such file or directory"))
 		})
 
+		it("should return an error when --new-thread is used with --set-thread", func() {
+			command := exec.Command(binaryPath, "--new-thread", "--set-thread", "some-thread")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Err.Contents())
+			Expect(output).To(ContainSubstring("the --new-thread flag cannot be used with the --set-thread or --thread flags"))
+		})
+
+		it("should return an error when --new-thread is used with --thread", func() {
+			command := exec.Command(binaryPath, "--new-thread", "--thread", "some-thread")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Err.Contents())
+			Expect(output).To(ContainSubstring("the --new-thread flag cannot be used with the --set-thread or --thread flags"))
+		})
+
 		it("should require an argument for the --set-model flag", func() {
 			command := exec.Command(binaryPath, "--set-model")
 			session, err := gexec.Start(command, io.Discard, io.Discard)

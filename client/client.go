@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kardolus/chatgpt-cli/utils"
 	"strings"
 	"unicode/utf8"
 
-	"github.com/google/uuid"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/kardolus/chatgpt-cli/types"
@@ -34,7 +34,7 @@ func New(callerFactory http.CallerFactory, hs history.HistoryStore, cfg types.Co
 	caller := callerFactory(cfg)
 
 	if interactiveMode && cfg.AutoCreateNewThread {
-		hs.SetThread(generateUniqueSlug())
+		hs.SetThread(utils.GenerateUniqueSlug(InteractiveThreadPrefix))
 	} else {
 		hs.SetThread(cfg.Thread)
 	}
@@ -328,11 +328,6 @@ func createMessagesFromString(input string) []types.Message {
 	}
 
 	return messages
-}
-
-func generateUniqueSlug() string {
-	guid := uuid.New()
-	return InteractiveThreadPrefix + guid.String()[:4]
 }
 
 func (c *Client) printRequestDebugInfo(endpoint string, body []byte) {

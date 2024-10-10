@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,6 +72,11 @@ func GetDataHome() (string, error) {
 	}
 
 	return result, nil
+}
+
+func GenerateUniqueSlug(prefix string) string {
+	guid := uuid.New()
+	return prefix + guid.String()[:4]
 }
 
 func FileToString(fileName string) (string, error) {

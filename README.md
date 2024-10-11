@@ -39,6 +39,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
     - [Command-Line Autocompletion](#command-line-autocompletion)
         - [Enabling Autocompletion](#enabling-autocompletion)
         - [Persistent Autocompletion](#persistent-autocompletion)
+- [Markdown Rendering](#markdown-rendering)
 - [Development](#development)
 - [Reporting Issues and Contributing](#reporting-issues-and-contributing)
 - [Uninstallation](#uninstallation)
@@ -477,6 +478,16 @@ For example, for Bash, you would add the following line to your `.bashrc` file:
 ```
 
 This ensures that command flag autocompletion is enabled automatically every time you open a new terminal window.
+
+## Markdown Rendering
+
+You can render markdown in real-time using the `mdrender.sh` script, located [here](scripts/mdrender.sh). You'll first need to
+install [glow](https://github.com/charmbracelet/glow).
+
+Example:
+```shell
+chatgpt write a hello world program in Java | ./scripts/mdrender.sh
+```
 
 ## Development
 

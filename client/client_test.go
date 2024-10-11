@@ -510,11 +510,6 @@ func (f *clientFactory) buildClientWithoutConfig() *client.Client {
 	return c.WithContextWindow(config.ContextWindow)
 }
 
-func (f *clientFactory) buildClientWithConfig(config types.Config) *client.Client {
-	c := client.New(mockCallerFactory, f.mockHistoryStore, config, commandLineMode)
-	return c.WithContextWindow(config.ContextWindow)
-}
-
 func (f *clientFactory) withoutHistory() {
 	f.mockHistoryStore.EXPECT().Read().Return(nil, nil).Times(1)
 }

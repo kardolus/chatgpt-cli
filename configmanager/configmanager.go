@@ -95,9 +95,7 @@ func replaceByConfigFile(defaultConfig, userConfig types.Config) types.Config {
 				defaultField.SetInt(int64(userInt))
 			}
 		case reflect.Bool:
-			if userBool := userField.Bool(); &userBool != nil {
-				defaultField.SetBool(userBool)
-			}
+			defaultField.SetBool(userField.Bool())
 		case reflect.Float64:
 			if userFloat := userField.Float(); userFloat != 0.0 {
 				defaultField.SetFloat(userFloat)

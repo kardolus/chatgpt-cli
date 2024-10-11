@@ -613,7 +613,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				files := []string{"thread1.json", "thread2.json", "thread3.json", "default.json"}
 
-				os.Mkdir(historyDir, 7555)
+				Expect(os.MkdirAll(historyDir, 7555)).To(Succeed())
 
 				for _, file := range files {
 					file, err := os.Create(filepath.Join(historyDir, file))
@@ -636,7 +636,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				files := []string{"thread1.json", "thread2.json", "thread3.json", "default.json"}
 
-				os.Mkdir(historyDir, 7555)
+				Expect(os.MkdirAll(historyDir, 7555)).To(Succeed())
 
 				for _, file := range files {
 					file, err := os.Create(filepath.Join(historyDir, file))

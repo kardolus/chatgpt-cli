@@ -3,7 +3,6 @@ package configmanager_test
 import (
 	"errors"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -380,29 +379,6 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(result[2]).NotTo(ContainSubstring("json"))
 		})
 	})
-}
-
-func performWriteTest(mockConfigStore *MockConfigStore, defaultConfig types.Config, expectedValue interface{}, fieldName string, action func()) {
-	mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
-	mockConfigStore.EXPECT().Read().Return(types.Config{}, errors.New("no user config")).Times(1)
-
-	setValue(&defaultConfig, fieldName, expectedValue)
-	mockConfigStore.EXPECT().Write(defaultConfig).Return(nil).Times(1)
-
-	action()
-}
-
-func setValue(config *types.Config, fieldName string, value interface{}) {
-	// Use reflection to set value of the field by name
-	v := reflect.ValueOf(config).Elem() // Get the value that the pointer 'config' points to
-	fieldVal := v.FieldByName(fieldName)
-
-	if fieldVal.IsValid() && fieldVal.CanSet() {
-		val := reflect.ValueOf(value)
-		if val.Type().AssignableTo(fieldVal.Type()) {
-			fieldVal.Set(val)
-		}
-	}
 }
 
 func unsetEnvironmentVariables(envPrefix string) {

@@ -553,8 +553,8 @@ func setupConfigFlags(rootCmd *cobra.Command, meta ConfigMetadata) {
 	}
 
 	// Bind the flags directly to Viper keys
-	viper.BindPFlag(meta.Key, rootCmd.PersistentFlags().Lookup(meta.FlagName))
-	viper.BindPFlag(meta.Key, rootCmd.PersistentFlags().Lookup(aliasFlagName))
+	_ = viper.BindPFlag(meta.Key, rootCmd.PersistentFlags().Lookup(meta.FlagName))
+	_ = viper.BindPFlag(meta.Key, rootCmd.PersistentFlags().Lookup(aliasFlagName))
 	viper.SetDefault(meta.Key, meta.DefaultValue)
 }
 

@@ -1,6 +1,14 @@
 # Release Procedures Manual
 
-## 1. Update the dependencies
+## 1. Run a linter
+
+Check the output of the linter and make changes accordingly
+
+```shell
+golangci-lint run
+```
+
+## 2. Update the dependencies
 
 It's a good practice to update the dependencies before cutting a new release
 
@@ -8,7 +16,7 @@ It's a good practice to update the dependencies before cutting a new release
 ./scripts/updatedeps.sh
 ```
 
-## 2. Create a tag
+## 3. Create a tag
 
 Use the git-cli to create a tag, for example:
 
@@ -22,7 +30,7 @@ Next, push the tag:
 git push origin --tags
 ```
 
-## 3. Create binaries
+## 4. Create binaries
 
 From the root of `kardolus/chatgpt-cli`, run the following script to create binaries for various architectures:
 
@@ -30,7 +38,7 @@ From the root of `kardolus/chatgpt-cli`, run the following script to create bina
 ./scripts/binaries.sh
 ```
 
-## 4. Create a GitHub release
+## 5. Create a GitHub release
 
 Create a GitHub release for the tag we just pushed out. Upload the binaries created in the previous step. Add this
 section with update instructions to the end:
@@ -50,7 +58,7 @@ For a quick and easy installation without compiling, you can directly download t
 system and architecture.
 ```
 
-## 5. Bump the version
+## 6. Bump the version
 
 Change the URL in the Homebrew formulae (`kardolus/homebrew-chatgpt-cli/HomebrewFormula/chatgpt-cli.rb`). Update the
 sha256 of the tar file using:

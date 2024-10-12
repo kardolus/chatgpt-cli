@@ -239,6 +239,10 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	if tmp := os.Getenv(utils.ConfigHomeEnv); tmp != "" && !fileExists(viper.ConfigFileUsed()) {
+		fmt.Printf("Warning: config.yaml doesn't exist in %s, create it\n", tmp)
+	}
+
 	if interactiveMode {
 		fmt.Printf("Entering interactive mode. Using thread ‘%s’. Type ‘clear’ to clear the screen, ‘exit’ to quit, or press Ctrl+C.\n\n", hs.GetThread())
 		rl, err := readline.New("")
@@ -412,7 +416,6 @@ func updateConfig(node *yaml.Node, changes map[string]interface{}) error {
 	return nil
 }
 
-// Helper function to check if a key already exists in a YAML mapping node.
 func keyExistsInNode(mapNode *yaml.Node, key string) bool {
 	for i := 0; i < len(mapNode.Content); i += 2 {
 		if mapNode.Content[i].Value == key {
@@ -655,4 +658,12 @@ func createConfigFromViper() types.Config {
 		SkipTLSVerify:       viper.GetBool("skip_tls_verify"),
 		Debug:               viper.GetBool("debug"),
 	}
+}
+
+func fileExists(filename string) bool {
+	_, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return err == nil
 }

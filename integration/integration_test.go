@@ -374,6 +374,43 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(output).To(ContainSubstring("flag needs an argument: --set-context-window"))
 		})
 
+		it("should warn when config.yaml does not exist and OPENAI_CONFIG_HOME is set", func() {
+			configHomeDir := "does-not-exist"
+			Expect(os.Setenv(utils.ConfigHomeEnv, configHomeDir)).To(Succeed())
+
+			configFilePath := path.Join(configHomeDir, "config.yaml")
+			Expect(configFilePath).NotTo(BeAnExistingFile())
+
+			command := exec.Command(binaryPath, "llm query")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitSuccess))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring(fmt.Sprintf("Warning: config.yaml doesn't exist in %s, create it", configHomeDir)))
+			
+			// Unset the variable to prevent pollution
+			Expect(os.Unsetenv(utils.ConfigHomeEnv)).To(Succeed())
+		})
+
+		it("should NOT warn when config.yaml does not exist and OPENAI_CONFIG_HOME is NOT set", func() {
+			configHomeDir := "does-not-exist"
+			Expect(os.Unsetenv(utils.ConfigHomeEnv)).To(Succeed())
+
+			configFilePath := path.Join(configHomeDir, "config.yaml")
+			Expect(configFilePath).NotTo(BeAnExistingFile())
+
+			command := exec.Command(binaryPath, "llm query")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitSuccess))
+
+			output := string(session.Out.Contents())
+			Expect(output).NotTo(ContainSubstring(fmt.Sprintf("Warning: config.yaml doesn't exist in %s, create it", configHomeDir)))
+		})
+
 		it("should require the chatgpt-cli folder but not an API key for the --set-model flag", func() {
 			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
 

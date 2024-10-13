@@ -41,6 +41,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
         - [Persistent Autocompletion](#persistent-autocompletion)
 - [Markdown Rendering](#markdown-rendering)
 - [Development](#development)
+  - [Using the Makefile](#using-the-makefile)
+  - [Testing the CLI](#testing-the-cli)
 - [Reporting Issues and Contributing](#reporting-issues-and-contributing)
 - [Uninstallation](#uninstallation)
 - [Useful Links](#useful-links)
@@ -494,52 +496,41 @@ chatgpt write a hello world program in Java | ./scripts/mdrender.sh
 ## Development
 
 To start developing, set the `OPENAI_API_KEY` environment variable to
-your [ChatGPT secret key](https://platform.openai.com/account/api-keys). Follow these steps for running tests and
-building the application:
+your [ChatGPT secret key](https://platform.openai.com/account/api-keys).
 
-1. Run the tests using the following scripts:
+### Using the Makefile
+The Makefile simplifies development tasks by providing several targets for testing, building, and deployment.
 
-   For unit tests, run:
+* **all-tests**: Run all tests, including linting, formatting, and go mod tidy.
+  ```shell 
+  make all-tests
+  ```
+* **binaries**: Build binaries for multiple platforms.
+  ```shell 
+  make binaries
+  ```
+* **shipit**: Run the release process, create binaries, and generate release notes.
+  ```shell 
+  make shipit
+  ```
+* **updatedeps**: Update dependencies and commit any changes.
+  ```shell 
+  make updatedeps
+  ```
 
-    ```shell
-    ./scripts/unit.sh
-    ```
+For more available commands, use:
+```shell
+make help
+```
 
-   For integration tests, run:
-
-    ```shell
-    ./scripts/integration.sh
-    ```
-
-   For contract tests, run:
-
-    ```shell
-    ./scripts/contract.sh
-    ```
-
-   To run all tests, use:
-
-    ```shell
-    ./scripts/all-tests.sh
-    ```
-   This script will:
-    * Ensure that Go modules are tidy by running go mod tidy and checking for uncommitted changes.
-    * Run `golangci-lint` to ensure that your code passes the linter checks.
-    * Execute unit tests, integration tests, and contract tests (the latter is not included in the CI workflow).
-
-2. Build the app using the installation script:
-
-    ```shell
-    ./scripts/install.sh
-    ```
-
-3. After a successful build, test the application with the following command:
+### Testing the CLI
+1. After a successful build, test the application with the following command:
 
     ```shell
     ./bin/chatgpt what type of dog is a Jack Russel?
     ```
 
-4. As mentioned previously, the ChatGPT CLI supports tracking conversation history across CLI calls. This feature
+2. As mentioned previously, the ChatGPT CLI supports tracking conversation history across CLI calls. This feature
    creates a seamless and conversational experience with the GPT model, as the history is utilized as context in
    subsequent interactions.
 
@@ -604,7 +595,7 @@ data. If you have any concerns about this, please feel free to delete this direc
 
 ## Useful Links
 
-* [Amazing Prompts!](https://github.com/kardolus/prompts)
+* [Amazing Prompts](https://github.com/kardolus/prompts)
 * [OpenAI API Reference](https://platform.openai.com/docs/api-reference/chat/create)
 * [OpenAI Key Usage Dashboard](https://platform.openai.com/account/usage)
 * [OpenAI Pricing Page](https://openai.com/pricing)

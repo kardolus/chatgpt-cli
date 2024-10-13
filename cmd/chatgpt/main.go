@@ -60,17 +60,18 @@ var configMetadata = []ConfigMetadata{
 	{"models_path", "set-models-path", "/v1/models", "Set the models API endpoint"},
 	{"auth_header", "set-auth-header", "Authorization", "Set the authorization header"},
 	{"auth_token_prefix", "set-auth-token-prefix", "Bearer ", "Set the authorization token prefix"},
-	{"command_prompt", "set-command-prompt", "[%datetime] [Q%counter] [%usage]", "Set the command prompt format"},
-	{"output_prompt", "set-output-prompt", "", "Set the output prompt format"},
+	{"command_prompt", "set-command-prompt", "[%datetime] [Q%counter] [%usage]", "Set the command prompt format for interactive mode"},
+	{"output_prompt", "set-output-prompt", "", "Set the output prompt format for interactive mode"},
 	{"temperature", "set-temperature", 1.0, "Set the sampling temperature"},
 	{"top_p", "set-top-p", 1.0, "Set the top-p value for nucleus sampling"},
 	{"frequency_penalty", "set-frequency-penalty", 0.0, "Set the frequency penalty"},
 	{"presence_penalty", "set-presence-penalty", 0.0, "Set the presence penalty"},
 	{"omit_history", "set-omit-history", false, "Omit history in the conversation"},
-	{"auto_create_new_thread", "set-auto-create-new-thread", true, "Automatically create a new thread for each session"},
+	{"auto_create_new_thread", "set-auto-create-new-thread", true, "Create a new thread for each interactive session"},
 	{"track_token_usage", "set-track-token-usage", true, "Track token usage"},
 	{"skip_tls_verify", "set-skip-tls-verify", false, "Skip TLS certificate verification"},
 	{"debug", "set-debug", false, "Enable debug mode"},
+	{"multiline", "set-multiline", false, "Enables multiline mode while in interactive mode"},
 	{"name", "set-name", "openai", "The prefix for environment variable overrides"},
 }
 
@@ -244,7 +245,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if interactiveMode {
-		fmt.Printf("Entering interactive mode. Using thread ‘%s’. Type ‘clear’ to clear the screen, ‘exit’ to quit, or press Ctrl+C.\n\n", hs.GetThread())
+		fmt.Printf("Entering interactive mode. Using thread '%s'. Type 'clear' to clear the screen, 'exit' to quit, or press Ctrl+C.\n\n", hs.GetThread())
 		rl, err := readline.New("")
 		if err != nil {
 			return err
@@ -259,30 +260,16 @@ func run(cmd *cobra.Command, args []string) error {
 		for {
 			rl.SetPrompt(commandPrompt(qNum, usage))
 
-			line, err := rl.Readline()
-			if errors.Is(err, readline.ErrInterrupt) || err == io.EOF {
+			input, err := readInput(rl, cfg.Multiline)
+			if err == io.EOF {
 				fmt.Println("Bye!")
-				break
-			}
-
-			if line == "clear" {
-				ansiClearScreenCode := "\033[H\033[2J"
-				fmt.Print(ansiClearScreenCode)
-				continue
-			}
-
-			if line == "exit" || line == "/q" {
-				fmt.Println("Bye!")
-				if queryMode {
-					fmt.Printf("Total tokens used: %d\n", usage)
-				}
-				break
+				return nil
 			}
 
 			fmtOutputPrompt := utils.FormatPrompt(client.Config.OutputPrompt, qNum, usage, time.Now())
 
 			if queryMode {
-				result, qUsage, err := client.Query(line)
+				result, qUsage, err := client.Query(input)
 				if err != nil {
 					fmt.Println("Error:", err)
 				} else {
@@ -292,7 +279,7 @@ func run(cmd *cobra.Command, args []string) error {
 				}
 			} else {
 				fmt.Print(fmtOutputPrompt)
-				if err := client.Stream(line); err != nil {
+				if err := client.Stream(input); err != nil {
 					fmt.Fprintln(os.Stderr, "Error:", err)
 				} else {
 					fmt.Println()
@@ -368,6 +355,43 @@ func readConfigWithComments(configPath string) (*yaml.Node, error) {
 		return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
 	}
 	return &rootNode, nil
+}
+
+// Helper function to handle single-line and multiline input
+func readInput(rl *readline.Instance, multiline bool) (string, error) {
+	var lines []string
+	clearScreenANSI := "\033[H\033[2J"
+
+	if multiline {
+		fmt.Println("Multiline mode enabled. Type 'EOF' on a new line to submit your query.")
+	}
+
+	for {
+		line, err := rl.Readline()
+		if errors.Is(err, readline.ErrInterrupt) || err == io.EOF {
+			return "", io.EOF
+		}
+
+		switch line {
+		case "clear":
+			fmt.Print(clearScreenANSI)
+			continue
+		case "exit", "/q":
+			return "", io.EOF
+		}
+
+		// If multiline mode is enabled, check for EOF to submit
+		if multiline {
+			if line == "EOF" {
+				break
+			}
+			lines = append(lines, line)
+		} else {
+			return line, nil
+		}
+	}
+
+	return strings.Join(lines, "\n"), nil
 }
 
 func updateConfig(node *yaml.Node, changes map[string]interface{}) error {
@@ -657,6 +681,7 @@ func createConfigFromViper() types.Config {
 		TrackTokenUsage:     viper.GetBool("track_token_usage"),
 		SkipTLSVerify:       viper.GetBool("skip_tls_verify"),
 		Debug:               viper.GetBool("debug"),
+		Multiline:           viper.GetBool("multiline"),
 	}
 }
 

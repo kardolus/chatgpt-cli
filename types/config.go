@@ -24,4 +24,5 @@ type Config struct {
 	TrackTokenUsage     bool    `yaml:"track_token_usage"`
 	SkipTLSVerify       bool    `yaml:"skip_tls_verify"`
 	Debug               bool    `yaml:"debug"`
+	Multiline           bool    `yaml:"multiline"`
 }

@@ -389,7 +389,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 			output := string(session.Out.Contents())
 			Expect(output).To(ContainSubstring(fmt.Sprintf("Warning: config.yaml doesn't exist in %s, create it", configHomeDir)))
-			
+
 			// Unset the variable to prevent pollution
 			Expect(os.Unsetenv(utils.ConfigHomeEnv)).To(Succeed())
 		})

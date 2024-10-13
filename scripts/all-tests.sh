@@ -9,6 +9,18 @@ git diff --exit-code go.mod go.sum || {
   exit 1
 }
 
+# Ensure go code is formatted properly
+echo "Checking code format with 'go fmt'..."
+# Capture the result of go fmt into a variable
+fmt_output=$(go fmt ./...)
+
+if [ -n "$fmt_output" ]; then
+  echo "The following files are not formatted properly:"
+  echo "$fmt_output"
+  echo "Please run 'go fmt' and fix the formatting issues before committing."
+  exit 1
+fi
+
 # Run golangci-lint to check for code issues
 echo "Running golangci-lint..."
 golangci-lint run

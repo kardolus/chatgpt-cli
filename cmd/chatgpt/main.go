@@ -368,10 +368,17 @@ func readInput(rl *readline.Instance, multiline bool) (string, error) {
 	rl.Config.SetListener(func(line []rune, pos int, key rune) ([]rune, int, bool) {
 		// Check if backspace is pressed and if multiline mode is enabled
 		if multiline && key == readline.CharBackspace && pos == 0 && len(lines) > 0 {
-			// Move the cursor up and clear the previous line
-			fmt.Print("\033[A\033[2K")   // Move cursor up one line and clear it
-			lines = lines[:len(lines)-1] // Remove the last line from the slice
-			return []rune{}, 0, true     // Reset the current input line
+			fmt.Print("\033[A") // Move cursor up one line
+
+			// Print the last line without clearing
+			lastLine := lines[len(lines)-1]
+			fmt.Print(lastLine)
+
+			// Remove the last line from the slice
+			lines = lines[:len(lines)-1]
+
+			// Set the cursor at the end of the previous line
+			return []rune(lastLine), len(lastLine), true
 		}
 		return line, pos, false // Default behavior for other keys
 	})
@@ -384,7 +391,7 @@ func readInput(rl *readline.Instance, multiline bool) (string, error) {
 
 		switch line {
 		case "clear":
-			fmt.Println("Clearing screen...")
+			fmt.Print("\033[H\033[2J") // ANSI escape code to clear the screen
 			continue
 		case "exit", "/q":
 			return "", io.EOF

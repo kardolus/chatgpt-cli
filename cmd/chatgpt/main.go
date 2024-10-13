@@ -357,14 +357,24 @@ func readConfigWithComments(configPath string) (*yaml.Node, error) {
 	return &rootNode, nil
 }
 
-// Helper function to handle single-line and multiline input
 func readInput(rl *readline.Instance, multiline bool) (string, error) {
 	var lines []string
-	clearScreenANSI := "\033[H\033[2J"
 
 	if multiline {
 		fmt.Println("Multiline mode enabled. Type 'EOF' on a new line to submit your query.")
 	}
+
+	// Custom keybinding to handle backspace in multiline mode
+	rl.Config.SetListener(func(line []rune, pos int, key rune) ([]rune, int, bool) {
+		// Check if backspace is pressed and if multiline mode is enabled
+		if multiline && key == readline.CharBackspace && pos == 0 && len(lines) > 0 {
+			// Move the cursor up and clear the previous line
+			fmt.Print("\033[A\033[2K")   // Move cursor up one line and clear it
+			lines = lines[:len(lines)-1] // Remove the last line from the slice
+			return []rune{}, 0, true     // Reset the current input line
+		}
+		return line, pos, false // Default behavior for other keys
+	})
 
 	for {
 		line, err := rl.Readline()
@@ -374,13 +384,12 @@ func readInput(rl *readline.Instance, multiline bool) (string, error) {
 
 		switch line {
 		case "clear":
-			fmt.Print(clearScreenANSI)
+			fmt.Println("Clearing screen...")
 			continue
 		case "exit", "/q":
 			return "", io.EOF
 		}
 
-		// If multiline mode is enabled, check for EOF to submit
 		if multiline {
 			if line == "EOF" {
 				break
@@ -391,6 +400,7 @@ func readInput(rl *readline.Instance, multiline bool) (string, error) {
 		}
 	}
 
+	// Join and return all accumulated lines as a single string
 	return strings.Join(lines, "\n"), nil
 }
 

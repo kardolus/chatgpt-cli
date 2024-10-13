@@ -481,10 +481,12 @@ This ensures that command flag autocompletion is enabled automatically every tim
 
 ## Markdown Rendering
 
-You can render markdown in real-time using the `mdrender.sh` script, located [here](scripts/mdrender.sh). You'll first need to
+You can render markdown in real-time using the `mdrender.sh` script, located [here](scripts/mdrender.sh). You'll first
+need to
 install [glow](https://github.com/charmbracelet/glow).
 
 Example:
+
 ```shell
 chatgpt write a hello world program in Java | ./scripts/mdrender.sh
 ```
@@ -520,6 +522,10 @@ building the application:
     ```shell
     ./scripts/all-tests.sh
     ```
+   This script will:
+    * Ensure that Go modules are tidy by running go mod tidy and checking for uncommitted changes.
+    * Run `golangci-lint` to ensure that your code passes the linter checks.
+    * Execute unit tests, integration tests, and contract tests (the latter is not included in the CI workflow).
 
 2. Build the app using the installation script:
 

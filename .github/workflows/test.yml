@@ -10,34 +10,35 @@ jobs:
     runs-on: ubuntu-latest
     name: Check modules
     steps:
-    - uses: actions/setup-go@v4
-      with:
-        go-version: 'stable'
-    - uses: actions/checkout@v4
-    - run: go mod tidy && git diff --exit-code go.mod go.sum
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 'stable'
+      - uses: actions/checkout@v4
+      - run: go mod tidy && git diff --exit-code go.mod go.sum
 
-  build:
+  lint:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        version: [ '1.22.0', '1.22.2' ]
-    name: Go ${{ matrix.version }}
+    name: Lint Go code
+    needs: mod
     steps:
-    - uses: actions/setup-go@v4
-      with:
-        go-version: ${{ matrix.version }}
-    - uses: actions/checkout@v4
-    - run: go vet ./...
+      - uses: actions/checkout@v4
+      - uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+      - run: golangci-lint run
 
   unit-tests:
     runs-on: ubuntu-latest
+    name: Run unit tests
+    needs: lint
     steps:
-    - uses: actions/checkout@v4
-    - run: ./scripts/unit.sh
+      - uses: actions/checkout@v4
+      - run: ./scripts/unit.sh
 
   integration-tests:
     runs-on: ubuntu-latest
+    name: Run integration tests
+    needs: unit-tests
     steps:
-    - uses: actions/checkout@v4
-    - run: ./scripts/integration.sh
-
+      - uses: actions/checkout@v4
+      - run: ./scripts/integration.sh

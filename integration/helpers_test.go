@@ -74,7 +74,7 @@ func getPing(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	w.Write([]byte("pong"))
+	_, _ = w.Write([]byte("pong"))
 }
 
 func getModels(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +94,7 @@ func getModels(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("error reading %s: %s\n", modelFile, err.Error())
 		return
 	}
-	w.Write(response)
+	_, _ = w.Write(response)
 }
 
 func postCompletions(w http.ResponseWriter, r *http.Request) {
@@ -114,7 +114,7 @@ func postCompletions(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("error reading %s: %s\n", completionsFile, err.Error())
 		return
 	}
-	w.Write(response)
+	_, _ = w.Write(response)
 }
 
 func checkBearerToken(r *http.Request, expectedToken string) error {

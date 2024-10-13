@@ -57,15 +57,15 @@ PowerShell:
 		Run: func(cmd *cobra.Command, args []string) {
 			switch args[0] {
 			case "bash":
-				command.Root().GenBashCompletion(os.Stdout)
+				_ = command.Root().GenBashCompletion(os.Stdout)
 			case "zsh":
-				command.Root().GenZshCompletion(os.Stdout)
+				_ = command.Root().GenZshCompletion(os.Stdout)
 			case "fish":
-				command.Root().GenFishCompletion(os.Stdout, true)
+				_ = command.Root().GenFishCompletion(os.Stdout, true)
 			case "powershell":
-				command.Root().GenPowerShellCompletionWithDesc(os.Stdout)
+				_ = command.Root().GenPowerShellCompletionWithDesc(os.Stdout)
 			case "-h", "--help":
-				cmd.Help()
+				_ = cmd.Help()
 			default:
 				fmt.Printf(`
 Usage:

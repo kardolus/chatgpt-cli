@@ -506,11 +506,6 @@ The Makefile simplifies development tasks by providing several targets for testi
   ```shell 
   make all-tests
   ```
-* **install**: Build a binary for your OS
-  ```shell 
-  make install
-  ```
-  
 * **binaries**: Build binaries for multiple platforms.
   ```shell 
   make binaries

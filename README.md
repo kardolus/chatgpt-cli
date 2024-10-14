@@ -248,7 +248,7 @@ environment variables, a config.yaml file, and default values, in that respectiv
    configurations.
 2. Environment Variables: If a setting is not specified by a flag, the corresponding environment variable (prefixed with
    the name field from the config) will be checked.
-3. Config file (config.yaml): If neither a flag nor a environment variable is set, the value from the config.yaml file
+3. Config file (config.yaml): If neither a flag nor an environment variable is set, the value from the config.yaml file
    will be used.
 4. Default Values: If no value is specified through flags, config.yaml, or environment variables, the CLI will fall back
    to its built-in default values.

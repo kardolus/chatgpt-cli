@@ -1,7 +1,7 @@
 # Default goal when running `make`
 .DEFAULT_GOAL := help
 
-.PHONY: help all-tests binaries commit contract install integration mdrender reinstall run_test shipit unit updatedeps
+.PHONY: help all-tests binaries commit contract install integration reinstall shipit unit updatedeps
 
 # Help command to list all available targets
 help:  ## Show this help message
@@ -27,9 +27,6 @@ integration: ## Run integration tests
 
 reinstall: ## Reinstall binaries (default target OS: darwin)
 	./scripts/reinstall.sh $(TARGET_OS)
-
-run_test: ## Run specified test type (Unit, Integration, Contract)
-	./scripts/run_test.sh $(TEST_TYPE)
 
 shipit: ## Run the release script, create binaries, and generate release notes
 	./scripts/shipit.sh

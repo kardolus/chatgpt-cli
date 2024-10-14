@@ -266,6 +266,7 @@ environment variables, a config.yaml file, and default values, in that respectiv
 | `track_token_usage`      | If set to true, displays the total token usage after each query in --query mode, helping you monitor API usage.                                                                                       | `false`                   |
 | `debug`                  | If set to true, prints the raw request and response data during API calls, useful for debugging.                                                                                                      | `false`                   |
 | `skip_tls_verify`        | If set to true, skips TLS certificate verification, allowing insecure HTTPS requests.                                                                                                                 | `false`                   |
+| `multiline`              | If set to true, enables multiline input mode in interactive sessions.                                                                                                                                 | `false`                   |
 
 ### LLM-Specific Configuration
 

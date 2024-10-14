@@ -523,6 +523,12 @@ For more available commands, use:
 make help
 ```
 
+#### Windows build script
+
+```ps1
+.\scripts\binaries.ps1
+```
+
 ### Testing the CLI
 1. After a successful build, test the application with the following command:
 

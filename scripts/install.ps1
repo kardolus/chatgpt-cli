@@ -1,4 +1,3 @@
-
 Set-StrictMode -Version Latest
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path

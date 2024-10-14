@@ -526,7 +526,7 @@ make help
 #### Windows build script
 
 ```ps1
-.\scripts\binaries.ps1
+.\scripts\install.ps1
 ```
 
 ### Testing the CLI

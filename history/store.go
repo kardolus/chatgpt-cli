@@ -16,8 +16,9 @@ const (
 
 type HistoryStore interface {
 	Read() ([]types.Message, error)
+	ReadThread(string) ([]types.Message, error)
 	Write([]types.Message) error
-	SetThread(thread string)
+	SetThread(string)
 	GetThread() string
 }
 
@@ -68,7 +69,11 @@ func (f *FileIO) WithDirectory(historyDir string) *FileIO {
 }
 
 func (f *FileIO) Read() ([]types.Message, error) {
-	return parseFile(f.getPath())
+	return parseFile(f.getPath(f.thread))
+}
+
+func (f *FileIO) ReadThread(thread string) ([]types.Message, error) {
+	return parseFile(f.getPath(thread))
 }
 
 func (f *FileIO) Write(messages []types.Message) error {
@@ -77,11 +82,11 @@ func (f *FileIO) Write(messages []types.Message) error {
 		return err
 	}
 
-	return os.WriteFile(f.getPath(), data, 0644)
+	return os.WriteFile(f.getPath(f.thread), data, 0644)
 }
 
-func (f *FileIO) getPath() string {
-	return filepath.Join(f.historyDir, f.thread+jsonExtension)
+func (f *FileIO) getPath(thread string) string {
+	return filepath.Join(f.historyDir, thread+jsonExtension)
 }
 
 // migrate moves the legacy "history" file in ~/.chatgpt-cli to "history/default.json"

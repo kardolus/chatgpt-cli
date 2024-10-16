@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/configmanager"
@@ -232,6 +233,10 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 			<-session.Exited
+
+			if tmp := string(session.Err.Contents()); tmp != "" {
+				fmt.Printf("error output: %s", string(session.Err.Contents()))
+			}
 
 			ExpectWithOffset(1, session).Should(gexec.Exit(0))
 			return string(session.Out.Contents())
@@ -865,6 +870,85 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				// Step 2: Verify it falls back to the default model.
 				output := runCommand("--list-models")
 				Expect(output).To(ContainSubstring("* " + defaultModel + " (current)"))
+			})
+		})
+
+		when("show-history flag is used", func() {
+			var tmpDir string
+			var err error
+			var historyFile string
+
+			it.Before(func() {
+				RegisterTestingT(t)
+				tmpDir, err = os.MkdirTemp("", "chatgpt-cli-test")
+				Expect(err).NotTo(HaveOccurred())
+				historyFile = filepath.Join(tmpDir, "default.json")
+
+				messages := []types.Message{
+					{Role: "user", Content: "Hello"},
+					{Role: "assistant", Content: "Hi, how can I help you?"},
+					{Role: "user", Content: "Tell me about the weather"},
+					{Role: "assistant", Content: "It's sunny today."},
+				}
+				data, err := json.Marshal(messages)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(os.WriteFile(historyFile, data, 0644)).To(Succeed())
+
+				// This is legacy: we need a config dir in order to have a history dir
+				filePath = path.Join(os.Getenv("HOME"), ".chatgpt-cli")
+				Expect(os.MkdirAll(filePath, 0777)).To(Succeed())
+
+				Expect(os.Setenv("OPENAI_DATA_HOME", tmpDir)).To(Succeed())
+			})
+
+			it("prints the history for the default thread", func() {
+				output := runCommand("--show-history")
+
+				// Check that the output contains the history as expected
+				Expect(output).To(ContainSubstring("**USER** 👤:\nHello"))
+				Expect(output).To(ContainSubstring("**ASSISTANT** 🤖:\nHi, how can I help you?"))
+				Expect(output).To(ContainSubstring("**USER** 👤:\nTell me about the weather"))
+				Expect(output).To(ContainSubstring("**ASSISTANT** 🤖:\nIt's sunny today."))
+			})
+
+			it("prints the history for a specific thread when specified", func() {
+				specificThread := "specific-thread"
+				specificHistoryFile := filepath.Join(tmpDir, specificThread+".json")
+
+				// Create a specific thread with custom history
+				messages := []types.Message{
+					{Role: "user", Content: "What's the capital of Belgium?"},
+					{Role: "assistant", Content: "The capital of Belgium is Brussels."},
+				}
+				data, err := json.Marshal(messages)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.WriteFile(specificHistoryFile, data, 0644)).To(Succeed())
+
+				// Run the --show-history flag with the specific thread
+				output := runCommand("--show-history", specificThread)
+
+				// Check that the output contains the history as expected
+				Expect(output).To(ContainSubstring("**USER** 👤:\nWhat's the capital of Belgium?"))
+				Expect(output).To(ContainSubstring("**ASSISTANT** 🤖:\nThe capital of Belgium is Brussels."))
+			})
+
+			it("concatenates user messages correctly", func() {
+				// Create history where two user messages are concatenated
+				messages := []types.Message{
+					{Role: "user", Content: "Part one"},
+					{Role: "user", Content: " and part two"},
+					{Role: "assistant", Content: "This is a response."},
+				}
+				data, err := json.Marshal(messages)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.WriteFile(historyFile, data, 0644)).To(Succeed())
+
+				output := runCommand("--show-history")
+
+				// Check that the concatenated user messages are displayed correctly
+				Expect(output).To(ContainSubstring("**USER** 👤:\nPart one and part two"))
+				Expect(output).To(ContainSubstring("**ASSISTANT** 🤖:\nThis is a response."))
 			})
 		})
 	})

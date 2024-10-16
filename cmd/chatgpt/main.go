@@ -27,6 +27,7 @@ var (
 	GitVersion      string
 	queryMode       bool
 	clearHistory    bool
+	showHistory     bool
 	showVersion     bool
 	newThread       bool
 	showConfig      bool
@@ -168,6 +169,30 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 
 		fmt.Println("History successfully cleared.")
+		return nil
+	}
+
+	if showHistory {
+		var targetThread string
+		if len(args) > 0 {
+			targetThread = args[0]
+		} else {
+			targetThread = cfg.Thread
+		}
+
+		store, err := history.New()
+		if err != nil {
+			return err
+		}
+
+		h := history.NewHistory(store)
+
+		output, err := h.Print(targetThread)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(output)
 		return nil
 	}
 
@@ -531,8 +556,9 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("-v, --version", "Display the version information")
 		printFlagWithPadding("-l, --list-models", "List available models")
 		printFlagWithPadding("--list-threads", "List available threads")
-		printFlagWithPadding("--clear-history", "Clear the history of the current thread")
 		printFlagWithPadding("--delete-thread", "Delete the specified thread")
+		printFlagWithPadding("--clear-history", "Clear the history of the current thread")
+		printFlagWithPadding("--show-history [thread]", "Show the human-readable conversation history")
 		printFlagWithPadding("--set-completions", "Generate autocompletion script for your current shell")
 		fmt.Println()
 
@@ -575,6 +601,7 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().StringVarP(&promptFile, "prompt", "p", "", "Provide a prompt file")
 	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
 	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
+	rootCmd.PersistentFlags().BoolVar(&showHistory, "show-history", false, "Show the human-readable conversation history")
 	rootCmd.PersistentFlags().StringVar(&shell, "set-completions", "", "Generate autocompletion script for your current shell")
 }
 
@@ -608,7 +635,7 @@ func isNonConfigSetter(name string) bool {
 
 func isGeneralFlag(name string) bool {
 	switch name {
-	case "query", "interactive", "config", "version", "new-thread", "list-models", "list-threads", "clear-history", "delete-thread", "prompt", "set-completions", "help":
+	case "query", "interactive", "config", "version", "new-thread", "list-models", "list-threads", "clear-history", "delete-thread", "show-history", "prompt", "set-completions", "help":
 		return true
 	default:
 		return false

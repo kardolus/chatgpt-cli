@@ -99,7 +99,7 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 
 		it("Overwrites the default when OPENAI_CONFIG_HOME is set", func() {
 			customConfigHome := "/custom/config/path"
-			os.Setenv("OPENAI_CONFIG_HOME", customConfigHome)
+			Expect(os.Setenv("OPENAI_CONFIG_HOME", customConfigHome)).To(Succeed())
 
 			configHome, err := utils.GetConfigHome()
 
@@ -118,7 +118,7 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 
 		it("Overwrites the default when OPENAI_DATA_HOME is set", func() {
 			customDataHome := "/custom/data/path"
-			os.Setenv("OPENAI_DATA_HOME", customDataHome)
+			Expect(os.Setenv("OPENAI_DATA_HOME", customDataHome)).To(Succeed())
 
 			dataHome, err := utils.GetDataHome()
 

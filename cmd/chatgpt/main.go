@@ -93,12 +93,12 @@ func main() {
 
 	var err error
 	if cfg, err = initConfig(rootCmd); err != nil {
-		fmt.Fprintf(os.Stderr, "Config initialization failed: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "Config initialization failed: %v\n", err)
 		os.Exit(1)
 	}
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
@@ -213,10 +213,10 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	hs, _ := history.New() // do not error out
-	client := client.New(http.RealCallerFactory, hs, cfg, interactiveMode)
+	c := client.New(http.RealCallerFactory, hs, cfg, interactiveMode)
 
 	if ServiceURL != "" {
-		client = client.WithServiceURL(ServiceURL)
+		c = c.WithServiceURL(ServiceURL)
 	}
 
 	if hs != nil && newThread {
@@ -234,7 +234,7 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		client.ProvideContext(prompt)
+		c.ProvideContext(prompt)
 	}
 
 	// Check if there is input from the pipe (stdin)
@@ -250,11 +250,11 @@ func run(cmd *cobra.Command, args []string) error {
 		if strings.Trim(context, "\n ") != "" {
 			hasPipe = true
 		}
-		client.ProvideContext(context)
+		c.ProvideContext(context)
 	}
 
 	if listModels {
-		models, err := client.ListModels()
+		models, err := c.ListModels()
 		if err != nil {
 			return err
 		}
@@ -278,7 +278,7 @@ func run(cmd *cobra.Command, args []string) error {
 		defer rl.Close()
 
 		commandPrompt := func(counter, usage int) string {
-			return utils.FormatPrompt(client.Config.CommandPrompt, counter, usage, time.Now())
+			return utils.FormatPrompt(c.Config.CommandPrompt, counter, usage, time.Now())
 		}
 
 		qNum, usage := 1, 0
@@ -291,10 +291,10 @@ func run(cmd *cobra.Command, args []string) error {
 				return nil
 			}
 
-			fmtOutputPrompt := utils.FormatPrompt(client.Config.OutputPrompt, qNum, usage, time.Now())
+			fmtOutputPrompt := utils.FormatPrompt(c.Config.OutputPrompt, qNum, usage, time.Now())
 
 			if queryMode {
-				result, qUsage, err := client.Query(input)
+				result, qUsage, err := c.Query(input)
 				if err != nil {
 					fmt.Println("Error:", err)
 				} else {
@@ -304,8 +304,8 @@ func run(cmd *cobra.Command, args []string) error {
 				}
 			} else {
 				fmt.Print(fmtOutputPrompt)
-				if err := client.Stream(input); err != nil {
-					fmt.Fprintln(os.Stderr, "Error:", err)
+				if err := c.Stream(input); err != nil {
+					_, _ = fmt.Fprintln(os.Stderr, "Error:", err)
 				} else {
 					fmt.Println()
 					qNum++
@@ -317,17 +317,17 @@ func run(cmd *cobra.Command, args []string) error {
 			return errors.New("you must specify your query or provide input via a pipe")
 		}
 		if queryMode {
-			result, usage, err := client.Query(strings.Join(args, " "))
+			result, usage, err := c.Query(strings.Join(args, " "))
 			if err != nil {
 				return err
 			}
 			fmt.Println(result)
 
-			if client.Config.TrackTokenUsage {
+			if c.Config.TrackTokenUsage {
 				fmt.Printf("\n[Token Usage: %d]\n", usage)
 			}
 		} else {
-			if err := client.Stream(strings.Join(args, " ")); err != nil {
+			if err := c.Stream(strings.Join(args, " ")); err != nil {
 				return err
 			}
 		}

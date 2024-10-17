@@ -518,7 +518,7 @@ func (f *clientFactory) withHistory(history []types.Message) {
 	f.mockHistoryStore.EXPECT().Read().Return(history, nil).Times(1)
 }
 
-func mockCallerFactory(cfg types.Config) http.Caller {
+func mockCallerFactory(_ types.Config) http.Caller {
 	return mockCaller
 }
 

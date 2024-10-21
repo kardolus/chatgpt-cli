@@ -2,7 +2,7 @@
 set -euo pipefail
 
 log() {
-  echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] $*"
+  printf "\n[%s] %s\n" "$(date +'%Y-%m-%dT%H:%M:%S%z')" "$*"
 }
 
 # Ensure dependencies are tidy and up to date
@@ -33,16 +33,12 @@ fi
 # Run tests in parallel for faster execution
 log "Running unit tests..."
 cd "$( dirname "${BASH_SOURCE[0]}" )/.."
-./scripts/unit.sh &
-unit_pid=$!
+./scripts/unit.sh
 
 log "Running integration tests..."
-./scripts/integration.sh &
-integration_pid=$!
+./scripts/integration.sh
 
 log "Running contract tests..."
-./scripts/contract.sh &
-contract_pid=$!
+./scripts/contract.sh
 
-wait $unit_pid $integration_pid $contract_pid
 log "All tests completed successfully."

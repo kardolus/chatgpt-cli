@@ -1,34 +1,48 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Ensure dependencies are tidy and up to date
-echo "Tidying go modules and checking for changes..."
-go mod tidy
-git diff --exit-code go.mod go.sum || {
-  echo "go.mod or go.sum has uncommitted changes after running 'go mod tidy'."
-  exit 1
+log() {
+  echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] $*"
 }
 
-# Ensure go code is formatted properly
-echo "Checking code format with 'go fmt'..."
-# Capture the result of go fmt into a variable
-fmt_output=$(go fmt ./...)
+# Ensure dependencies are tidy and up to date
+log "Tidying Go modules and checking for changes..."
+go mod tidy
+if ! git diff --exit-code go.mod go.sum; then
+  log "go.mod or go.sum has uncommitted changes after 'go mod tidy'."
+  exit 1
+fi
 
+# Ensure Go code is formatted properly
+log "Checking code format with 'go fmt'..."
+fmt_output=$(go fmt ./...)
 if [ -n "$fmt_output" ]; then
-  echo "The following files are not formatted properly:"
+  log "The following files are not formatted properly:"
   echo "$fmt_output"
-  echo "Please run 'go fmt' and fix the formatting issues before committing."
+  log "Please run 'go fmt' to fix the formatting issues."
   exit 1
 fi
 
 # Run golangci-lint to check for code issues
-echo "Running golangci-lint..."
-golangci-lint run
+log "Running golangci-lint..."
+if ! golangci-lint run; then
+  log "Linting issues detected."
+  exit 1
+fi
 
+# Run tests in parallel for faster execution
+log "Running unit tests..."
 cd "$( dirname "${BASH_SOURCE[0]}" )/.."
-./scripts/unit.sh
-echo
-./scripts/integration.sh
-echo
-./scripts/contract.sh
+./scripts/unit.sh &
+unit_pid=$!
 
+log "Running integration tests..."
+./scripts/integration.sh &
+integration_pid=$!
+
+log "Running contract tests..."
+./scripts/contract.sh &
+contract_pid=$!
+
+wait $unit_pid $integration_pid $contract_pid
+log "All tests completed successfully."

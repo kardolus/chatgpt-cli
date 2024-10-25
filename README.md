@@ -618,3 +618,9 @@ data. If you have any concerns about this, please feel free to delete this direc
   on Reddit: Discuss the tool, ask questions, and share your experiences with our growing community.
 
 Thank you for using ChatGPT CLI!
+
+<div align="center" align-items: center;">
+        <a href="#top">
+            <img src="https://img.shields.io/badge/Back%20to%20Top-000000?style=for-the-badge&logo=github&logoColor=white" alt="Back to Top">
+        </a>
+</div>

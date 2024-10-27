@@ -190,6 +190,7 @@ func (c *Client) createBody(stream bool) ([]byte, error) {
 		TopP:             c.Config.TopP,
 		FrequencyPenalty: c.Config.FrequencyPenalty,
 		PresencePenalty:  c.Config.PresencePenalty,
+		Seed:             c.Config.Seed,
 		Stream:           stream,
 	}
 

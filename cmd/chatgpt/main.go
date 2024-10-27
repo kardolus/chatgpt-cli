@@ -73,6 +73,7 @@ var configMetadata = []ConfigMetadata{
 	{"skip_tls_verify", "set-skip-tls-verify", false, "Skip TLS certificate verification"},
 	{"debug", "set-debug", false, "Enable debug mode"},
 	{"multiline", "set-multiline", false, "Enables multiline mode while in interactive mode"},
+	{"seed", "set-seed", 0, "Sets the seed for deterministic sampling (Beta)"},
 	{"name", "set-name", "openai", "The prefix for environment variable overrides"},
 }
 
@@ -726,6 +727,7 @@ func createConfigFromViper() types.Config {
 		SkipTLSVerify:       viper.GetBool("skip_tls_verify"),
 		Debug:               viper.GetBool("debug"),
 		Multiline:           viper.GetBool("multiline"),
+		Seed:                viper.GetInt("seed"),
 	}
 }
 

@@ -281,6 +281,7 @@ environment variables, a config.yaml file, and default values, in that respectiv
 | `frequency_penalty` | Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far.                                 | 0.0                            |
 | `top_p`             | An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. | 1.0                            |
 | `presence_penalty`  | Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far.                                      | 0.0                            |
+| `seed`              | Sets the seed for deterministic sampling (Beta). Repeated requests with the same seed and parameters aim to return the same result.                    | 0                              |
 | `url`               | The base URL for the OpenAI API.                                                                                                                       | 'https://api.openai.com'       |
 | `completions_path`  | The API endpoint for completions.                                                                                                                      | '/v1/chat/completions'         |
 | `models_path`       | The API endpoint for accessing model information.                                                                                                      | '/v1/models'                   |
@@ -619,8 +620,9 @@ data. If you have any concerns about this, please feel free to delete this direc
 
 Thank you for using ChatGPT CLI!
 
-<div align="center" align-items: center;">
-        <a href="#top">
-            <img src="https://img.shields.io/badge/Back%20to%20Top-000000?style=for-the-badge&logo=github&logoColor=white" alt="Back to Top">
-        </a>
+<div align="center" style="text-align: center; display: flex; justify-content: center; align-items: center;">
+    <a href="#top">
+        <img src="https://img.shields.io/badge/Back%20to%20Top-000000?style=for-the-badge&logo=github&logoColor=white" alt="Back to Top">
+    </a>
 </div>
+

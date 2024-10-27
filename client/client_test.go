@@ -467,6 +467,7 @@ func createBody(messages []types.Message, stream bool) ([]byte, error) {
 		FrequencyPenalty: config.FrequencyPenalty,
 		MaxTokens:        config.MaxTokens,
 		PresencePenalty:  config.PresencePenalty,
+		Seed:             config.Seed,
 	}
 
 	return json.Marshal(req)
@@ -547,5 +548,6 @@ func MockConfig() types.Config {
 		TrackTokenUsage:     true,
 		SkipTLSVerify:       false,
 		Debug:               false,
+		Seed:                1,
 	}
 }

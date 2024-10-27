@@ -22,6 +22,7 @@ type CompletionsRequest struct {
 	PresencePenalty  float64   `json:"presence_penalty,omitempty"`
 	Messages         []Message `json:"messages"`
 	Stream           bool      `json:"stream"`
+	Seed             int       `json:"seed,omitempty"`
 }
 
 type Message struct {

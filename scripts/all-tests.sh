@@ -2,7 +2,7 @@
 set -euo pipefail
 
 log() {
-  printf "\n[%s] %s\n" "$(date +'%Y-%m-%dT%H:%M:%S%z')" "$*"
+    printf "\n[%s] %s\n" "$(date +'%b %d %I:%M:%S %p')" "$*"
 }
 
 # Ensure dependencies are tidy and up to date

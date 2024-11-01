@@ -49,10 +49,10 @@ func (mr *MockHistoryStoreMockRecorder) GetThread() *gomock.Call {
 }
 
 // Read mocks base method.
-func (m *MockHistoryStore) Read() ([]types.Message, error) {
+func (m *MockHistoryStore) Read() ([]types.History, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Read")
-	ret0, _ := ret[0].([]types.Message)
+	ret0, _ := ret[0].([]types.History)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -64,10 +64,10 @@ func (mr *MockHistoryStoreMockRecorder) Read() *gomock.Call {
 }
 
 // ReadThread mocks base method.
-func (m *MockHistoryStore) ReadThread(arg0 string) ([]types.Message, error) {
+func (m *MockHistoryStore) ReadThread(arg0 string) ([]types.History, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReadThread", arg0)
-	ret0, _ := ret[0].([]types.Message)
+	ret0, _ := ret[0].([]types.History)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -91,7 +91,7 @@ func (mr *MockHistoryStoreMockRecorder) SetThread(arg0 interface{}) *gomock.Call
 }
 
 // Write mocks base method.
-func (m *MockHistoryStore) Write(arg0 []types.Message) error {
+func (m *MockHistoryStore) Write(arg0 []types.History) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", arg0)
 	ret0, _ := ret[0].(error)

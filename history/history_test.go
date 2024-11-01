@@ -46,13 +46,19 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("concatenates multiple user messages", func() {
-			messages := []types.Message{
-				{Role: "user", Content: "first message"},
-				{Role: "user", Content: " second message"},
-				{Role: "assistant", Content: "response"},
+			historyEntries := []types.History{
+				{
+					Message: types.Message{Role: "user", Content: "first message"},
+				},
+				{
+					Message: types.Message{Role: "user", Content: " second message"},
+				},
+				{
+					Message: types.Message{Role: "assistant", Content: "response"},
+				},
 			}
 
-			mockHistoryStore.EXPECT().ReadThread(threadName).Return(messages, nil).Times(1)
+			mockHistoryStore.EXPECT().ReadThread(threadName).Return(historyEntries, nil).Times(1)
 
 			result, err := subject.Print(threadName)
 			Expect(err).NotTo(HaveOccurred())
@@ -61,13 +67,19 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("prints all roles correctly", func() {
-			messages := []types.Message{
-				{Role: "system", Content: "system message"},
-				{Role: "user", Content: "user message"},
-				{Role: "assistant", Content: "assistant message"},
+			historyEntries := []types.History{
+				{
+					Message: types.Message{Role: "system", Content: "system message"},
+				},
+				{
+					Message: types.Message{Role: "user", Content: "user message"},
+				},
+				{
+					Message: types.Message{Role: "assistant", Content: "assistant message"},
+				},
 			}
 
-			mockHistoryStore.EXPECT().ReadThread(threadName).Return(messages, nil).Times(1)
+			mockHistoryStore.EXPECT().ReadThread(threadName).Return(historyEntries, nil).Times(1)
 
 			result, err := subject.Print(threadName)
 			Expect(err).NotTo(HaveOccurred())
@@ -77,12 +89,16 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("handles the final user message concatenation", func() {
-			messages := []types.Message{
-				{Role: "user", Content: "first message"},
-				{Role: "user", Content: " second message"},
+			historyEntries := []types.History{
+				{
+					Message: types.Message{Role: "user", Content: "first message"},
+				},
+				{
+					Message: types.Message{Role: "user", Content: " second message"},
+				},
 			}
 
-			mockHistoryStore.EXPECT().ReadThread(threadName).Return(messages, nil).Times(1)
+			mockHistoryStore.EXPECT().ReadThread(threadName).Return(historyEntries, nil).Times(1)
 
 			result, err := subject.Print(threadName)
 			Expect(err).NotTo(HaveOccurred())

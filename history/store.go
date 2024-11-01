@@ -15,9 +15,9 @@ const (
 )
 
 type HistoryStore interface {
-	Read() ([]types.Message, error)
-	ReadThread(string) ([]types.Message, error)
-	Write([]types.Message) error
+	Read() ([]types.History, error)
+	ReadThread(string) ([]types.History, error)
+	Write([]types.History) error
 	SetThread(string)
 	GetThread() string
 }
@@ -68,16 +68,16 @@ func (f *FileIO) WithDirectory(historyDir string) *FileIO {
 	return f
 }
 
-func (f *FileIO) Read() ([]types.Message, error) {
+func (f *FileIO) Read() ([]types.History, error) {
 	return parseFile(f.getPath(f.thread))
 }
 
-func (f *FileIO) ReadThread(thread string) ([]types.Message, error) {
+func (f *FileIO) ReadThread(thread string) ([]types.History, error) {
 	return parseFile(f.getPath(thread))
 }
 
-func (f *FileIO) Write(messages []types.Message) error {
-	data, err := json.Marshal(messages)
+func (f *FileIO) Write(historyEntries []types.History) error {
+	data, err := json.Marshal(historyEntries)
 	if err != nil {
 		return err
 	}
@@ -128,8 +128,8 @@ func migrate() error {
 	return nil
 }
 
-func parseFile(fileName string) ([]types.Message, error) {
-	var result []types.Message
+func parseFile(fileName string) ([]types.History, error) {
+	var result []types.History
 
 	buf, err := os.ReadFile(fileName)
 	if err != nil {

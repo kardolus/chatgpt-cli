@@ -214,7 +214,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	hs, _ := history.New() // do not error out
-	c := client.New(http.RealCallerFactory, hs, cfg, interactiveMode)
+	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, cfg, interactiveMode)
 
 	if ServiceURL != "" {
 		c = c.WithServiceURL(ServiceURL)

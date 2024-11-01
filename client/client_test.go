@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	. "github.com/onsi/gomega"
 	"github.com/sclevine/spec"
@@ -20,6 +21,7 @@ import (
 
 //go:generate mockgen -destination=callermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/http Caller
 //go:generate mockgen -destination=historymocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/history HistoryStore
+//go:generate mockgen -destination=timermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/client Timer
 
 const (
 	envApiKey       = "api-key"
@@ -31,6 +33,7 @@ var (
 	mockCtrl         *gomock.Controller
 	mockCaller       *MockCaller
 	mockHistoryStore *MockHistoryStore
+	mockTimer        *MockTimer
 	factory          *clientFactory
 	apiKeyEnvVar     string
 	config           types.Config
@@ -48,6 +51,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		mockCtrl = gomock.NewController(t)
 		mockCaller = NewMockCaller(mockCtrl)
 		mockHistoryStore = NewMockHistoryStore(mockCtrl)
+		mockTimer = NewMockTimer(mockCtrl)
 		config = MockConfig()
 
 		factory = newClientFactory(mockHistoryStore)
@@ -67,7 +71,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				capturedThread = thread
 			}).Times(1)
 
-			client.New(mockCallerFactory, mockHistoryStore, MockConfig(), interactiveMode)
+			client.New(mockCallerFactory, mockHistoryStore, mockTimer, MockConfig(), interactiveMode)
 
 			Expect(capturedThread).To(HavePrefix(client.InteractiveThreadPrefix)) // Assuming `InteractiveThreadPrefix` is "int_"
 			Expect(len(capturedThread)).To(Equal(8))                              // "int_" (4 chars) + 4 random characters
@@ -81,7 +85,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			cfg := MockConfig()
 			cfg.AutoCreateNewThread = false
 
-			client.New(mockCallerFactory, mockHistoryStore, cfg, interactiveMode)
+			client.New(mockCallerFactory, mockHistoryStore, mockTimer, cfg, interactiveMode)
 
 			Expect(capturedThread).To(Equal(config.Thread))
 		})
@@ -91,7 +95,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				capturedThread = thread
 			}).Times(1)
 
-			client.New(mockCallerFactory, mockHistoryStore, MockConfig(), commandLineMode)
+			client.New(mockCallerFactory, mockHistoryStore, mockTimer, MockConfig(), commandLineMode)
 
 			Expect(capturedThread).To(Equal(config.Thread))
 		})
@@ -165,6 +169,8 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				Expect(err).NotTo(HaveOccurred())
 				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, body, false).Return(respBytes, tt.postError)
 
+				mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
+
 				_, _, err = subject.Query(query)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(tt.expectedError))
@@ -172,7 +178,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		}
 
 		when("a valid http response is received", func() {
-			testValidHTTPResponse := func(subject *client.Client, history []types.Message, expectedBody []byte, omitHistory bool) {
+			testValidHTTPResponse := func(subject *client.Client, expectedBody []byte, omitHistory bool) {
 				const (
 					answer = "content"
 					tokens = 789
@@ -207,10 +213,21 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				err = json.Unmarshal(expectedBody, &request)
 				Expect(err).NotTo(HaveOccurred())
 
+				mockTimer.EXPECT().Now().Return(time.Time{}).AnyTimes()
+
+				var history []types.History
 				if !omitHistory {
-					mockHistoryStore.EXPECT().Write(append(request.Messages, types.Message{
-						Role:    client.AssistantRole,
-						Content: answer,
+					for _, msg := range request.Messages {
+						history = append(history, types.History{
+							Message: msg,
+						})
+					}
+
+					mockHistoryStore.EXPECT().Write(append(history, types.History{
+						Message: types.Message{
+							Role:    client.AssistantRole,
+							Content: answer,
+						},
 					}))
 				}
 
@@ -220,20 +237,27 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				Expect(usage).To(Equal(tokens))
 			}
 			it("returns the expected result for a non-empty history", func() {
-				history := []types.Message{
+				history := []types.History{
 					{
-						Role:    client.SystemRole,
-						Content: config.Role,
+						Message: types.Message{
+							Role:    client.SystemRole,
+							Content: config.Role,
+						},
 					},
 					{
-						Role:    client.UserRole,
-						Content: "question 1",
+						Message: types.Message{
+							Role:    client.UserRole,
+							Content: "question 1",
+						},
 					},
 					{
-						Role:    client.AssistantRole,
-						Content: "answer 1",
+						Message: types.Message{
+							Role:    client.AssistantRole,
+							Content: "answer 1",
+						},
 					},
 				}
+
 				messages = createMessages(history, query)
 				factory.withHistory(history)
 				subject := factory.buildClientWithoutConfig()
@@ -241,7 +265,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				body, err = createBody(messages, false)
 				Expect(err).NotTo(HaveOccurred())
 
-				testValidHTTPResponse(subject, history, body, false)
+				testValidHTTPResponse(subject, body, false)
 			})
 			it("ignores history when configured to do so", func() {
 				mockHistoryStore.EXPECT().SetThread(config.Thread).Times(1)
@@ -249,7 +273,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				config := MockConfig()
 				config.OmitHistory = true
 
-				subject := client.New(mockCallerFactory, mockHistoryStore, config, commandLineMode)
+				subject := client.New(mockCallerFactory, mockHistoryStore, mockTimer, config, commandLineMode)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Read and Write are never called on the history store
@@ -261,37 +285,58 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				body, err = createBody(messages, false)
 				Expect(err).NotTo(HaveOccurred())
 
-				testValidHTTPResponse(subject, nil, body, true)
+				testValidHTTPResponse(subject, body, true)
 			})
 			it("truncates the history as expected", func() {
-				history := []types.Message{
+				history := []types.History{
 					{
-						Role:    client.SystemRole,
-						Content: config.Role,
+						Message: types.Message{
+							Role:    client.SystemRole,
+							Content: config.Role,
+						},
+						Timestamp: time.Time{},
 					},
 					{
-						Role:    client.UserRole,
-						Content: "question 1",
+						Message: types.Message{
+							Role:    client.UserRole,
+							Content: "question 1",
+						},
+						Timestamp: time.Time{},
 					},
 					{
-						Role:    client.AssistantRole,
-						Content: "answer 1",
+						Message: types.Message{
+							Role:    client.AssistantRole,
+							Content: "answer 1",
+						},
+						Timestamp: time.Time{},
 					},
 					{
-						Role:    client.UserRole,
-						Content: "question 2",
+						Message: types.Message{
+							Role:    client.UserRole,
+							Content: "question 2",
+						},
+						Timestamp: time.Time{},
 					},
 					{
-						Role:    client.AssistantRole,
-						Content: "answer 2",
+						Message: types.Message{
+							Role:    client.AssistantRole,
+							Content: "answer 2",
+						},
+						Timestamp: time.Time{},
 					},
 					{
-						Role:    client.UserRole,
-						Content: "question 3",
+						Message: types.Message{
+							Role:    client.UserRole,
+							Content: "question 3",
+						},
+						Timestamp: time.Time{},
 					},
 					{
-						Role:    client.AssistantRole,
-						Content: "answer 3",
+						Message: types.Message{
+							Role:    client.AssistantRole,
+							Content: "answer 3",
+						},
+						Timestamp: time.Time{},
 					},
 				}
 
@@ -306,7 +351,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				body, err = createBody(messages, false)
 				Expect(err).NotTo(HaveOccurred())
 
-				testValidHTTPResponse(subject, history, body, false)
+				testValidHTTPResponse(subject, body, false)
 			})
 		})
 	})
@@ -328,6 +373,8 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			errorMsg := "error message"
 			mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, body, true).Return(nil, errors.New(errorMsg))
 
+			mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
+
 			err := subject.Stream(query)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal(errorMsg))
@@ -335,18 +382,30 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		when("a valid http response is received", func() {
 			const answer = "answer"
 
-			testValidHTTPResponse := func(subject *client.Client, history []types.Message, expectedBody []byte) {
+			testValidHTTPResponse := func(subject *client.Client, history []types.History, expectedBody []byte) {
 				messages = createMessages(nil, query)
 				body, err = createBody(messages, true)
 				Expect(err).NotTo(HaveOccurred())
 
 				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, true).Return([]byte(answer), nil)
 
+				mockTimer.EXPECT().Now().Return(time.Time{}).AnyTimes()
+
 				messages = createMessages(history, query)
 
-				mockHistoryStore.EXPECT().Write(append(messages, types.Message{
-					Role:    client.AssistantRole,
-					Content: answer,
+				history = []types.History{}
+
+				for _, message := range messages {
+					history = append(history, types.History{
+						Message: message,
+					})
+				}
+
+				mockHistoryStore.EXPECT().Write(append(history, types.History{
+					Message: types.Message{
+						Role:    client.AssistantRole,
+						Content: answer,
+					},
 				}))
 
 				err := subject.Stream(query)
@@ -364,18 +423,24 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				testValidHTTPResponse(subject, nil, body)
 			})
 			it("returns the expected result for a non-empty history", func() {
-				history := []types.Message{
+				history := []types.History{
 					{
-						Role:    client.SystemRole,
-						Content: config.Role,
+						Message: types.Message{
+							Role:    client.SystemRole,
+							Content: config.Role,
+						},
 					},
 					{
-						Role:    client.UserRole,
-						Content: "question 1",
+						Message: types.Message{
+							Role:    client.UserRole,
+							Content: "question x",
+						},
 					},
 					{
-						Role:    client.AssistantRole,
-						Content: "answer 1",
+						Message: types.Message{
+							Role:    client.AssistantRole,
+							Content: "answer x",
+						},
 					},
 				}
 				factory.withHistory(history)
@@ -442,6 +507,8 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			context := "This is a story about a dog named Kya. Kya loves to play fetch and swim in the lake."
 			mockHistoryStore.EXPECT().Read().Return(nil, nil).Times(1)
 
+			mockTimer.EXPECT().Now().Return(time.Time{}).AnyTimes()
+
 			subject.ProvideContext(context)
 
 			Expect(len(subject.History)).To(Equal(2)) // The system message and the provided context
@@ -473,16 +540,18 @@ func createBody(messages []types.Message, stream bool) ([]byte, error) {
 	return json.Marshal(req)
 }
 
-func createMessages(history []types.Message, query string) []types.Message {
+func createMessages(historyEntries []types.History, query string) []types.Message {
 	var messages []types.Message
 
-	if len(history) == 0 {
+	if len(historyEntries) == 0 {
 		messages = append(messages, types.Message{
 			Role:    client.SystemRole,
 			Content: config.Role,
 		})
 	} else {
-		messages = history
+		for _, entry := range historyEntries {
+			messages = append(messages, entry.Message)
+		}
 	}
 
 	messages = append(messages, types.Message{
@@ -506,7 +575,7 @@ func newClientFactory(mhs *MockHistoryStore) *clientFactory {
 func (f *clientFactory) buildClientWithoutConfig() *client.Client {
 	f.mockHistoryStore.EXPECT().SetThread(config.Thread).Times(1)
 
-	c := client.New(mockCallerFactory, f.mockHistoryStore, MockConfig(), commandLineMode)
+	c := client.New(mockCallerFactory, f.mockHistoryStore, mockTimer, MockConfig(), commandLineMode)
 
 	return c.WithContextWindow(config.ContextWindow)
 }
@@ -515,7 +584,7 @@ func (f *clientFactory) withoutHistory() {
 	f.mockHistoryStore.EXPECT().Read().Return(nil, nil).Times(1)
 }
 
-func (f *clientFactory) withHistory(history []types.Message) {
+func (f *clientFactory) withHistory(history []types.History) {
 	f.mockHistoryStore.EXPECT().Read().Return(history, nil).Times(1)
 }
 

@@ -84,17 +84,31 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("writes the messages to the file", func() {
-			err = fileIO.Write(messages)
+			var historyEntries []types.History
+			for _, message := range messages {
+				historyEntries = append(historyEntries, types.History{
+					Message: message,
+				})
+			}
+
+			err = fileIO.Write(historyEntries)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		it("reads the messages from the file", func() {
-			err = fileIO.Write(messages) // need to write before reading
+			var historyEntries []types.History
+			for _, message := range messages {
+				historyEntries = append(historyEntries, types.History{
+					Message: message,
+				})
+			}
+
+			err = fileIO.Write(historyEntries) // need to write before reading
 			Expect(err).NotTo(HaveOccurred())
 
-			readMessages, err := fileIO.Read()
+			readEntries, err := fileIO.Read()
 			Expect(err).NotTo(HaveOccurred())
-			Expect(readMessages).To(Equal(messages))
+			Expect(readEntries).To(Equal(historyEntries))
 		})
 	})
 

@@ -28,10 +28,6 @@ fi
 TAG="$1"
 MESSAGE="$2"
 
-echo TAG
-echo MESSAGE
-exit 0
-
 # Step 5: Create and push git tag
 echo "Creating git tag..."
 git tag -a "$TAG" -m "$MESSAGE"
@@ -43,6 +39,6 @@ echo "Creating binaries..."
 
 # Step 7: Generate release notes by diffing from the latest tag to HEAD
 echo "Generating release notes..."
-git diff $(git rev-list --tags --max-count=1)..HEAD | chatgpt -n -p ../prompts/write_release_notes.md for the 'how to update' section explain you can use brew upgrade chatgpt-cli or do a direct download of the binaries for your specific OS.
+git diff $(git rev-list --tags --max-count=1)..HEAD  -- . ":(exclude)vendor" | chatgpt -n -p ../prompts/write_release_notes.md for the 'how to update' section explain you can use brew upgrade chatgpt-cli or do a direct download of the binaries for your specific OS. The version we are releasing is "$TAG"
 
 echo "Release complete. Tag $TAG has been created, pushed, and binaries are ready."

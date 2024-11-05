@@ -28,8 +28,10 @@ integration: ## Run integration tests
 reinstall: ## Reinstall binaries (default target OS: darwin)
 	./scripts/reinstall.sh $(TARGET_OS)
 
+.PHONY: shipit
+
 shipit: ## Run the release script, create binaries, and generate release notes
-	./scripts/shipit.sh
+	./scripts/shipit.sh $(version) "$(message)"
 
 unit: ## Run unit tests
 	./scripts/unit.sh

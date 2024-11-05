@@ -5,12 +5,7 @@
 Execute the Ship-It script to prepare the release:
 
 ```shell
-make shipit <tag> <message>
-```
-
-example: 
-```shell
-make shipit v1.0.5 "Add list-models flag"
+make shipit version=v1.0.0 message="bla bla"
 ```
 
 ## 2. Create a GitHub release

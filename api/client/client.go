@@ -40,11 +40,11 @@ type Client struct {
 	Config       config.Config
 	History      []history.History
 	caller       http.Caller
-	historyStore history.HistoryStore
+	historyStore history.Store
 	timer        Timer
 }
 
-func New(callerFactory http.CallerFactory, hs history.HistoryStore, t Timer, cfg config.Config, interactiveMode bool) *Client {
+func New(callerFactory http.CallerFactory, hs history.Store, t Timer, cfg config.Config, interactiveMode bool) *Client {
 	caller := callerFactory(cfg)
 
 	if interactiveMode && cfg.AutoCreateNewThread {

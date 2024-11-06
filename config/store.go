@@ -28,7 +28,7 @@ const (
 	openAICommandPrompt    = "[%datetime] [Q%counter]"
 )
 
-type ConfigStore interface {
+type Store interface {
 	Delete(string) error
 	List() ([]string, error)
 	Read() (Config, error)
@@ -37,7 +37,7 @@ type ConfigStore interface {
 }
 
 // Ensure FileIO implements ConfigStore interface
-var _ ConfigStore = &FileIO{}
+var _ Store = &FileIO{}
 
 type FileIO struct {
 	configFilePath  string

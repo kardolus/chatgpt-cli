@@ -13,10 +13,10 @@ const (
 )
 
 type Manager struct {
-	store HistoryStore
+	store Store
 }
 
-func NewHistory(store HistoryStore) *Manager {
+func NewHistory(store Store) *Manager {
 	return &Manager{store: store}
 }
 

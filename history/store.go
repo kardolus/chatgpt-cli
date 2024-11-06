@@ -9,11 +9,9 @@ import (
 	"path/filepath"
 )
 
-const (
-	jsonExtension = ".json"
-)
+const jsonExtension = ".json"
 
-type HistoryStore interface {
+type Store interface {
 	Read() ([]History, error)
 	ReadThread(string) ([]History, error)
 	Write([]History) error
@@ -22,7 +20,7 @@ type HistoryStore interface {
 }
 
 // Ensure FileIO implements the HistoryStore interface
-var _ HistoryStore = &FileIO{}
+var _ Store = &FileIO{}
 
 type FileIO struct {
 	historyDir string

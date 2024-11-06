@@ -10,11 +10,11 @@ import (
 )
 
 type Manager struct {
-	configStore ConfigStore
+	configStore Store
 	Config      Config
 }
 
-func NewManager(cs ConfigStore) *Manager {
+func NewManager(cs Store) *Manager {
 	configuration := cs.ReadDefaults()
 
 	userConfig, err := cs.Read()

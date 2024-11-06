@@ -7,7 +7,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/internal"
-	utils2 "github.com/kardolus/chatgpt-cli/test"
+	"github.com/kardolus/chatgpt-cli/test"
 	"github.com/onsi/gomega/gexec"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
@@ -580,7 +580,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				historyFile := path.Join(filePath, "history", "default.json")
 				Expect(historyFile).NotTo(BeAnExistingFile())
 
-				bytes, err := utils2.FileToBytes("history.json")
+				bytes, err := test.FileToBytes("history.json")
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(os.WriteFile(legacyFile, bytes, 0644)).To(Succeed())

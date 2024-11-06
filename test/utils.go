@@ -17,9 +17,9 @@ func FileToBytes(fileName string) ([]byte, error) {
 		err     error
 	)
 	if strings.Contains(thisFile, "vendor") {
-		urlPath, err = filepath.Abs(path.Join(thisFile, "../../../../../..", "resources", "testdata", fileName))
+		urlPath, err = filepath.Abs(path.Join(thisFile, "../../../../../..", "test", "data", fileName))
 	} else {
-		urlPath, err = filepath.Abs(path.Join(thisFile, "../..", "resources", "testdata", fileName))
+		urlPath, err = filepath.Abs(path.Join(thisFile, "../..", "test", "data", fileName))
 	}
 
 	if err != nil {

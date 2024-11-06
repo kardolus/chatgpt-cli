@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/api/client"
 	"github.com/kardolus/chatgpt-cli/api/http"
-	utils2 "github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
+	"github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
 	"github.com/kardolus/chatgpt-cli/internal"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
@@ -230,7 +230,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.Flag("prompt").Changed {
-		prompt, err := utils2.FileToString(promptFile)
+		prompt, err := utils.FileToString(promptFile)
 		if err != nil {
 			return err
 		}
@@ -278,7 +278,7 @@ func run(cmd *cobra.Command, args []string) error {
 		defer rl.Close()
 
 		commandPrompt := func(counter, usage int) string {
-			return utils2.FormatPrompt(c.Config.CommandPrompt, counter, usage, time.Now())
+			return utils.FormatPrompt(c.Config.CommandPrompt, counter, usage, time.Now())
 		}
 
 		qNum, usage := 1, 0
@@ -291,7 +291,7 @@ func run(cmd *cobra.Command, args []string) error {
 				return nil
 			}
 
-			fmtOutputPrompt := utils2.FormatPrompt(c.Config.OutputPrompt, qNum, usage, time.Now())
+			fmtOutputPrompt := utils.FormatPrompt(c.Config.OutputPrompt, qNum, usage, time.Now())
 
 			if queryMode {
 				result, qUsage, err := c.Query(input)

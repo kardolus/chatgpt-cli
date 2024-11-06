@@ -7,7 +7,7 @@
 ChatGPT CLI provides a powerful command-line interface for seamless interaction with ChatGPT models via OpenAI and
 Azure, featuring streaming capabilities and extensive configuration options.
 
-![a screenshot](resources/vhs.gif)
+![a screenshot](cmd/chatgpt/resources/vhs.gif)
 
 ## Table of Contents
 

@@ -11,11 +11,11 @@ import (
 	"testing"
 )
 
-//go:generate mockgen -destination=historymocks_test.go -package=history_test github.com/kardolus/chatgpt-cli/history HistoryStore
+//go:generate mockgen -destination=historymocks_test.go -package=history_test github.com/kardolus/chatgpt-cli/history Store
 
 var (
 	mockCtrl         *gomock.Controller
-	mockHistoryStore *MockHistoryStore
+	mockHistoryStore *MockStore
 	subject          *history.Manager
 )
 
@@ -27,7 +27,7 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 	it.Before(func() {
 		RegisterTestingT(t)
 		mockCtrl = gomock.NewController(t)
-		mockHistoryStore = NewMockHistoryStore(mockCtrl)
+		mockHistoryStore = NewMockStore(mockCtrl)
 		subject = history.NewHistory(mockHistoryStore)
 	})
 

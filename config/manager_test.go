@@ -13,7 +13,7 @@ import (
 	"github.com/sclevine/spec/report"
 )
 
-//go:generate mockgen -destination=configmocks_test.go -package=configmanager_test github.com/kardolus/chatgpt-cli/config ConfigStore
+//go:generate mockgen -destination=configmocks_test.go -package=config_test github.com/kardolus/chatgpt-cli/config Store
 
 func TestUnitConfigManager(t *testing.T) {
 	spec.Run(t, "Config Manager", testConfig, spec.Report(report.Terminal{}))
@@ -48,7 +48,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 
 	var (
 		mockCtrl        *gomock.Controller
-		mockConfigStore *MockConfigStore
+		mockConfigStore *MockStore
 		defaultConfig   config.Config
 		envPrefix       string
 	)
@@ -56,7 +56,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 	it.Before(func() {
 		RegisterTestingT(t)
 		mockCtrl = gomock.NewController(t)
-		mockConfigStore = NewMockConfigStore(mockCtrl)
+		mockConfigStore = NewMockStore(mockCtrl)
 
 		defaultConfig = config.Config{
 			Name:                defaultName,

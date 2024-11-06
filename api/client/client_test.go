@@ -21,9 +21,9 @@ import (
 	"github.com/sclevine/spec/report"
 )
 
-//go:generate mockgen -destination=callermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/http Caller
-//go:generate mockgen -destination=historymocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/history HistoryStore
-//go:generate mockgen -destination=timermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/client Timer
+//go:generate mockgen -destination=callermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/http Caller
+//go:generate mockgen -destination=historymocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/history Store
+//go:generate mockgen -destination=timermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client Timer
 
 const (
 	envApiKey       = "api-key"
@@ -34,7 +34,7 @@ const (
 var (
 	mockCtrl         *gomock.Controller
 	mockCaller       *MockCaller
-	mockHistoryStore *MockHistoryStore
+	mockHistoryStore *MockStore
 	mockTimer        *MockTimer
 	factory          *clientFactory
 	apiKeyEnvVar     string
@@ -52,7 +52,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		RegisterTestingT(t)
 		mockCtrl = gomock.NewController(t)
 		mockCaller = NewMockCaller(mockCtrl)
-		mockHistoryStore = NewMockHistoryStore(mockCtrl)
+		mockHistoryStore = NewMockStore(mockCtrl)
 		mockTimer = NewMockTimer(mockCtrl)
 		config = MockConfig()
 
@@ -565,10 +565,10 @@ func createMessages(historyEntries []history.History, query string) []api.Messag
 }
 
 type clientFactory struct {
-	mockHistoryStore *MockHistoryStore
+	mockHistoryStore *MockStore
 }
 
-func newClientFactory(mhs *MockHistoryStore) *clientFactory {
+func newClientFactory(mhs *MockStore) *clientFactory {
 	return &clientFactory{
 		mockHistoryStore: mhs,
 	}

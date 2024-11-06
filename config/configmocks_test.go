@@ -2,13 +2,13 @@
 // Source: github.com/kardolus/chatgpt-cli/config (interfaces: ConfigStore)
 
 // Package configmanager_test is a generated GoMock package.
-package configmanager_test
+package config_test
 
 import (
+	types "github.com/kardolus/chatgpt-cli/config"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	types "github.com/kardolus/chatgpt-cli/types"
 )
 
 // MockConfigStore is a mock of ConfigStore interface.

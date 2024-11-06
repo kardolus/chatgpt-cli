@@ -3,8 +3,7 @@ package history
 import (
 	"encoding/json"
 	"github.com/kardolus/chatgpt-cli/config"
-	"github.com/kardolus/chatgpt-cli/types"
-	"github.com/kardolus/chatgpt-cli/utils"
+	"github.com/kardolus/chatgpt-cli/internal/utils"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,9 +14,9 @@ const (
 )
 
 type HistoryStore interface {
-	Read() ([]types.History, error)
-	ReadThread(string) ([]types.History, error)
-	Write([]types.History) error
+	Read() ([]History, error)
+	ReadThread(string) ([]History, error)
+	Write([]History) error
 	SetThread(string)
 	GetThread() string
 }
@@ -68,15 +67,15 @@ func (f *FileIO) WithDirectory(historyDir string) *FileIO {
 	return f
 }
 
-func (f *FileIO) Read() ([]types.History, error) {
+func (f *FileIO) Read() ([]History, error) {
 	return parseFile(f.getPath(f.thread))
 }
 
-func (f *FileIO) ReadThread(thread string) ([]types.History, error) {
+func (f *FileIO) ReadThread(thread string) ([]History, error) {
 	return parseFile(f.getPath(thread))
 }
 
-func (f *FileIO) Write(historyEntries []types.History) error {
+func (f *FileIO) Write(historyEntries []History) error {
 	data, err := json.Marshal(historyEntries)
 	if err != nil {
 		return err
@@ -107,7 +106,7 @@ func migrate() error {
 	}
 
 	if !fileInfo.IsDir() {
-		defaults := config.New().ReadDefaults()
+		defaults := config.NewStore().ReadDefaults()
 
 		// move the legacy "history" file to "default.json"
 		if err := os.Rename(historyFile, path.Join(hiddenDir, defaults.Thread+jsonExtension)); err != nil {
@@ -128,8 +127,8 @@ func migrate() error {
 	return nil
 }
 
-func parseFile(fileName string) ([]types.History, error) {
-	var result []types.History
+func parseFile(fileName string) ([]History, error) {
+	var result []History
 
 	buf, err := os.ReadFile(fileName)
 	if err != nil {

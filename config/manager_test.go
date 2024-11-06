@@ -1,14 +1,13 @@
-package configmanager_test
+package config_test
 
 import (
 	"errors"
+	"github.com/kardolus/chatgpt-cli/config"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/kardolus/chatgpt-cli/configmanager"
-	"github.com/kardolus/chatgpt-cli/types"
 	. "github.com/onsi/gomega"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
@@ -50,7 +49,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 	var (
 		mockCtrl        *gomock.Controller
 		mockConfigStore *MockConfigStore
-		defaultConfig   types.Config
+		defaultConfig   config.Config
 		envPrefix       string
 	)
 
@@ -59,7 +58,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		mockCtrl = gomock.NewController(t)
 		mockConfigStore = NewMockConfigStore(mockCtrl)
 
-		defaultConfig = types.Config{
+		defaultConfig = config.Config{
 			Name:                defaultName,
 			APIKey:              defaultApiKey,
 			Model:               defaultModel,
@@ -96,9 +95,9 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 
 	it("should use default values when no environment variables or user config are provided", func() {
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
-		mockConfigStore.EXPECT().Read().Return(types.Config{}, errors.New("no user config")).Times(1)
+		mockConfigStore.EXPECT().Read().Return(config.Config{}, errors.New("no user config")).Times(1)
 
-		subject := configmanager.New(mockConfigStore).WithEnvironment()
+		subject := config.NewManager(mockConfigStore).WithEnvironment()
 
 		Expect(subject.Config.MaxTokens).To(Equal(defaultMaxTokens))
 		Expect(subject.Config.ContextWindow).To(Equal(defaultContextWindow))
@@ -125,7 +124,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 	})
 
 	it("should prioritize user-provided config over defaults", func() {
-		userConfig := types.Config{
+		userConfig := config.Config{
 			Model:               "user-model",
 			MaxTokens:           20,
 			ContextWindow:       30,
@@ -152,7 +151,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 		mockConfigStore.EXPECT().Read().Return(userConfig, nil).Times(1)
 
-		subject := configmanager.New(mockConfigStore).WithEnvironment()
+		subject := config.NewManager(mockConfigStore).WithEnvironment()
 
 		Expect(subject.Config.Model).To(Equal("user-model"))
 		Expect(subject.Config.MaxTokens).To(Equal(20))
@@ -202,9 +201,9 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(os.Setenv(envPrefix+"OUTPUT_PROMPT", "env-output-prompt")).To(Succeed())
 
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
-		mockConfigStore.EXPECT().Read().Return(types.Config{}, errors.New("config error")).Times(1)
+		mockConfigStore.EXPECT().Read().Return(config.Config{}, errors.New("config error")).Times(1)
 
-		subject := configmanager.New(mockConfigStore).WithEnvironment()
+		subject := config.NewManager(mockConfigStore).WithEnvironment()
 
 		Expect(subject.Config.APIKey).To(Equal("env-api-key"))
 		Expect(subject.Config.Model).To(Equal("env-model"))
@@ -254,7 +253,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(os.Setenv(envPrefix+"COMMAND_PROMPT", "env-command-prompt")).To(Succeed())
 		Expect(os.Setenv(envPrefix+"OUTPUT_PROMPT", "env-output-prompt")).To(Succeed())
 
-		userConfig := types.Config{
+		userConfig := config.Config{
 			APIKey:              "user-api-key",
 			Model:               "user-model",
 			MaxTokens:           20,
@@ -282,7 +281,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 		mockConfigStore.EXPECT().Read().Return(userConfig, nil).Times(1)
 
-		subject := configmanager.New(mockConfigStore).WithEnvironment()
+		subject := config.NewManager(mockConfigStore).WithEnvironment()
 
 		Expect(subject.Config.APIKey).To(Equal("env-api-key"))
 		Expect(subject.Config.Model).To(Equal("env-model"))
@@ -309,17 +308,17 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 	})
 
 	when("DeleteThread()", func() {
-		var subject *configmanager.ConfigManager
+		var subject *config.Manager
 
 		threadName := "non-active-thread"
 
 		it.Before(func() {
-			userConfig := types.Config{Thread: threadName}
+			userConfig := config.Config{Thread: threadName}
 
 			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 			mockConfigStore.EXPECT().Read().Return(userConfig, nil).Times(1)
 
-			subject = configmanager.New(mockConfigStore).WithEnvironment()
+			subject = config.NewManager(mockConfigStore).WithEnvironment()
 		})
 
 		it("propagates the error from the config store", func() {
@@ -345,14 +344,14 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		activeThread := "active-thread"
 
 		it.Before(func() {
-			userConfig := types.Config{Thread: activeThread}
+			userConfig := config.Config{Thread: activeThread}
 
 			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
 			mockConfigStore.EXPECT().Read().Return(userConfig, nil).Times(1)
 		})
 
 		it("throws an error when the List call fails", func() {
-			subject := configmanager.New(mockConfigStore).WithEnvironment()
+			subject := config.NewManager(mockConfigStore).WithEnvironment()
 
 			errorInstance := errors.New("an error occurred")
 			mockConfigStore.EXPECT().List().Return(nil, errorInstance).Times(1)
@@ -363,7 +362,7 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("returns the expected threads", func() {
-			subject := configmanager.New(mockConfigStore).WithEnvironment()
+			subject := config.NewManager(mockConfigStore).WithEnvironment()
 
 			threads := []string{"thread1.json", "thread2.json", activeThread + ".json"}
 			mockConfigStore.EXPECT().List().Return(threads, nil).Times(1)

@@ -5,10 +5,10 @@
 package client_test
 
 import (
+	types "github.com/kardolus/chatgpt-cli/history"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	types "github.com/kardolus/chatgpt-cli/types"
 )
 
 // MockHistoryStore is a mock of HistoryStore interface.

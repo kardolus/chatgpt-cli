@@ -14,7 +14,7 @@ go mod tidy
 if [[ `git status --porcelain` ]]; then
   echo "Updated dependencies"
   git add .
-  git ci -m "Bump dependencies"
+  git ci -m "chore: bump dependencies"
   git push
 else
   echo "Dependencies up to date"

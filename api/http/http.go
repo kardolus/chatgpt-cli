@@ -6,7 +6,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/types"
+	"github.com/kardolus/chatgpt-cli/api"
+	"github.com/kardolus/chatgpt-cli/config"
 	"io"
 	"net/http"
 	"os"
@@ -30,13 +31,13 @@ type Caller interface {
 
 type RestCaller struct {
 	client *http.Client
-	config types.Config
+	config config.Config
 }
 
 // Ensure RestCaller implements Caller interface
 var _ Caller = &RestCaller{}
 
-func New(cfg types.Config) *RestCaller {
+func New(cfg config.Config) *RestCaller {
 	var client *http.Client
 	if cfg.SkipTLSVerify {
 		transport := &http.Transport{
@@ -55,9 +56,9 @@ func New(cfg types.Config) *RestCaller {
 	}
 }
 
-type CallerFactory func(cfg types.Config) Caller
+type CallerFactory func(cfg config.Config) Caller
 
-func RealCallerFactory(cfg types.Config) Caller {
+func RealCallerFactory(cfg config.Config) Caller {
 	return New(cfg)
 }
 
@@ -97,7 +98,7 @@ func (r *RestCaller) ProcessResponse(reader io.Reader, writer io.Writer) []byte 
 				break
 			}
 
-			var data types.Data
+			var data api.Data
 			err := json.Unmarshal([]byte(line), &data)
 			if err != nil {
 				_, _ = fmt.Fprintf(writer, "Error: %s\n", err.Error())
@@ -133,7 +134,7 @@ func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]
 			return nil, fmt.Errorf(errHTTPStatus, response.StatusCode)
 		}
 
-		var errorData types.ErrorResponse
+		var errorData api.ErrorResponse
 		if err := json.Unmarshal(errorResponse, &errorData); err != nil {
 			return nil, fmt.Errorf(errHTTPStatus, response.StatusCode)
 		}

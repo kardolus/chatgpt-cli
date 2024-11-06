@@ -10,14 +10,9 @@ test_type=$1
 
 cd "$( dirname "${BASH_SOURCE[0]}" )/.."
 
-if [[ ! -d integration ]]; then
-    echo -e "\n\033[0;31m** WARNING  No ${test_type} tests **\033[0m"
-    exit 0
-fi
-
 echo "Run ${test_type} Tests"
 set +e
-go test -parallel 1 -timeout 0 -mod=vendor ./integration/... -v -run ${test_type}
+go test -parallel 1 -timeout 0 -mod=vendor ./test/... -v -run ${test_type}
 exit_code=$?
 
 if [ "$exit_code" != "0" ]; then

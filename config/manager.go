@@ -1,9 +1,7 @@
-package configmanager
+package config
 
 import (
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/config"
-	"github.com/kardolus/chatgpt-cli/types"
 	"gopkg.in/yaml.v3"
 	"os"
 	"reflect"
@@ -11,12 +9,12 @@ import (
 	"strings"
 )
 
-type ConfigManager struct {
-	configStore config.ConfigStore
-	Config      types.Config
+type Manager struct {
+	configStore ConfigStore
+	Config      Config
 }
 
-func New(cs config.ConfigStore) *ConfigManager {
+func NewManager(cs ConfigStore) *Manager {
 	configuration := cs.ReadDefaults()
 
 	userConfig, err := cs.Read()
@@ -24,28 +22,28 @@ func New(cs config.ConfigStore) *ConfigManager {
 		configuration = replaceByConfigFile(configuration, userConfig)
 	}
 
-	return &ConfigManager{configStore: cs, Config: configuration}
+	return &Manager{configStore: cs, Config: configuration}
 }
 
-func (c *ConfigManager) WithEnvironment() *ConfigManager {
+func (c *Manager) WithEnvironment() *Manager {
 	c.Config = replaceByEnvironment(c.Config)
 	return c
 }
 
-func (c *ConfigManager) APIKeyEnvVarName() string {
+func (c *Manager) APIKeyEnvVarName() string {
 	return strings.ToUpper(c.Config.Name) + "_" + "API_KEY"
 }
 
 // DeleteThread removes the specified thread from the configuration store.
 // This operation is idempotent; non-existent threads do not cause errors.
-func (c *ConfigManager) DeleteThread(thread string) error {
+func (c *Manager) DeleteThread(thread string) error {
 	return c.configStore.Delete(thread)
 }
 
 // ListThreads retrieves a list of all threads stored in the configuration.
 // It marks the current thread with an asterisk (*) and returns the list sorted alphabetically.
 // If an error occurs while retrieving the threads from the config store, it returns the error.
-func (c *ConfigManager) ListThreads() ([]string, error) {
+func (c *Manager) ListThreads() ([]string, error) {
 	var result []string
 
 	threads, err := c.configStore.List()
@@ -67,7 +65,7 @@ func (c *ConfigManager) ListThreads() ([]string, error) {
 
 // ShowConfig serializes the current configuration to a YAML string.
 // It returns the serialized string or an error if the serialization fails.
-func (c *ConfigManager) ShowConfig() (string, error) {
+func (c *Manager) ShowConfig() (string, error) {
 	data, err := yaml.Marshal(c.Config)
 	if err != nil {
 		return "", err
@@ -76,7 +74,7 @@ func (c *ConfigManager) ShowConfig() (string, error) {
 	return string(data), nil
 }
 
-func replaceByConfigFile(defaultConfig, userConfig types.Config) types.Config {
+func replaceByConfigFile(defaultConfig, userConfig Config) Config {
 	t := reflect.TypeOf(defaultConfig)
 	vDefault := reflect.ValueOf(&defaultConfig).Elem()
 	vUser := reflect.ValueOf(userConfig)
@@ -106,7 +104,7 @@ func replaceByConfigFile(defaultConfig, userConfig types.Config) types.Config {
 	return defaultConfig
 }
 
-func replaceByEnvironment(configuration types.Config) types.Config {
+func replaceByEnvironment(configuration Config) Config {
 	t := reflect.TypeOf(configuration)
 	v := reflect.ValueOf(&configuration).Elem()
 

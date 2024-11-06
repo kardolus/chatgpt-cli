@@ -2,7 +2,7 @@ package http_test
 
 import (
 	"bytes"
-	"github.com/kardolus/chatgpt-cli/http"
+	"github.com/kardolus/chatgpt-cli/api/http"
 	"strings"
 	"testing"
 

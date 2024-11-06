@@ -3,8 +3,8 @@ package history_test
 import (
 	"errors"
 	"github.com/golang/mock/gomock"
+	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/history"
-	"github.com/kardolus/chatgpt-cli/types"
 	. "github.com/onsi/gomega"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
@@ -16,7 +16,7 @@ import (
 var (
 	mockCtrl         *gomock.Controller
 	mockHistoryStore *MockHistoryStore
-	subject          *history.History
+	subject          *history.Manager
 )
 
 func TestUnitHistory(t *testing.T) {
@@ -46,15 +46,15 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("concatenates multiple user messages", func() {
-			historyEntries := []types.History{
+			historyEntries := []history.History{
 				{
-					Message: types.Message{Role: "user", Content: "first message"},
+					Message: api.Message{Role: "user", Content: "first message"},
 				},
 				{
-					Message: types.Message{Role: "user", Content: " second message"},
+					Message: api.Message{Role: "user", Content: " second message"},
 				},
 				{
-					Message: types.Message{Role: "assistant", Content: "response"},
+					Message: api.Message{Role: "assistant", Content: "response"},
 				},
 			}
 
@@ -67,15 +67,15 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("prints all roles correctly", func() {
-			historyEntries := []types.History{
+			historyEntries := []history.History{
 				{
-					Message: types.Message{Role: "system", Content: "system message"},
+					Message: api.Message{Role: "system", Content: "system message"},
 				},
 				{
-					Message: types.Message{Role: "user", Content: "user message"},
+					Message: api.Message{Role: "user", Content: "user message"},
 				},
 				{
-					Message: types.Message{Role: "assistant", Content: "assistant message"},
+					Message: api.Message{Role: "assistant", Content: "assistant message"},
 				},
 			}
 
@@ -89,12 +89,12 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("handles the final user message concatenation", func() {
-			historyEntries := []types.History{
+			historyEntries := []history.History{
 				{
-					Message: types.Message{Role: "user", Content: "first message"},
+					Message: api.Message{Role: "user", Content: "first message"},
 				},
 				{
-					Message: types.Message{Role: "user", Content: " second message"},
+					Message: api.Message{Role: "user", Content: " second message"},
 				},
 			}
 

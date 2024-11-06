@@ -3,11 +3,11 @@ package integration_test
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/config"
-	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/history"
-	"github.com/kardolus/chatgpt-cli/types"
-	"github.com/kardolus/chatgpt-cli/utils"
+	"github.com/kardolus/chatgpt-cli/internal/utils"
+	utils2 "github.com/kardolus/chatgpt-cli/test"
 	"github.com/onsi/gomega/gexec"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
@@ -55,7 +55,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		var (
 			tmpDir   string
 			fileIO   *history.FileIO
-			messages []types.Message
+			messages []api.Message
 			err      error
 		)
 
@@ -67,7 +67,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			fileIO = fileIO.WithDirectory(tmpDir)
 			fileIO.SetThread(threadName)
 
-			messages = []types.Message{
+			messages = []api.Message{
 				{
 					Role:    "user",
 					Content: "Test message 1",
@@ -84,9 +84,9 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("writes the messages to the file", func() {
-			var historyEntries []types.History
+			var historyEntries []history.History
 			for _, message := range messages {
-				historyEntries = append(historyEntries, types.History{
+				historyEntries = append(historyEntries, history.History{
 					Message: message,
 				})
 			}
@@ -96,9 +96,9 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("reads the messages from the file", func() {
-			var historyEntries []types.History
+			var historyEntries []history.History
 			for _, message := range messages {
-				historyEntries = append(historyEntries, types.History{
+				historyEntries = append(historyEntries, history.History{
 					Message: message,
 				})
 			}
@@ -118,7 +118,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			tmpFile    *os.File
 			historyDir string
 			configIO   *config.FileIO
-			testConfig types.Config
+			testConfig config.Config
 			err        error
 		)
 
@@ -134,9 +134,9 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 			Expect(tmpFile.Close()).To(Succeed())
 
-			configIO = config.New().WithConfigPath(tmpFile.Name()).WithHistoryPath(historyDir)
+			configIO = config.NewStore().WithConfigPath(tmpFile.Name()).WithHistoryPath(historyDir)
 
-			testConfig = types.Config{
+			testConfig = config.Config{
 				Model: "test-model",
 			}
 		})
@@ -146,7 +146,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		when("performing a migration", func() {
-			defaults := config.New().ReadDefaults()
+			defaults := config.NewStore().ReadDefaults()
 
 			it("it doesn't apply a migration when max_tokens is 0", func() {
 				testConfig.MaxTokens = 0
@@ -282,7 +282,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			homeDir, err = os.MkdirTemp("", "mockHome")
 			Expect(err).NotTo(HaveOccurred())
 
-			apiKeyEnvVar = configmanager.New(config.New()).WithEnvironment().APIKeyEnvVarName()
+			apiKeyEnvVar = config.NewManager(config.NewStore()).WithEnvironment().APIKeyEnvVarName()
 
 			Expect(os.Setenv("HOME", homeDir)).To(Succeed())
 			Expect(os.Setenv(apiKeyEnvVar, expectedToken)).To(Succeed())
@@ -580,7 +580,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				historyFile := path.Join(filePath, "history", "default.json")
 				Expect(historyFile).NotTo(BeAnExistingFile())
 
-				bytes, err := utils.FileToBytes("history.json")
+				bytes, err := utils2.FileToBytes("history.json")
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(os.WriteFile(legacyFile, bytes, 0644)).To(Succeed())
@@ -748,7 +748,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				})
 
 				it("has a configurable default context-window", func() {
-					defaults := config.New().ReadDefaults()
+					defaults := config.NewStore().ReadDefaults()
 
 					// Initial check for default context-window
 					output := runCommand("--config")
@@ -776,7 +776,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				})
 
 				it("has a configurable default max-tokens", func() {
-					defaults := config.New().ReadDefaults()
+					defaults := config.NewStore().ReadDefaults()
 
 					// Initial check for default max-tokens
 					output := runCommand("--config")
@@ -803,7 +803,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				})
 
 				it("has a configurable default thread", func() {
-					defaults := config.New().ReadDefaults()
+					defaults := config.NewStore().ReadDefaults()
 
 					// Initial check for default thread
 					output := runCommand("--config")
@@ -898,7 +898,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				Expect(err).NotTo(HaveOccurred())
 				historyFile = filepath.Join(tmpDir, "default.json")
 
-				messages := []types.Message{
+				messages := []api.Message{
 					{Role: "user", Content: "Hello"},
 					{Role: "assistant", Content: "Hi, how can I help you?"},
 					{Role: "user", Content: "Tell me about the weather"},
@@ -931,7 +931,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				specificHistoryFile := filepath.Join(tmpDir, specificThread+".json")
 
 				// Create a specific thread with custom history
-				messages := []types.Message{
+				messages := []api.Message{
 					{Role: "user", Content: "What's the capital of Belgium?"},
 					{Role: "assistant", Content: "The capital of Belgium is Brussels."},
 				}
@@ -949,7 +949,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 			it("concatenates user messages correctly", func() {
 				// Create history where two user messages are concatenated
-				messages := []types.Message{
+				messages := []api.Message{
 					{Role: "user", Content: "Part one"},
 					{Role: "user", Content: " and part two"},
 					{Role: "assistant", Content: "This is a response."},

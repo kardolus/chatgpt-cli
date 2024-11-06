@@ -3,8 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/types"
-	"github.com/kardolus/chatgpt-cli/utils"
+	"github.com/kardolus/chatgpt-cli/api/client"
+	"github.com/kardolus/chatgpt-cli/api/http"
+	utils2 "github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
+	"github.com/kardolus/chatgpt-cli/internal/utils"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 	"io"
@@ -13,11 +15,8 @@ import (
 	"time"
 
 	"github.com/chzyer/readline"
-	"github.com/kardolus/chatgpt-cli/client"
 	"github.com/kardolus/chatgpt-cli/config"
-	"github.com/kardolus/chatgpt-cli/configmanager"
 	"github.com/kardolus/chatgpt-cli/history"
-	"github.com/kardolus/chatgpt-cli/http"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,7 +38,7 @@ var (
 	threadName      string
 	ServiceURL      string
 	shell           string
-	cfg             types.Config
+	cfg             config.Config
 )
 
 type ConfigMetadata struct {
@@ -139,7 +138,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.Flag("delete-thread").Changed {
-		cm := configmanager.New(config.New())
+		cm := config.NewManager(config.NewStore())
 
 		if err := cm.DeleteThread(threadName); err != nil {
 			return err
@@ -149,7 +148,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if listThreads {
-		cm := configmanager.New(config.New())
+		cm := config.NewManager(config.NewStore())
 
 		threads, err := cm.ListThreads()
 		if err != nil {
@@ -163,7 +162,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if clearHistory {
-		cm := configmanager.New(config.New())
+		cm := config.NewManager(config.NewStore())
 
 		if err := cm.DeleteThread(cfg.Thread); err != nil {
 			return err
@@ -221,7 +220,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if hs != nil && newThread {
-		slug := utils.GenerateUniqueSlug("cmd_")
+		slug := client.GenerateUniqueSlug("cmd_")
 
 		hs.SetThread(slug)
 
@@ -231,7 +230,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.Flag("prompt").Changed {
-		prompt, err := utils.FileToString(promptFile)
+		prompt, err := utils2.FileToString(promptFile)
 		if err != nil {
 			return err
 		}
@@ -279,7 +278,7 @@ func run(cmd *cobra.Command, args []string) error {
 		defer rl.Close()
 
 		commandPrompt := func(counter, usage int) string {
-			return utils.FormatPrompt(c.Config.CommandPrompt, counter, usage, time.Now())
+			return utils2.FormatPrompt(c.Config.CommandPrompt, counter, usage, time.Now())
 		}
 
 		qNum, usage := 1, 0
@@ -292,7 +291,7 @@ func run(cmd *cobra.Command, args []string) error {
 				return nil
 			}
 
-			fmtOutputPrompt := utils.FormatPrompt(c.Config.OutputPrompt, qNum, usage, time.Now())
+			fmtOutputPrompt := utils2.FormatPrompt(c.Config.OutputPrompt, qNum, usage, time.Now())
 
 			if queryMode {
 				result, qUsage, err := c.Query(input)
@@ -336,14 +335,14 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func initConfig(rootCmd *cobra.Command) (types.Config, error) {
+func initConfig(rootCmd *cobra.Command) (config.Config, error) {
 	// Set default name for environment variables if no config is loaded yet.
 	viper.SetDefault("name", "openai")
 
 	// Read only the `name` field from the config to determine the environment prefix.
 	configHome, err := utils.GetConfigHome()
 	if err != nil {
-		return types.Config{}, err
+		return config.Config{}, err
 	}
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -353,7 +352,7 @@ func initConfig(rootCmd *cobra.Command) (types.Config, error) {
 	if err := viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
 		if !errors.As(err, &configFileNotFoundError) {
-			return types.Config{}, err
+			return config.Config{}, err
 		}
 	}
 
@@ -701,8 +700,8 @@ func syncFlag(cmd *cobra.Command, meta ConfigMetadata, alias string) error {
 	return nil
 }
 
-func createConfigFromViper() types.Config {
-	return types.Config{
+func createConfigFromViper() config.Config {
+	return config.Config{
 		Name:                viper.GetString("name"),
 		APIKey:              viper.GetString("api_key"),
 		Model:               viper.GetString("model"),

@@ -4,8 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/config"
-	"github.com/kardolus/chatgpt-cli/types"
-	"github.com/kardolus/chatgpt-cli/utils"
+	"github.com/kardolus/chatgpt-cli/test"
 	"github.com/onsi/gomega/gexec"
 	"io"
 	"net/http"
@@ -50,13 +49,13 @@ func curl(url string) (string, error) {
 
 func runMockServer() error {
 	var (
-		defaults types.Config
+		defaults config.Config
 		err      error
 	)
 
 	onceServe.Do(func() {
 		go func() {
-			defaults = config.New().ReadDefaults()
+			defaults = config.NewStore().ReadDefaults()
 
 			http.HandleFunc("/ping", getPing)
 			http.HandleFunc(defaults.CompletionsPath, postCompletions)
@@ -89,7 +88,7 @@ func getModels(w http.ResponseWriter, r *http.Request) {
 	}
 
 	const modelFile = "models.json"
-	response, err := utils.FileToBytes(modelFile)
+	response, err := test.FileToBytes(modelFile)
 	if err != nil {
 		fmt.Printf("error reading %s: %s\n", modelFile, err.Error())
 		return
@@ -109,7 +108,7 @@ func postCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	const completionsFile = "completions.json"
-	response, err := utils.FileToBytes(completionsFile)
+	response, err := test.FileToBytes(completionsFile)
 	if err != nil {
 		fmt.Printf("error reading %s: %s\n", completionsFile, err.Error())
 		return
@@ -139,7 +138,7 @@ func checkBearerToken(r *http.Request, expectedToken string) error {
 func creatAuthError() string {
 	const errorFile = "error.json"
 
-	response, err := utils.FileToBytes(errorFile)
+	response, err := test.FileToBytes(errorFile)
 	if err != nil {
 		fmt.Printf("error reading %s: %s\n", errorFile, err.Error())
 		return ""

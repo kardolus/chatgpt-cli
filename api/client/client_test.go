@@ -5,10 +5,12 @@ import (
 	"errors"
 	"github.com/golang/mock/gomock"
 	_ "github.com/golang/mock/mockgen/model"
-	"github.com/kardolus/chatgpt-cli/client"
-	"github.com/kardolus/chatgpt-cli/http"
-	"github.com/kardolus/chatgpt-cli/types"
-	"github.com/kardolus/chatgpt-cli/utils"
+	"github.com/kardolus/chatgpt-cli/api"
+	"github.com/kardolus/chatgpt-cli/api/client"
+	"github.com/kardolus/chatgpt-cli/api/http"
+	config2 "github.com/kardolus/chatgpt-cli/config"
+	"github.com/kardolus/chatgpt-cli/history"
+	"github.com/kardolus/chatgpt-cli/test"
 	"os"
 	"strings"
 	"testing"
@@ -36,7 +38,7 @@ var (
 	mockTimer        *MockTimer
 	factory          *clientFactory
 	apiKeyEnvVar     string
-	config           types.Config
+	config           config2.Config
 )
 
 func TestUnitClient(t *testing.T) {
@@ -104,7 +106,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 	when("Query()", func() {
 		var (
 			body     []byte
-			messages []types.Message
+			messages []api.Message
 			err      error
 		)
 
@@ -140,12 +142,12 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			{
 				description: "throws an error when the response is missing Choices",
 				setupPostReturn: func() ([]byte, error) {
-					response := &types.CompletionsResponse{
+					response := &api.CompletionsResponse{
 						ID:      "id",
 						Object:  "object",
 						Created: 0,
 						Model:   "model",
-						Choices: []types.Choice{},
+						Choices: []api.Choice{},
 					}
 
 					respBytes, err := json.Marshal(response)
@@ -184,21 +186,21 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					tokens = 789
 				)
 
-				choice := types.Choice{
-					Message: types.Message{
+				choice := api.Choice{
+					Message: api.Message{
 						Role:    client.AssistantRole,
 						Content: answer,
 					},
 					FinishReason: "",
 					Index:        0,
 				}
-				response := &types.CompletionsResponse{
+				response := &api.CompletionsResponse{
 					ID:      "id",
 					Object:  "object",
 					Created: 0,
 					Model:   subject.Config.Model,
-					Choices: []types.Choice{choice},
-					Usage: types.Usage{
+					Choices: []api.Choice{choice},
+					Usage: api.Usage{
 						PromptTokens:     123,
 						CompletionTokens: 456,
 						TotalTokens:      tokens,
@@ -209,22 +211,22 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				Expect(err).NotTo(HaveOccurred())
 				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(respBytes, nil)
 
-				var request types.CompletionsRequest
+				var request api.CompletionsRequest
 				err = json.Unmarshal(expectedBody, &request)
 				Expect(err).NotTo(HaveOccurred())
 
 				mockTimer.EXPECT().Now().Return(time.Time{}).AnyTimes()
 
-				var history []types.History
+				var h []history.History
 				if !omitHistory {
 					for _, msg := range request.Messages {
-						history = append(history, types.History{
+						h = append(h, history.History{
 							Message: msg,
 						})
 					}
 
-					mockHistoryStore.EXPECT().Write(append(history, types.History{
-						Message: types.Message{
+					mockHistoryStore.EXPECT().Write(append(h, history.History{
+						Message: api.Message{
 							Role:    client.AssistantRole,
 							Content: answer,
 						},
@@ -237,29 +239,29 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				Expect(usage).To(Equal(tokens))
 			}
 			it("returns the expected result for a non-empty history", func() {
-				history := []types.History{
+				h := []history.History{
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.SystemRole,
 							Content: config.Role,
 						},
 					},
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.UserRole,
 							Content: "question 1",
 						},
 					},
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.AssistantRole,
 							Content: "answer 1",
 						},
 					},
 				}
 
-				messages = createMessages(history, query)
-				factory.withHistory(history)
+				messages = createMessages(h, query)
+				factory.withHistory(h)
 				subject := factory.buildClientWithoutConfig()
 
 				body, err = createBody(messages, false)
@@ -288,51 +290,51 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				testValidHTTPResponse(subject, body, true)
 			})
 			it("truncates the history as expected", func() {
-				history := []types.History{
+				hs := []history.History{
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.SystemRole,
 							Content: config.Role,
 						},
 						Timestamp: time.Time{},
 					},
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.UserRole,
 							Content: "question 1",
 						},
 						Timestamp: time.Time{},
 					},
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.AssistantRole,
 							Content: "answer 1",
 						},
 						Timestamp: time.Time{},
 					},
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.UserRole,
 							Content: "question 2",
 						},
 						Timestamp: time.Time{},
 					},
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.AssistantRole,
 							Content: "answer 2",
 						},
 						Timestamp: time.Time{},
 					},
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.UserRole,
 							Content: "question 3",
 						},
 						Timestamp: time.Time{},
 					},
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.AssistantRole,
 							Content: "answer 3",
 						},
@@ -340,9 +342,9 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					},
 				}
 
-				messages = createMessages(history, query)
+				messages = createMessages(hs, query)
 
-				factory.withHistory(history)
+				factory.withHistory(hs)
 				subject := factory.buildClientWithoutConfig()
 
 				// messages get truncated. Index 1+2 are cut out
@@ -358,7 +360,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 	when("Stream()", func() {
 		var (
 			body     []byte
-			messages []types.Message
+			messages []api.Message
 			err      error
 		)
 
@@ -382,7 +384,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		when("a valid http response is received", func() {
 			const answer = "answer"
 
-			testValidHTTPResponse := func(subject *client.Client, history []types.History, expectedBody []byte) {
+			testValidHTTPResponse := func(subject *client.Client, hs []history.History, expectedBody []byte) {
 				messages = createMessages(nil, query)
 				body, err = createBody(messages, true)
 				Expect(err).NotTo(HaveOccurred())
@@ -391,18 +393,18 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 				mockTimer.EXPECT().Now().Return(time.Time{}).AnyTimes()
 
-				messages = createMessages(history, query)
+				messages = createMessages(hs, query)
 
-				history = []types.History{}
+				hs = []history.History{}
 
 				for _, message := range messages {
-					history = append(history, types.History{
+					hs = append(hs, history.History{
 						Message: message,
 					})
 				}
 
-				mockHistoryStore.EXPECT().Write(append(history, types.History{
-					Message: types.Message{
+				mockHistoryStore.EXPECT().Write(append(hs, history.History{
+					Message: api.Message{
 						Role:    client.AssistantRole,
 						Content: answer,
 					},
@@ -423,34 +425,34 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				testValidHTTPResponse(subject, nil, body)
 			})
 			it("returns the expected result for a non-empty history", func() {
-				history := []types.History{
+				h := []history.History{
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.SystemRole,
 							Content: config.Role,
 						},
 					},
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.UserRole,
 							Content: "question x",
 						},
 					},
 					{
-						Message: types.Message{
+						Message: api.Message{
 							Role:    client.AssistantRole,
 							Content: "answer x",
 						},
 					},
 				}
-				factory.withHistory(history)
+				factory.withHistory(h)
 				subject := factory.buildClientWithoutConfig()
 
-				messages = createMessages(history, query)
+				messages = createMessages(h, query)
 				body, err = createBody(messages, true)
 				Expect(err).NotTo(HaveOccurred())
 
-				testValidHTTPResponse(subject, history, body)
+				testValidHTTPResponse(subject, h, body)
 			})
 		})
 	})
@@ -487,7 +489,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		it("filters gpt models as expected", func() {
 			subject := factory.buildClientWithoutConfig()
 
-			response, err := utils.FileToBytes("models.json")
+			response, err := test.FileToBytes("models.json")
 			Expect(err).NotTo(HaveOccurred())
 
 			mockCaller.EXPECT().Get(subject.Config.URL+subject.Config.ModelsPath).Return(response, nil)
@@ -524,8 +526,8 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 	})
 }
 
-func createBody(messages []types.Message, stream bool) ([]byte, error) {
-	req := types.CompletionsRequest{
+func createBody(messages []api.Message, stream bool) ([]byte, error) {
+	req := api.CompletionsRequest{
 		Model:            config.Model,
 		Messages:         messages,
 		Stream:           stream,
@@ -540,11 +542,11 @@ func createBody(messages []types.Message, stream bool) ([]byte, error) {
 	return json.Marshal(req)
 }
 
-func createMessages(historyEntries []types.History, query string) []types.Message {
-	var messages []types.Message
+func createMessages(historyEntries []history.History, query string) []api.Message {
+	var messages []api.Message
 
 	if len(historyEntries) == 0 {
-		messages = append(messages, types.Message{
+		messages = append(messages, api.Message{
 			Role:    client.SystemRole,
 			Content: config.Role,
 		})
@@ -554,7 +556,7 @@ func createMessages(historyEntries []types.History, query string) []types.Messag
 		}
 	}
 
-	messages = append(messages, types.Message{
+	messages = append(messages, api.Message{
 		Role:    client.UserRole,
 		Content: query,
 	})
@@ -584,16 +586,16 @@ func (f *clientFactory) withoutHistory() {
 	f.mockHistoryStore.EXPECT().Read().Return(nil, nil).Times(1)
 }
 
-func (f *clientFactory) withHistory(history []types.History) {
+func (f *clientFactory) withHistory(history []history.History) {
 	f.mockHistoryStore.EXPECT().Read().Return(history, nil).Times(1)
 }
 
-func mockCallerFactory(_ types.Config) http.Caller {
+func mockCallerFactory(_ config2.Config) http.Caller {
 	return mockCaller
 }
 
-func MockConfig() types.Config {
-	return types.Config{
+func MockConfig() config2.Config {
+	return config2.Config{
 		Name:                "mock-openai",
 		APIKey:              "mock-api-key",
 		Model:               "gpt-3.5-turbo",

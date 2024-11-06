@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/utils"
+	"github.com/google/uuid"
+	"github.com/kardolus/chatgpt-cli/api"
+	"github.com/kardolus/chatgpt-cli/api/http"
+	"github.com/kardolus/chatgpt-cli/config"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/kardolus/chatgpt-cli/history"
-	"github.com/kardolus/chatgpt-cli/http"
-	"github.com/kardolus/chatgpt-cli/types"
 )
 
 const (
@@ -36,18 +37,18 @@ func (r *RealTime) Now() time.Time {
 }
 
 type Client struct {
-	Config       types.Config
-	History      []types.History
+	Config       config.Config
+	History      []history.History
 	caller       http.Caller
 	historyStore history.HistoryStore
 	timer        Timer
 }
 
-func New(callerFactory http.CallerFactory, hs history.HistoryStore, t Timer, cfg types.Config, interactiveMode bool) *Client {
+func New(callerFactory http.CallerFactory, hs history.HistoryStore, t Timer, cfg config.Config, interactiveMode bool) *Client {
 	caller := callerFactory(cfg)
 
 	if interactiveMode && cfg.AutoCreateNewThread {
-		hs.SetThread(utils.GenerateUniqueSlug(InteractiveThreadPrefix))
+		hs.SetThread(GenerateUniqueSlug(InteractiveThreadPrefix))
 	} else {
 		hs.SetThread(cfg.Thread)
 	}
@@ -94,7 +95,7 @@ func (c *Client) ListModels() ([]string, error) {
 		return nil, err
 	}
 
-	var response types.ListModelsResponse
+	var response api.ListModelsResponse
 	if err := c.processResponse(raw, &response); err != nil {
 		return nil, err
 	}
@@ -152,7 +153,7 @@ func (c *Client) Query(input string) (string, int, error) {
 		return "", 0, err
 	}
 
-	var response types.CompletionsResponse
+	var response api.CompletionsResponse
 	if err := c.processResponse(raw, &response); err != nil {
 		return "", 0, err
 	}
@@ -196,13 +197,13 @@ func (c *Client) Stream(input string) error {
 }
 
 func (c *Client) createBody(stream bool) ([]byte, error) {
-	var messages []types.Message
+	var messages []api.Message
 
 	for _, item := range c.History {
 		messages = append(messages, item.Message)
 	}
 
-	body := types.CompletionsRequest{
+	body := api.CompletionsRequest{
 		Messages:         messages,
 		Model:            c.Config.Model,
 		MaxTokens:        c.Config.MaxTokens,
@@ -227,8 +228,8 @@ func (c *Client) initHistory() {
 	}
 
 	if len(c.History) == 0 {
-		c.History = []types.History{{
-			Message: types.Message{
+		c.History = []history.History{{
+			Message: api.Message{
 				Role: SystemRole,
 			},
 			Timestamp: c.timer.Now(),
@@ -239,12 +240,12 @@ func (c *Client) initHistory() {
 }
 
 func (c *Client) addQuery(query string) {
-	message := types.Message{
+	message := api.Message{
 		Role:    UserRole,
 		Content: query,
 	}
 
-	c.History = append(c.History, types.History{
+	c.History = append(c.History, history.History{
 		Message:   message,
 		Timestamp: c.timer.Now(),
 	})
@@ -296,8 +297,8 @@ func (c *Client) truncateHistory() {
 }
 
 func (c *Client) updateHistory(response string) {
-	c.History = append(c.History, types.History{
-		Message: types.Message{
+	c.History = append(c.History, history.History{
+		Message: api.Message{
 			Role:    AssistantRole,
 			Content: response,
 		},
@@ -315,7 +316,7 @@ func calculateEffectiveContextWindow(window int, bufferPercentage int) int {
 	return effectiveContextWindow
 }
 
-func countTokens(entries []types.History) (int, []int) {
+func countTokens(entries []history.History) (int, []int) {
 	var result int
 	var rolling []int
 
@@ -338,8 +339,8 @@ func countTokens(entries []types.History) (int, []int) {
 	return result, rolling
 }
 
-func (c *Client) createHistoryEntriesFromString(input string) []types.History {
-	var result []types.History
+func (c *Client) createHistoryEntriesFromString(input string) []history.History {
+	var result []history.History
 
 	words := strings.Fields(input)
 
@@ -351,8 +352,8 @@ func (c *Client) createHistoryEntriesFromString(input string) []types.History {
 
 		content := strings.Join(words[i:end], " ")
 
-		item := types.History{
-			Message: types.Message{
+		item := history.History{
+			Message: api.Message{
 				Role:    UserRole,
 				Content: content,
 			},
@@ -384,4 +385,9 @@ func (c *Client) printRequestDebugInfo(endpoint string, body []byte) {
 func (c *Client) printResponseDebugInfo(raw []byte) {
 	fmt.Printf("\nResponse\n\n")
 	fmt.Printf("%s\n\n", raw)
+}
+
+func GenerateUniqueSlug(prefix string) string {
+	guid := uuid.New()
+	return prefix + guid.String()[:4]
 }

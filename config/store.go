@@ -1,8 +1,7 @@
 package config
 
 import (
-	"github.com/kardolus/chatgpt-cli/types"
-	"github.com/kardolus/chatgpt-cli/utils"
+	"github.com/kardolus/chatgpt-cli/internal/utils"
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
@@ -32,9 +31,9 @@ const (
 type ConfigStore interface {
 	Delete(string) error
 	List() ([]string, error)
-	Read() (types.Config, error)
-	ReadDefaults() types.Config
-	Write(types.Config) error
+	Read() (Config, error)
+	ReadDefaults() Config
+	Write(Config) error
 }
 
 // Ensure FileIO implements ConfigStore interface
@@ -45,7 +44,7 @@ type FileIO struct {
 	historyFilePath string
 }
 
-func New() *FileIO {
+func NewStore() *FileIO {
 	configPath, _ := getPath()
 	historyPath, _ := utils.GetDataHome()
 
@@ -89,17 +88,17 @@ func (f *FileIO) List() ([]string, error) {
 	return result, nil
 }
 
-func (f *FileIO) Read() (types.Config, error) {
+func (f *FileIO) Read() (Config, error) {
 	result, err := parseFile(f.configFilePath)
 	if err != nil {
-		return types.Config{}, err
+		return Config{}, err
 	}
 
 	return migrate(result), nil
 }
 
-func (f *FileIO) ReadDefaults() types.Config {
-	return types.Config{
+func (f *FileIO) ReadDefaults() Config {
+	return Config{
 		Name:             openAIName,
 		Model:            openAIModel,
 		Role:             openAIRole,
@@ -119,7 +118,7 @@ func (f *FileIO) ReadDefaults() types.Config {
 	}
 }
 
-func (f *FileIO) Write(config types.Config) error {
+func (f *FileIO) Write(config Config) error {
 	rootNode, err := f.readNode()
 
 	// If readNode returns an error or there was a problem reading the rootNode, initialize a new rootNode.
@@ -162,7 +161,7 @@ func getPath() (string, error) {
 	return filepath.Join(homeDir, "config.yaml"), nil
 }
 
-func migrate(config types.Config) types.Config {
+func migrate(config Config) Config {
 	// the "old" max_tokens became context_window
 	if config.ContextWindow == 0 && config.MaxTokens > 0 {
 		config.ContextWindow = config.MaxTokens
@@ -175,16 +174,16 @@ func migrate(config types.Config) types.Config {
 	return config
 }
 
-func parseFile(fileName string) (types.Config, error) {
-	var result types.Config
+func parseFile(fileName string) (Config, error) {
+	var result Config
 
 	buf, err := os.ReadFile(fileName)
 	if err != nil {
-		return types.Config{}, err
+		return Config{}, err
 	}
 
 	if err := yaml.Unmarshal(buf, &result); err != nil {
-		return types.Config{}, err
+		return Config{}, err
 	}
 
 	return result, nil
@@ -192,7 +191,7 @@ func parseFile(fileName string) (types.Config, error) {
 
 // updateNodeFromConfig updates the specified yaml.Node with values from the Config struct.
 // It uses reflection to match struct fields with YAML tags, updating the node accordingly.
-func updateNodeFromConfig(node *yaml.Node, config types.Config) {
+func updateNodeFromConfig(node *yaml.Node, config Config) {
 	t := reflect.TypeOf(config)
 	v := reflect.ValueOf(config)
 

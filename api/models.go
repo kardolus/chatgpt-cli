@@ -1,4 +1,4 @@
-package types
+package api
 
 type ListModelsResponse struct {
 	Object string  `json:"object"`

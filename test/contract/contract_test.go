@@ -1,12 +1,11 @@
-package integration_test
+package contract_test
 
 import (
 	"encoding/json"
-	"github.com/kardolus/chatgpt-cli/client"
+	"github.com/kardolus/chatgpt-cli/api"
+	"github.com/kardolus/chatgpt-cli/api/client"
+	"github.com/kardolus/chatgpt-cli/api/http"
 	"github.com/kardolus/chatgpt-cli/config"
-	"github.com/kardolus/chatgpt-cli/configmanager"
-	"github.com/kardolus/chatgpt-cli/http"
-	"github.com/kardolus/chatgpt-cli/types"
 	. "github.com/onsi/gomega"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
@@ -21,16 +20,16 @@ func TestContract(t *testing.T) {
 func testContract(t *testing.T, when spec.G, it spec.S) {
 	var (
 		restCaller *http.RestCaller
-		cfg        types.Config
+		cfg        config.Config
 	)
 
 	it.Before(func() {
 		RegisterTestingT(t)
 
-		apiKey := os.Getenv(configmanager.New(config.New()).WithEnvironment().APIKeyEnvVarName())
+		apiKey := os.Getenv(config.NewManager(config.NewStore()).WithEnvironment().APIKeyEnvVarName())
 		Expect(apiKey).NotTo(BeEmpty())
 
-		cfg = config.New().ReadDefaults()
+		cfg = config.NewStore().ReadDefaults()
 		cfg.APIKey = apiKey
 
 		restCaller = http.New(cfg)
@@ -38,8 +37,8 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 
 	when("accessing the completion endpoint", func() {
 		it("should return a successful response with expected keys", func() {
-			body := types.CompletionsRequest{
-				Messages: []types.Message{{
+			body := api.CompletionsRequest{
+				Messages: []api.Message{{
 					Role:    client.SystemRole,
 					Content: cfg.Role,
 				}},
@@ -54,7 +53,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			resp, err := restCaller.Post(cfg.URL+cfg.CompletionsPath, bytes, false)
 			Expect(err).NotTo(HaveOccurred())
 
-			var data types.CompletionsResponse
+			var data api.CompletionsResponse
 			err = json.Unmarshal(resp, &data)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -67,8 +66,8 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("should return an error response with appropriate error details", func() {
-			body := types.CompletionsRequest{
-				Messages: []types.Message{{
+			body := api.CompletionsRequest{
+				Messages: []api.Message{{
 					Role:    client.SystemRole,
 					Content: cfg.Role,
 				}},
@@ -82,7 +81,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			resp, err := restCaller.Post(cfg.URL+cfg.CompletionsPath, bytes, false)
 			Expect(err).To(HaveOccurred())
 
-			var errorData types.ErrorResponse
+			var errorData api.ErrorResponse
 			err = json.Unmarshal(resp, &errorData)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -97,7 +96,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			resp, err := restCaller.Get(cfg.URL + cfg.ModelsPath)
 			Expect(err).NotTo(HaveOccurred())
 
-			var data types.ListModelsResponse
+			var data api.ListModelsResponse
 			err = json.Unmarshal(resp, &data)
 			Expect(err).NotTo(HaveOccurred())
 

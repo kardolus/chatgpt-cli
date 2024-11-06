@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/kardolus/chatgpt-cli/internal/utils"
+	"github.com/kardolus/chatgpt-cli/internal"
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
@@ -46,7 +46,7 @@ type FileIO struct {
 
 func NewStore() *FileIO {
 	configPath, _ := getPath()
-	historyPath, _ := utils.GetDataHome()
+	historyPath, _ := internal.GetDataHome()
 
 	return &FileIO{
 		configFilePath:  configPath,
@@ -153,7 +153,7 @@ func (f *FileIO) readNode() (yaml.Node, error) {
 }
 
 func getPath() (string, error) {
-	homeDir, err := utils.GetConfigHome()
+	homeDir, err := internal.GetConfigHome()
 	if err != nil {
 		return "", err
 	}

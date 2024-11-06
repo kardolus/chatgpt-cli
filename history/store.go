@@ -3,7 +3,7 @@ package history
 import (
 	"encoding/json"
 	"github.com/kardolus/chatgpt-cli/config"
-	"github.com/kardolus/chatgpt-cli/internal/utils"
+	"github.com/kardolus/chatgpt-cli/internal"
 	"os"
 	"path"
 	"path/filepath"
@@ -30,12 +30,12 @@ type FileIO struct {
 func New() (*FileIO, error) {
 	_ = migrate()
 
-	dir, err := utils.GetDataHome()
+	dir, err := internal.GetDataHome()
 	if err != nil {
 		return nil, err
 	}
 
-	chatGPTDir, err := utils.GetConfigHome()
+	chatGPTDir, err := internal.GetConfigHome()
 	if err != nil {
 		return nil, err
 	}
@@ -88,12 +88,12 @@ func (f *FileIO) getPath(thread string) string {
 
 // migrate moves the legacy "history" file in ~/.chatgpt-cli to "history/default.json"
 func migrate() error {
-	hiddenDir, err := utils.GetConfigHome()
+	hiddenDir, err := internal.GetConfigHome()
 	if err != nil {
 		return err
 	}
 
-	historyFile, err := utils.GetDataHome()
+	historyFile, err := internal.GetDataHome()
 	if err != nil {
 		return err
 	}

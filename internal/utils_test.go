@@ -1,7 +1,7 @@
-package utils_test
+package internal_test
 
 import (
-	"github.com/kardolus/chatgpt-cli/internal/utils"
+	"github.com/kardolus/chatgpt-cli/internal"
 	. "github.com/onsi/gomega"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
@@ -16,13 +16,13 @@ func TestUnitUtils(t *testing.T) {
 func testUtils(t *testing.T, when spec.G, it spec.S) {
 	it.Before(func() {
 		RegisterTestingT(t)
-		Expect(os.Unsetenv(utils.ConfigHomeEnv)).To(Succeed())
-		Expect(os.Unsetenv(utils.DataHomeEnv)).To(Succeed())
+		Expect(os.Unsetenv(internal.ConfigHomeEnv)).To(Succeed())
+		Expect(os.Unsetenv(internal.DataHomeEnv)).To(Succeed())
 	})
 
 	when("GetConfigHome()", func() {
 		it("Uses the default value if OPENAI_CONFIG_HOME is not set", func() {
-			configHome, err := utils.GetConfigHome()
+			configHome, err := internal.GetConfigHome()
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(configHome).To(ContainSubstring(".chatgpt-cli")) // Assuming default location is ~/.chatgpt-cli
@@ -32,7 +32,7 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			customConfigHome := "/custom/config/path"
 			Expect(os.Setenv("OPENAI_CONFIG_HOME", customConfigHome)).To(Succeed())
 
-			configHome, err := utils.GetConfigHome()
+			configHome, err := internal.GetConfigHome()
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(configHome).To(Equal(customConfigHome))
@@ -41,7 +41,7 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 
 	when("GetDataHome()", func() {
 		it("Uses the default value if OPENAI_DATA_HOME is not set", func() {
-			dataHome, err := utils.GetDataHome()
+			dataHome, err := internal.GetDataHome()
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(dataHome).To(ContainSubstring(".chatgpt-cli/history")) // Assuming default location is ~/.local/share/chatgpt-cli
@@ -51,7 +51,7 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			customDataHome := "/custom/data/path"
 			Expect(os.Setenv("OPENAI_DATA_HOME", customDataHome)).To(Succeed())
 
-			dataHome, err := utils.GetDataHome()
+			dataHome, err := internal.GetDataHome()
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(dataHome).To(Equal(customDataHome))

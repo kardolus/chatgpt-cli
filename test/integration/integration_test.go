@@ -6,7 +6,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/history"
-	"github.com/kardolus/chatgpt-cli/internal/utils"
+	"github.com/kardolus/chatgpt-cli/internal"
 	utils2 "github.com/kardolus/chatgpt-cli/test"
 	"github.com/onsi/gomega/gexec"
 	"github.com/sclevine/spec"
@@ -45,8 +45,8 @@ func TestIntegration(t *testing.T) {
 func testIntegration(t *testing.T, when spec.G, it spec.S) {
 	it.Before(func() {
 		RegisterTestingT(t)
-		Expect(os.Unsetenv(utils.ConfigHomeEnv)).To(Succeed())
-		Expect(os.Unsetenv(utils.DataHomeEnv)).To(Succeed())
+		Expect(os.Unsetenv(internal.ConfigHomeEnv)).To(Succeed())
+		Expect(os.Unsetenv(internal.DataHomeEnv)).To(Succeed())
 	})
 
 	when("Read and Write History", func() {
@@ -395,7 +395,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 		it("should warn when config.yaml does not exist and OPENAI_CONFIG_HOME is set", func() {
 			configHomeDir := "does-not-exist"
-			Expect(os.Setenv(utils.ConfigHomeEnv, configHomeDir)).To(Succeed())
+			Expect(os.Setenv(internal.ConfigHomeEnv, configHomeDir)).To(Succeed())
 
 			configFilePath := path.Join(configHomeDir, "config.yaml")
 			Expect(configFilePath).NotTo(BeAnExistingFile())
@@ -410,12 +410,12 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(output).To(ContainSubstring(fmt.Sprintf("Warning: config.yaml doesn't exist in %s, create it", configHomeDir)))
 
 			// Unset the variable to prevent pollution
-			Expect(os.Unsetenv(utils.ConfigHomeEnv)).To(Succeed())
+			Expect(os.Unsetenv(internal.ConfigHomeEnv)).To(Succeed())
 		})
 
 		it("should NOT warn when config.yaml does not exist and OPENAI_CONFIG_HOME is NOT set", func() {
 			configHomeDir := "does-not-exist"
-			Expect(os.Unsetenv(utils.ConfigHomeEnv)).To(Succeed())
+			Expect(os.Unsetenv(internal.ConfigHomeEnv)).To(Succeed())
 
 			configFilePath := path.Join(configHomeDir, "config.yaml")
 			Expect(configFilePath).NotTo(BeAnExistingFile())

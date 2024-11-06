@@ -6,7 +6,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/api/client"
 	"github.com/kardolus/chatgpt-cli/api/http"
 	utils2 "github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
-	"github.com/kardolus/chatgpt-cli/internal/utils"
+	"github.com/kardolus/chatgpt-cli/internal"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 	"io"
@@ -265,7 +265,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if tmp := os.Getenv(utils.ConfigHomeEnv); tmp != "" && !fileExists(viper.ConfigFileUsed()) {
+	if tmp := os.Getenv(internal.ConfigHomeEnv); tmp != "" && !fileExists(viper.ConfigFileUsed()) {
 		fmt.Printf("Warning: config.yaml doesn't exist in %s, create it\n", tmp)
 	}
 
@@ -340,7 +340,7 @@ func initConfig(rootCmd *cobra.Command) (config.Config, error) {
 	viper.SetDefault("name", "openai")
 
 	// Read only the `name` field from the config to determine the environment prefix.
-	configHome, err := utils.GetConfigHome()
+	configHome, err := internal.GetConfigHome()
 	if err != nil {
 		return config.Config{}, err
 	}
@@ -501,7 +501,7 @@ func saveConfigWithComments(configPath string, node *yaml.Node) error {
 
 func saveConfig(changedValues map[string]interface{}) error {
 	configFile := viper.ConfigFileUsed()
-	configHome, err := utils.GetConfigHome()
+	configHome, err := internal.GetConfigHome()
 	if err != nil {
 		return fmt.Errorf("failed to get config home: %w", err)
 	}
@@ -580,7 +580,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		fmt.Println("  You can also use environment variables to set config values. For example:")
 		fmt.Printf("  %s_API_KEY=your_api_key chatgpt --query 'Hello'\n", strings.ToUpper(viper.GetEnvPrefix()))
 
-		configHome, _ := utils.GetConfigHome()
+		configHome, _ := internal.GetConfigHome()
 
 		fmt.Println("\nConfiguration File:")
 		fmt.Println("  All configuration changes made with the setters will be saved in the config.yaml file.")

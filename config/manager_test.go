@@ -378,6 +378,21 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			Expect(result[2]).NotTo(ContainSubstring("json"))
 		})
 	})
+
+	when("ShowConfig()", func() {
+		it("returns the expected config", func() {
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).Times(1)
+			mockConfigStore.EXPECT().Read().Return(config.Config{
+				APIKey: "user-api-key",
+			}, nil).Times(1)
+
+			subject := config.NewManager(mockConfigStore).WithEnvironment()
+
+			result, err := subject.ShowConfig()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(ContainSubstring("user-api-key"))
+		})
+	})
 }
 
 func unsetEnvironmentVariables(envPrefix string) {

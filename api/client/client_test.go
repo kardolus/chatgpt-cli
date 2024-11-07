@@ -523,6 +523,34 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(contextMessage.Role).To(Equal(client.UserRole))
 			Expect(contextMessage.Content).To(Equal(context))
 		})
+		it("behaves as expected with a non empty initial history", func() {
+			subject := factory.buildClientWithoutConfig()
+
+			subject.History = []history.History{
+				{
+					Message: api.Message{
+						Role:    client.SystemRole,
+						Content: "system message",
+					},
+				},
+				{
+					Message: api.Message{
+						Role: client.UserRole,
+					},
+				},
+			}
+
+			mockTimer.EXPECT().Now().Return(time.Time{}).AnyTimes()
+
+			context := "test context"
+			subject.ProvideContext(context)
+
+			Expect(len(subject.History)).To(Equal(3))
+
+			contextMessage := subject.History[2]
+			Expect(contextMessage.Role).To(Equal(client.UserRole))
+			Expect(contextMessage.Content).To(Equal(context))
+		})
 	})
 }
 

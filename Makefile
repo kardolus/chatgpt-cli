@@ -1,7 +1,7 @@
 # Default goal when running `make`
 .DEFAULT_GOAL := help
 
-.PHONY: help all-tests binaries commit contract install integration reinstall shipit unit updatedeps
+.PHONY: help all-tests binaries commit contract coverage install integration reinstall shipit unit updatedeps
 
 # Help command to list all available targets
 help:  ## Show this help message
@@ -18,6 +18,9 @@ commit: ## Generate a commit message using ChatGPT based on git diff
 
 contract: ## Run contract tests
 	./scripts/contract.sh
+
+coverage: ## Generate a combined coverage report for unit, integration, and contract tests
+	./scripts/coverage.sh
 
 install: ## Build the binaries for the specified OS (default: darwin)
 	./scripts/install.sh $(TARGET_OS)

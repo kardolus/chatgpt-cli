@@ -13,6 +13,7 @@ bin/                    # Compiled binaries
 *.exe                   # Windows executables
 *.out                   # Output files
 *.test                  # Test binaries
+**/coverage.html        # Code coverage reports
 
 # Logs, Temp Files, & Runtime Data
 logs/                   # Application logs

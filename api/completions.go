@@ -18,7 +18,7 @@ type CompletionsRequest struct {
 	Temperature      float64   `json:"temperature"`
 	TopP             float64   `json:"top_p"`
 	FrequencyPenalty float64   `json:"frequency_penalty,omitempty"`
-	MaxTokens        int       `json:"max_tokens"`
+	MaxTokens        int       `json:"max_completion_tokens"`
 	PresencePenalty  float64   `json:"presence_penalty,omitempty"`
 	Messages         []Message `json:"messages"`
 	Stream           bool      `json:"stream"`

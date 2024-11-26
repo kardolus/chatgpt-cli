@@ -25,5 +25,6 @@ type Config struct {
 	SkipTLSVerify       bool    `yaml:"skip_tls_verify"`
 	Debug               bool    `yaml:"debug"`
 	Multiline           bool    `yaml:"multiline"`
+	NoSystem            bool    `yaml:"no_system"`
 	Seed                int     `yaml:"seed"`
 }

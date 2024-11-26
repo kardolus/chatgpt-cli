@@ -228,15 +228,18 @@ func (c *Client) initHistory() {
 	}
 
 	if len(c.History) == 0 {
-		c.History = []history.History{{
-			Message: api.Message{
-				Role: SystemRole,
-			},
-			Timestamp: c.timer.Now(),
-		}}
+		if !c.Config.NoSystem {
+			c.History = []history.History{{
+				Message: api.Message{
+					Role: SystemRole,
+				},
+				Timestamp: c.timer.Now(),
+			}}
+	  	c.History[0].Content = c.Config.Role
+		} else {
+			c.History = []history.History{}
+		}
 	}
-
-	c.History[0].Content = c.Config.Role
 }
 
 func (c *Client) addQuery(query string) {

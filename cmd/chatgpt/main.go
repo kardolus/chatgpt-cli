@@ -726,6 +726,7 @@ func createConfigFromViper() config.Config {
 		SkipTLSVerify:       viper.GetBool("skip_tls_verify"),
 		Debug:               viper.GetBool("debug"),
 		Multiline:           viper.GetBool("multiline"),
+		NoSystem:            viper.GetBool("no_system"),
 		Seed:                viper.GetInt("seed"),
 	}
 }

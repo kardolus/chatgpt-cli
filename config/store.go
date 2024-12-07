@@ -26,7 +26,6 @@ const (
 	openAIFrequencyPenalty = 0.0
 	openAIPresencePenalty  = 0.0
 	openAICommandPrompt    = "[%datetime] [Q%counter]"
-	openAINoSystem         = false
 )
 
 type Store interface {
@@ -116,7 +115,6 @@ func (f *FileIO) ReadDefaults() Config {
 		FrequencyPenalty: openAIFrequencyPenalty,
 		PresencePenalty:  openAIPresencePenalty,
 		CommandPrompt:    openAICommandPrompt,
-		NoSystem:         openAINoSystem,
 	}
 }
 

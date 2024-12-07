@@ -200,7 +200,10 @@ func (c *Client) Stream(input string) error {
 func (c *Client) createBody(stream bool) ([]byte, error) {
 	var messages []api.Message
 
-	for _, item := range c.History {
+	for index, item := range c.History {
+		if strings.HasPrefix(c.Config.Model, o1Prefix) && index == 0 {
+			continue
+		}
 		messages = append(messages, item.Message)
 	}
 
@@ -229,17 +232,13 @@ func (c *Client) initHistory() {
 	}
 
 	if len(c.History) == 0 {
-		if !c.Config.NoSystem {
-			c.History = []history.History{{
-				Message: api.Message{
-					Role: SystemRole,
-				},
-				Timestamp: c.timer.Now(),
-			}}
-			c.History[0].Content = c.Config.Role
-		} else {
-			c.History = []history.History{}
-		}
+		c.History = []history.History{{
+			Message: api.Message{
+				Role: SystemRole,
+			},
+			Timestamp: c.timer.Now(),
+		}}
+		c.History[0].Content = c.Config.Role
 	}
 }
 

@@ -372,7 +372,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					{Role: client.UserRole, Content: "test query"},
 				}, false)
 				Expect(err).NotTo(HaveOccurred())
-				
+
 				mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
 				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
 

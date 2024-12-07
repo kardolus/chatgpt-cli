@@ -379,8 +379,10 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				_, _, _ = subject.Query("test query")
 			})
 			it("should include all messages when the model does not start with o1Prefix", func() {
+				const systemRole = "System role for this test"
+
 				factory.withHistory([]history.History{
-					{Message: api.Message{Role: client.SystemRole, Content: "First message"}},
+					{Message: api.Message{Role: client.SystemRole, Content: systemRole}},
 					{Message: api.Message{Role: client.UserRole, Content: "Second message"}},
 				})
 
@@ -389,9 +391,10 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 				subject := factory.buildClientWithoutConfig()
 				subject.Config.Model = regularModel
+				subject.Config.Role = systemRole
 
 				expectedBody, err := createBody([]api.Message{
-					{Role: client.SystemRole, Content: "First message"},
+					{Role: client.SystemRole, Content: systemRole},
 					{Role: client.UserRole, Content: "Second message"},
 					{Role: client.UserRole, Content: "test query"},
 				}, false)

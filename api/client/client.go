@@ -238,8 +238,9 @@ func (c *Client) initHistory() {
 			},
 			Timestamp: c.timer.Now(),
 		}}
-		c.History[0].Content = c.Config.Role
 	}
+
+	c.History[0].Content = c.Config.Role
 }
 
 func (c *Client) addQuery(query string) {

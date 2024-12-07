@@ -1,27 +1,28 @@
 # IDE/Editor Specific
-.idea/                  # IntelliJ, GoLand, or other JetBrains IDEs
-.vscode/                # Visual Studio Code
-*.sublime*              # Sublime Text files
+.idea/
+.vscode/
+*.sublime*
 
 # System Specific
-.DS_Store               # macOS Finder metadata
-Thumbs.db               # Windows image file metadata
-*.swp                   # Swap files
+.DS_Store
+Thumbs.db
+*.swp
 
 # Go Build Artifacts
-bin/                    # Compiled binaries
-*.exe                   # Windows executables
-*.out                   # Output files
-*.test                  # Test binaries
-**/coverage.html        # Code coverage reports
+bin/
+*.exe
+*.out
+*.test
+**/coverage.html
 
 # Logs, Temp Files, & Runtime Data
-logs/                   # Application logs
-*.log                   # Log files
-*.tmp                   # Temporary files
-*.bak                   # Backup files
+logs/
+*.log
+*.tmp
+*.bak
 
 # GitHub, CI/CD, and Debugging
-*.coverage              # Code coverage files
-*.prof                  # Profiling files
-coverage.out            # Coverage output file
+*.coverage
+*.prof
+coverage.out
+

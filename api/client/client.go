@@ -23,6 +23,7 @@ const (
 	UserRole                 = "user"
 	InteractiveThreadPrefix  = "int_"
 	gptPrefix                = "gpt"
+	o1Prefix                 = "o1"
 )
 
 type Timer interface {
@@ -101,7 +102,7 @@ func (c *Client) ListModels() ([]string, error) {
 	}
 
 	for _, model := range response.Data {
-		if strings.HasPrefix(model.Id, gptPrefix) {
+		if strings.HasPrefix(model.Id, gptPrefix) || strings.HasPrefix(model.Id, o1Prefix) {
 			if model.Id != c.Config.Model {
 				result = append(result, fmt.Sprintf("- %s", model.Id))
 				continue
@@ -199,7 +200,10 @@ func (c *Client) Stream(input string) error {
 func (c *Client) createBody(stream bool) ([]byte, error) {
 	var messages []api.Message
 
-	for _, item := range c.History {
+	for index, item := range c.History {
+		if strings.HasPrefix(c.Config.Model, o1Prefix) && index == 0 {
+			continue
+		}
 		messages = append(messages, item.Message)
 	}
 

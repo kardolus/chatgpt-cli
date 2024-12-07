@@ -98,6 +98,30 @@
       "parent": null
     },
     {
+      "id": "o1-mini",
+      "object": "model",
+      "created": 1649359874,
+      "owned_by": "openai",
+      "permission": [
+        {
+          "id": "modelperm-U6ZwlyAd0LyMk4rcMdz33Yc3",
+          "object": "model_permission",
+          "created": 1669066355,
+          "allow_create_engine": false,
+          "allow_sampling": true,
+          "allow_logprobs": true,
+          "allow_search_indices": false,
+          "allow_view": true,
+          "allow_fine_tuning": false,
+          "organization": "*",
+          "group": null,
+          "is_blocking": false
+        }
+      ],
+      "root": "davinci",
+      "parent": null
+    },
+    {
       "id": "text-davinci-edit-001",
       "object": "model",
       "created": 1649809179,

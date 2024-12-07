@@ -355,6 +355,56 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 				testValidHTTPResponse(subject, body, false)
 			})
+			it("should skip the first message when the model starts with o1Prefix", func() {
+				factory.withHistory([]history.History{
+					{Message: api.Message{Role: client.SystemRole, Content: "First message"}},
+					{Message: api.Message{Role: client.UserRole, Content: "Second message"}},
+				})
+
+				o1Model := "o1-example-model"
+				config.Model = o1Model
+
+				subject := factory.buildClientWithoutConfig()
+				subject.Config.Model = o1Model
+
+				expectedBody, err := createBody([]api.Message{
+					{Role: client.UserRole, Content: "Second message"},
+					{Role: client.UserRole, Content: "test query"},
+				}, false)
+				Expect(err).NotTo(HaveOccurred())
+
+				mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
+				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
+
+				_, _, _ = subject.Query("test query")
+			})
+			it("should include all messages when the model does not start with o1Prefix", func() {
+				const systemRole = "System role for this test"
+
+				factory.withHistory([]history.History{
+					{Message: api.Message{Role: client.SystemRole, Content: systemRole}},
+					{Message: api.Message{Role: client.UserRole, Content: "Second message"}},
+				})
+
+				regularModel := "gpt-4o"
+				config.Model = regularModel
+
+				subject := factory.buildClientWithoutConfig()
+				subject.Config.Model = regularModel
+				subject.Config.Role = systemRole
+
+				expectedBody, err := createBody([]api.Message{
+					{Role: client.SystemRole, Content: systemRole},
+					{Role: client.UserRole, Content: "Second message"},
+					{Role: client.UserRole, Content: "test query"},
+				}, false)
+				Expect(err).NotTo(HaveOccurred())
+
+				mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
+				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
+
+				_, _, _ = subject.Query("test query")
+			})
 		})
 	})
 	when("Stream()", func() {
@@ -486,7 +536,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).Should(HavePrefix("failed to decode response:"))
 		})
-		it("filters gpt models as expected", func() {
+		it("filters gpt and o1 models as expected", func() {
 			subject := factory.buildClientWithoutConfig()
 
 			response, err := test.FileToBytes("models.json")
@@ -497,9 +547,10 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			result, err := subject.ListModels()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).NotTo(BeEmpty())
-			Expect(result).To(HaveLen(3))
+			Expect(result).To(HaveLen(4))
 			Expect(result[0]).To(Equal("* gpt-3.5-turbo (current)"))
-			Expect(result[1]).To(Equal("- gpt-3.5-turbo-0301"))
+			Expect(result[1]).To(Equal("- o1-mini"))
+			Expect(result[2]).To(Equal("- gpt-3.5-turbo-0301"))
 		})
 	})
 	when("ProvideContext()", func() {

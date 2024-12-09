@@ -35,6 +35,7 @@ var (
 	listThreads     bool
 	hasPipe         bool
 	promptFile      string
+	roleFile        string
 	threadName      string
 	ServiceURL      string
 	shell           string
@@ -194,6 +195,15 @@ func run(cmd *cobra.Command, args []string) error {
 
 		fmt.Println(output)
 		return nil
+	}
+
+	if cmd.Flag("role-file").Changed {
+		role, err := utils.FileToString(roleFile)
+		if err != nil {
+			return err
+		}
+		cfg.Role = role
+		viper.Set("role", role)
 	}
 
 	if showConfig {
@@ -599,6 +609,7 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().BoolVarP(&newThread, "new-thread", "n", false, "Create a new thread with a random name and target it")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
 	rootCmd.PersistentFlags().StringVarP(&promptFile, "prompt", "p", "", "Provide a prompt file")
+	rootCmd.PersistentFlags().StringVarP(&roleFile, "role-file", "", "", "Provide a role file")
 	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
 	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
 	rootCmd.PersistentFlags().BoolVar(&showHistory, "show-history", false, "Show the human-readable conversation history")

@@ -578,6 +578,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--delete-thread", "Delete the specified thread")
 		printFlagWithPadding("--clear-history", "Clear the history of the current thread")
 		printFlagWithPadding("--show-history [thread]", "Show the human-readable conversation history")
+		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--set-completions", "Generate autocompletion script for your current shell")
 		fmt.Println()
 
@@ -655,7 +656,7 @@ func isNonConfigSetter(name string) bool {
 
 func isGeneralFlag(name string) bool {
 	switch name {
-	case "query", "interactive", "config", "version", "new-thread", "list-models", "list-threads", "clear-history", "delete-thread", "show-history", "prompt", "set-completions", "help":
+	case "query", "interactive", "config", "version", "new-thread", "list-models", "list-threads", "clear-history", "delete-thread", "show-history", "prompt", "set-completions", "help", "role-file":
 		return true
 	default:
 		return false

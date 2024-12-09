@@ -62,7 +62,9 @@ var configMetadata = []ConfigMetadata{
 	{"auth_header", "set-auth-header", "Authorization", "Set the authorization header"},
 	{"auth_token_prefix", "set-auth-token-prefix", "Bearer ", "Set the authorization token prefix"},
 	{"command_prompt", "set-command-prompt", "[%datetime] [Q%counter] [%usage]", "Set the command prompt format for interactive mode"},
+	{"command_prompt_color", "set-command-prompt-color", "", "Set the command prompt color"},
 	{"output_prompt", "set-output-prompt", "", "Set the output prompt format for interactive mode"},
+	{"output_prompt_color", "set-output-prompt-color", "", "Set the output prompt color"},
 	{"temperature", "set-temperature", 1.0, "Set the sampling temperature"},
 	{"top_p", "set-top-p", 1.0, "Set the top-p value for nucleus sampling"},
 	{"frequency_penalty", "set-frequency-penalty", 0.0, "Set the frequency penalty"},
@@ -291,11 +293,17 @@ func run(cmd *cobra.Command, args []string) error {
 			return utils.FormatPrompt(c.Config.CommandPrompt, counter, usage, time.Now())
 		}
 
+		cmdColor, cmdReset := utils.ColorToAnsi(c.Config.CommandPromptColor)
+		outputColor, outPutReset := utils.ColorToAnsi(c.Config.OutputPromptColor)
+
 		qNum, usage := 1, 0
 		for {
 			rl.SetPrompt(commandPrompt(qNum, usage))
 
+			fmt.Print(cmdColor)
 			input, err := readInput(rl, cfg.Multiline)
+			fmt.Print(cmdReset)
+
 			if err == io.EOF {
 				fmt.Println("Bye!")
 				return nil
@@ -308,18 +316,19 @@ func run(cmd *cobra.Command, args []string) error {
 				if err != nil {
 					fmt.Println("Error:", err)
 				} else {
-					fmt.Printf("%s\n\n", fmtOutputPrompt+result)
+					fmt.Printf("%s%s%s\n\n", outputColor, fmtOutputPrompt+result, outPutReset)
 					usage += qUsage
 					qNum++
 				}
 			} else {
-				fmt.Print(fmtOutputPrompt)
+				fmt.Print(outputColor + fmtOutputPrompt)
 				if err := c.Stream(input); err != nil {
 					_, _ = fmt.Fprintln(os.Stderr, "Error:", err)
 				} else {
 					fmt.Println()
 					qNum++
 				}
+				fmt.Print(outPutReset)
 			}
 		}
 	} else {
@@ -731,7 +740,9 @@ func createConfigFromViper() config.Config {
 		AuthHeader:          viper.GetString("auth_header"),
 		AuthTokenPrefix:     viper.GetString("auth_token_prefix"),
 		CommandPrompt:       viper.GetString("command_prompt"),
+		CommandPromptColor:  viper.GetString("command_prompt_color"),
 		OutputPrompt:        viper.GetString("output_prompt"),
+		OutputPromptColor:   viper.GetString("output_prompt_color"),
 		AutoCreateNewThread: viper.GetBool("auto_create_new_thread"),
 		TrackTokenUsage:     viper.GetBool("track_token_usage"),
 		SkipTLSVerify:       viper.GetBool("skip_tls_verify"),

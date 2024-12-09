@@ -19,7 +19,9 @@ type Config struct {
 	AuthHeader          string  `yaml:"auth_header"`
 	AuthTokenPrefix     string  `yaml:"auth_token_prefix"`
 	CommandPrompt       string  `yaml:"command_prompt"`
+	CommandPromptColor  string  `yaml:"command_prompt_color"`
 	OutputPrompt        string  `yaml:"output_prompt"`
+	OutputPromptColor   string  `yaml:"output_prompt_color"`
 	AutoCreateNewThread bool    `yaml:"auto_create_new_thread"`
 	TrackTokenUsage     bool    `yaml:"track_token_usage"`
 	SkipTLSVerify       bool    `yaml:"skip_tls_verify"`

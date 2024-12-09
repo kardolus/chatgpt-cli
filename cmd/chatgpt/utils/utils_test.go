@@ -20,6 +20,62 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 		RegisterTestingT(t)
 	})
 
+	when("ColorToAnsi()", func() {
+		it("should return an empty color and reset if the input is an empty string", func() {
+			color, reset := utils.ColorToAnsi("")
+			Expect(color).To(Equal(""))
+			Expect(reset).To(Equal(""))
+		})
+
+		it("should return an empty color and reset if the input is an unsupported color", func() {
+			color, reset := utils.ColorToAnsi("unsupported")
+			Expect(color).To(Equal(""))
+			Expect(reset).To(Equal(""))
+		})
+
+		it("should return the correct ANSI code for red", func() {
+			color, reset := utils.ColorToAnsi("red")
+			Expect(color).To(Equal("\033[31m"))
+			Expect(reset).To(Equal("\033[0m"))
+		})
+
+		it("should return the correct ANSI code for green", func() {
+			color, reset := utils.ColorToAnsi("green")
+			Expect(color).To(Equal("\033[32m"))
+			Expect(reset).To(Equal("\033[0m"))
+		})
+
+		it("should return the correct ANSI code for yellow", func() {
+			color, reset := utils.ColorToAnsi("yellow")
+			Expect(color).To(Equal("\033[33m"))
+			Expect(reset).To(Equal("\033[0m"))
+		})
+
+		it("should return the correct ANSI code for blue", func() {
+			color, reset := utils.ColorToAnsi("blue")
+			Expect(color).To(Equal("\033[34m"))
+			Expect(reset).To(Equal("\033[0m"))
+		})
+
+		it("should return the correct ANSI code for magenta", func() {
+			color, reset := utils.ColorToAnsi("magenta")
+			Expect(color).To(Equal("\033[35m"))
+			Expect(reset).To(Equal("\033[0m"))
+		})
+
+		it("should handle case-insensitivity correctly", func() {
+			color, reset := utils.ColorToAnsi("ReD")
+			Expect(color).To(Equal("\033[31m"))
+			Expect(reset).To(Equal("\033[0m"))
+		})
+
+		it("should handle leading and trailing spaces", func() {
+			color, reset := utils.ColorToAnsi("  blue ")
+			Expect(color).To(Equal("\033[34m"))
+			Expect(reset).To(Equal("\033[0m"))
+		})
+	})
+
 	when("FormatPrompt()", func() {
 		const (
 			counter = 1

@@ -7,6 +7,31 @@ import (
 	"time"
 )
 
+func ColorToAnsi(color string) (string, string) {
+	if color == "" {
+		return "", ""
+	}
+
+	color = strings.ToLower(strings.TrimSpace(color))
+
+	reset := "\033[0m"
+
+	switch color {
+	case "red":
+		return "\033[31m", reset
+	case "green":
+		return "\033[32m", reset
+	case "yellow":
+		return "\033[33m", reset
+	case "blue":
+		return "\033[34m", reset
+	case "magenta":
+		return "\033[35m", reset
+	default:
+		return "", ""
+	}
+}
+
 func FileToString(fileName string) (string, error) {
 	bytes, err := os.ReadFile(fileName)
 	if err != nil {

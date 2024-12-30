@@ -36,6 +36,7 @@ var (
 	hasPipe         bool
 	promptFile      string
 	roleFile        string
+	imageFile       string
 	threadName      string
 	ServiceURL      string
 	shell           string
@@ -208,6 +209,11 @@ func run(cmd *cobra.Command, args []string) error {
 		viper.Set("role", role)
 	}
 
+	if cmd.Flag("image").Changed {
+		cfg.Image = imageFile
+		viper.Set("image", imageFile)
+	}
+
 	if showConfig {
 		allSettings := viper.AllSettings()
 
@@ -225,7 +231,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	hs, _ := history.New() // do not error out
-	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, cfg, interactiveMode)
+	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, &client.RealImageReader{}, cfg, interactiveMode)
 
 	if ServiceURL != "" {
 		c = c.WithServiceURL(ServiceURL)
@@ -578,6 +584,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--delete-thread", "Delete the specified thread")
 		printFlagWithPadding("--clear-history", "Clear the history of the current thread")
 		printFlagWithPadding("--show-history [thread]", "Show the human-readable conversation history")
+		printFlagWithPadding("--image", "Upload an image from the specified local path or URL")
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--set-completions", "Generate autocompletion script for your current shell")
 		fmt.Println()
@@ -620,6 +627,7 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
 	rootCmd.PersistentFlags().StringVarP(&promptFile, "prompt", "p", "", "Provide a prompt file")
 	rootCmd.PersistentFlags().StringVarP(&roleFile, "role-file", "", "", "Provide a role file")
+	rootCmd.PersistentFlags().StringVarP(&imageFile, "image", "", "", "Provide an image from a local path or URL")
 	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
 	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
 	rootCmd.PersistentFlags().BoolVar(&showHistory, "show-history", false, "Show the human-readable conversation history")
@@ -656,7 +664,7 @@ func isNonConfigSetter(name string) bool {
 
 func isGeneralFlag(name string) bool {
 	switch name {
-	case "query", "interactive", "config", "version", "new-thread", "list-models", "list-threads", "clear-history", "delete-thread", "show-history", "prompt", "set-completions", "help", "role-file":
+	case "query", "interactive", "config", "version", "new-thread", "list-models", "list-threads", "clear-history", "delete-thread", "show-history", "prompt", "set-completions", "help", "role-file", "image":
 		return true
 	default:
 		return false

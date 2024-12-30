@@ -41,8 +41,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
         - [Persistent Autocompletion](#persistent-autocompletion)
 - [Markdown Rendering](#markdown-rendering)
 - [Development](#development)
-  - [Using the Makefile](#using-the-makefile)
-  - [Testing the CLI](#testing-the-cli)
+    - [Using the Makefile](#using-the-makefile)
+    - [Testing the CLI](#testing-the-cli)
 - [Reporting Issues and Contributing](#reporting-issues-and-contributing)
 - [Uninstallation](#uninstallation)
 - [Useful Links](#useful-links)
@@ -62,6 +62,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
 * **Custom context from any source**: You can provide the GPT model with a custom context during conversation. This
   context can be piped in from any source, such as local files, standard input, or even another program. This
   flexibility allows the model to adapt to a wide range of conversational scenarios.
+* **Support for images**: Upload an image or provide an image URL using the `--image` flag. Note that image support may
+  not be available for all models.
 * **Model listing**: Access a list of available models using the `-l` or `--list-models` flag.
 * **Thread listing**: Display a list of active threads using the `--list-threads` flag.
 * **Advanced configuration options**: The CLI supports a layered configuration system where settings can be specified
@@ -503,6 +505,7 @@ To start developing, set the `OPENAI_API_KEY` environment variable to
 your [ChatGPT secret key](https://platform.openai.com/account/api-keys).
 
 ### Using the Makefile
+
 The Makefile simplifies development tasks by providing several targets for testing, building, and deployment.
 
 * **all-tests**: Run all tests, including linting, formatting, and go mod tidy.
@@ -523,6 +526,7 @@ The Makefile simplifies development tasks by providing several targets for testi
   ```
 
 For more available commands, use:
+
 ```shell
 make help
 ```
@@ -534,6 +538,7 @@ make help
 ```
 
 ### Testing the CLI
+
 1. After a successful build, test the application with the following command:
 
     ```shell

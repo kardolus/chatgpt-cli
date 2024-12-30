@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,11 +9,14 @@ import (
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/api/http"
 	"github.com/kardolus/chatgpt-cli/config"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/kardolus/chatgpt-cli/history"
+	stdhttp "net/http"
 )
 
 const (
@@ -24,6 +28,11 @@ const (
 	InteractiveThreadPrefix  = "int_"
 	gptPrefix                = "gpt"
 	o1Prefix                 = "o1"
+	imageURLType             = "image_url"
+	imageContent             = "data:%s;base64,%s"
+	httpScheme               = "http"
+	httpsScheme              = "https"
+	bufferSize               = 512
 )
 
 type Timer interface {
@@ -37,15 +46,39 @@ func (r *RealTime) Now() time.Time {
 	return time.Now()
 }
 
+type ImageReader interface {
+	ReadFile(name string) ([]byte, error)
+	ReadBufferFromFile(file *os.File) ([]byte, error)
+	Open(name string) (*os.File, error)
+}
+
+type RealImageReader struct{}
+
+func (r *RealImageReader) Open(name string) (*os.File, error) {
+	return os.Open(name)
+}
+
+func (r *RealImageReader) ReadFile(name string) ([]byte, error) {
+	return os.ReadFile(name)
+}
+
+func (r *RealImageReader) ReadBufferFromFile(file *os.File) ([]byte, error) {
+	buffer := make([]byte, bufferSize)
+	_, err := file.Read(buffer)
+
+	return buffer, err
+}
+
 type Client struct {
 	Config       config.Config
 	History      []history.History
 	caller       http.Caller
 	historyStore history.Store
 	timer        Timer
+	reader       ImageReader
 }
 
-func New(callerFactory http.CallerFactory, hs history.Store, t Timer, cfg config.Config, interactiveMode bool) *Client {
+func New(callerFactory http.CallerFactory, hs history.Store, t Timer, r ImageReader, cfg config.Config, interactiveMode bool) *Client {
 	caller := callerFactory(cfg)
 
 	if interactiveMode && cfg.AutoCreateNewThread {
@@ -59,6 +92,7 @@ func New(callerFactory http.CallerFactory, hs history.Store, t Timer, cfg config
 		caller:       caller,
 		historyStore: hs,
 		timer:        t,
+		reader:       r,
 	}
 }
 
@@ -163,9 +197,9 @@ func (c *Client) Query(input string) (string, int, error) {
 		return "", response.Usage.TotalTokens, errors.New("no responses returned")
 	}
 
-	c.updateHistory(response.Choices[0].Message.Content)
+	c.updateHistory(response.Choices[0].Message.Content.(string))
 
-	return response.Choices[0].Message.Content, response.Usage.TotalTokens, nil
+	return response.Choices[0].Message.Content.(string), response.Usage.TotalTokens, nil
 }
 
 // Stream sends a query to the API and processes the response as a stream.
@@ -217,6 +251,45 @@ func (c *Client) createBody(stream bool) ([]byte, error) {
 		PresencePenalty:  c.Config.PresencePenalty,
 		Seed:             c.Config.Seed,
 		Stream:           stream,
+	}
+
+	if c.Config.Image != "" {
+		var content api.ImageContent
+
+		if isValidURL(c.Config.Image) {
+			content = api.ImageContent{
+				Type: imageURLType,
+				ImageURL: struct {
+					URL string `json:"url"`
+				}{
+					URL: c.Config.Image,
+				},
+			}
+		} else {
+			mime, err := c.getMimeTypeFromFileContent(c.Config.Image)
+			if err != nil {
+				return nil, err
+			}
+
+			image, err := c.base64EncodeImage(c.Config.Image)
+			if err != nil {
+				return nil, err
+			}
+
+			content = api.ImageContent{
+				Type: imageURLType,
+				ImageURL: struct {
+					URL string `json:"url"`
+				}{
+					URL: fmt.Sprintf(imageContent, mime, image),
+				},
+			}
+		}
+
+		body.Messages = append(body.Messages, api.Message{
+			Role:    UserRole,
+			Content: []api.ImageContent{content},
+		})
 	}
 
 	return json.Marshal(body)
@@ -314,33 +387,13 @@ func (c *Client) updateHistory(response string) {
 	}
 }
 
-func calculateEffectiveContextWindow(window int, bufferPercentage int) int {
-	adjustedPercentage := 100 - bufferPercentage
-	effectiveContextWindow := (window * adjustedPercentage) / 100
-	return effectiveContextWindow
-}
-
-func countTokens(entries []history.History) (int, []int) {
-	var result int
-	var rolling []int
-
-	for _, entry := range entries {
-		charCount, wordCount := 0, 0
-		words := strings.Fields(entry.Content)
-		wordCount += len(words)
-
-		for _, word := range words {
-			charCount += utf8.RuneCountInString(word)
-		}
-
-		// This is a simple approximation; actual token count may differ.
-		// You can adjust this based on your language and the specific tokenizer used by the model.
-		tokenCountForMessage := (charCount + wordCount) / 2
-		result += tokenCountForMessage
-		rolling = append(rolling, tokenCountForMessage)
+func (c *Client) base64EncodeImage(path string) (string, error) {
+	imageData, err := c.reader.ReadFile(path)
+	if err != nil {
+		return "", err
 	}
 
-	return result, rolling
+	return base64.StdEncoding.EncodeToString(imageData), nil
 }
 
 func (c *Client) createHistoryEntriesFromString(input string) []history.History {
@@ -369,6 +422,23 @@ func (c *Client) createHistoryEntriesFromString(input string) []history.History 
 	return result
 }
 
+func (c *Client) getMimeTypeFromFileContent(path string) (string, error) {
+	file, err := c.reader.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	buffer, err := c.reader.ReadBufferFromFile(file)
+	if err != nil {
+		return "", err
+	}
+
+	mimeType := stdhttp.DetectContentType(buffer)
+
+	return mimeType, nil
+}
+
 func (c *Client) printRequestDebugInfo(endpoint string, body []byte) {
 	fmt.Printf("\nGenerated cURL command:\n\n")
 	method := "POST"
@@ -394,4 +464,50 @@ func (c *Client) printResponseDebugInfo(raw []byte) {
 func GenerateUniqueSlug(prefix string) string {
 	guid := uuid.New()
 	return prefix + guid.String()[:4]
+}
+
+func calculateEffectiveContextWindow(window int, bufferPercentage int) int {
+	adjustedPercentage := 100 - bufferPercentage
+	effectiveContextWindow := (window * adjustedPercentage) / 100
+	return effectiveContextWindow
+}
+
+func countTokens(entries []history.History) (int, []int) {
+	var result int
+	var rolling []int
+
+	for _, entry := range entries {
+		charCount, wordCount := 0, 0
+		words := strings.Fields(entry.Content.(string))
+		wordCount += len(words)
+
+		for _, word := range words {
+			charCount += utf8.RuneCountInString(word)
+		}
+
+		// This is a simple approximation; actual token count may differ.
+		// You can adjust this based on your language and the specific tokenizer used by the model.
+		tokenCountForMessage := (charCount + wordCount) / 2
+		result += tokenCountForMessage
+		rolling = append(rolling, tokenCountForMessage)
+	}
+
+	return result, rolling
+}
+
+func isValidURL(input string) bool {
+	parsedURL, err := url.ParseRequestURI(input)
+	if err != nil {
+		return false
+	}
+
+	// Ensure that the URL has a valid scheme
+	schemes := []string{httpScheme, httpsScheme}
+	for _, scheme := range schemes {
+		if strings.HasPrefix(parsedURL.Scheme, scheme) {
+			return true
+		}
+	}
+
+	return false
 }

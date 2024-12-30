@@ -72,6 +72,55 @@ data: {"id":"chatcmpl-8B1ELWT5QKYmUbH0Az9anpvoOVdGZ","object":"chat.completion.c
 data: [DONE]
 ```
 
+### Uploading images
+You can upload base64 encoded images from your local machine (and some models also accept URLs) using: 
+
+```shell
+curl --location --insecure --request POST 'https://api.openai.com/v1/chat/completions' \
+    --header "Authorization: Bearer ${OPENAI_API_KEY}" \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+       "model": "gpt-4o",
+       "messages": [
+         {"role": "user", "content": "What is this image"},
+         { "role": "user", "content": [
+             {
+               "type": "image_url",
+               "image_url": {
+                 "url": "data:image/png;base64,'"$(base64 -i ~/Downloads/wifi2.png)"'"
+               }
+             }
+           ]
+         }
+       ],
+       "stream": false
+    }' | jq .
+```
+
+Note that some models also allow the use of URLs
+
+```shell
+curl --location --insecure --request POST 'https://api.openai.com/v1/chat/completions' \
+    --header "Authorization: Bearer ${OPENAI_API_KEY}" \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+       "model": "gpt-4o",
+       "messages": [
+         {"role": "user", "content": "What is this image"},
+         { "role": "user", "content": [
+             {
+               "type": "image_url",
+               "image_url": {
+                 "url": "https://upload.wikimedia.org/wikipedia/commons/5/57/Imagen_de_los_canales_conc%C3%A9ntricos_en_%C3%81msterdam.png"
+               }
+             }
+           ]
+         }
+       ],
+       "stream": false
+    }' | jq .
+```
+
 ### Providing custom context
 
 You can provide your own context in the messages array in your callout. You can split this data over multiple lines. For

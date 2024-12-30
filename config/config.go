@@ -7,6 +7,7 @@ type Config struct {
 	MaxTokens           int     `yaml:"max_tokens"`
 	ContextWindow       int     `yaml:"context_window"`
 	Role                string  `yaml:"role"`
+	Image               string  `yaml:"image"`
 	Temperature         float64 `yaml:"temperature"`
 	TopP                float64 `yaml:"top_p"`
 	FrequencyPenalty    float64 `yaml:"frequency_penalty"`

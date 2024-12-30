@@ -35,7 +35,7 @@ func (h *Manager) Print(thread string) (string, error) {
 
 	for _, entry := range historyEntries {
 		if entry.Role == userRole && lastRole == userRole {
-			concatenatedMessage += entry.Content
+			concatenatedMessage += entry.Content.(string)
 		} else {
 			if lastRole == userRole && concatenatedMessage != "" {
 				result += formatHistory(History{
@@ -46,7 +46,7 @@ func (h *Manager) Print(thread string) (string, error) {
 			}
 
 			if entry.Role == userRole {
-				concatenatedMessage = entry.Content
+				concatenatedMessage = entry.Content.(string)
 			} else {
 				result += formatHistory(History{
 					Message:   entry.Message,

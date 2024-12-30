@@ -24,6 +24,7 @@ import (
 //go:generate mockgen -destination=callermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/http Caller
 //go:generate mockgen -destination=historymocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/history Store
 //go:generate mockgen -destination=timermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client Timer
+//go:generate mockgen -destination=readermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client ImageReader
 
 const (
 	envApiKey       = "api-key"
@@ -36,6 +37,7 @@ var (
 	mockCaller       *MockCaller
 	mockHistoryStore *MockStore
 	mockTimer        *MockTimer
+	mockReader       *MockImageReader
 	factory          *clientFactory
 	apiKeyEnvVar     string
 	config           config2.Config
@@ -54,6 +56,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		mockCaller = NewMockCaller(mockCtrl)
 		mockHistoryStore = NewMockStore(mockCtrl)
 		mockTimer = NewMockTimer(mockCtrl)
+		mockReader = NewMockImageReader(mockCtrl)
 		config = MockConfig()
 
 		factory = newClientFactory(mockHistoryStore)
@@ -73,10 +76,10 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				capturedThread = thread
 			}).Times(1)
 
-			client.New(mockCallerFactory, mockHistoryStore, mockTimer, MockConfig(), interactiveMode)
+			client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, MockConfig(), interactiveMode)
 
-			Expect(capturedThread).To(HavePrefix(client.InteractiveThreadPrefix)) // Assuming `InteractiveThreadPrefix` is "int_"
-			Expect(len(capturedThread)).To(Equal(8))                              // "int_" (4 chars) + 4 random characters
+			Expect(capturedThread).To(HavePrefix(client.InteractiveThreadPrefix))
+			Expect(len(capturedThread)).To(Equal(8)) // "int_" (4 chars) + 4 random characters
 		})
 		it("should not overwrite the thread in interactive mode when AutoCreateNewThread is false", func() {
 			var capturedThread string
@@ -87,7 +90,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			cfg := MockConfig()
 			cfg.AutoCreateNewThread = false
 
-			client.New(mockCallerFactory, mockHistoryStore, mockTimer, cfg, interactiveMode)
+			client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, cfg, interactiveMode)
 
 			Expect(capturedThread).To(Equal(config.Thread))
 		})
@@ -97,12 +100,11 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				capturedThread = thread
 			}).Times(1)
 
-			client.New(mockCallerFactory, mockHistoryStore, mockTimer, MockConfig(), commandLineMode)
+			client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, MockConfig(), commandLineMode)
 
 			Expect(capturedThread).To(Equal(config.Thread))
 		})
 	})
-
 	when("Query()", func() {
 		var (
 			body     []byte
@@ -275,7 +277,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				config := MockConfig()
 				config.OmitHistory = true
 
-				subject := client.New(mockCallerFactory, mockHistoryStore, mockTimer, config, commandLineMode)
+				subject := client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, config, commandLineMode)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Read and Write are never called on the history store
@@ -404,6 +406,118 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
 
 				_, _, _ = subject.Query("test query")
+			})
+		})
+
+		when("an image is provided", func() {
+			const (
+				query        = "test query"
+				systemRole   = "System role for this test"
+				errorMessage = "error message"
+				image        = "path/to/image.wrong"
+				website      = "https://website.com"
+			)
+
+			it.Before(func() {
+				factory.withoutHistory()
+			})
+
+			it("should update a callout as expected when a valid image URL is provided", func() {
+				subject := factory.buildClientWithoutConfig()
+				subject.Config.Image = website
+				subject.Config.Role = systemRole
+
+				expectedBody, err := createBody([]api.Message{
+					{Role: client.SystemRole, Content: systemRole},
+					{Role: client.UserRole, Content: query},
+					{Role: client.UserRole, Content: []api.ImageContent{{
+						Type: "image_url",
+						ImageURL: struct {
+							URL string `json:"url"`
+						}{
+							URL: website,
+						},
+					}}},
+				}, false)
+				Expect(err).NotTo(HaveOccurred())
+
+				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
+				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
+
+				_, _, _ = subject.Query(query)
+			})
+			it("throws an error when the image mime type cannot be obtained due to an open-error", func() {
+				subject := factory.buildClientWithoutConfig()
+				subject.Config.Image = image
+				subject.Config.Role = systemRole
+
+				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
+				mockReader.EXPECT().Open(image).Return(nil, errors.New(errorMessage))
+
+				_, _, err := subject.Query(query)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal(errorMessage))
+			})
+			it("throws an error when the image mime type cannot be obtained due to a read-error", func() {
+				imageFile := &os.File{}
+
+				subject := factory.buildClientWithoutConfig()
+				subject.Config.Image = image
+				subject.Config.Role = systemRole
+
+				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
+				mockReader.EXPECT().Open(image).Return(imageFile, nil)
+				mockReader.EXPECT().ReadBufferFromFile(imageFile).Return(nil, errors.New(errorMessage))
+
+				_, _, err := subject.Query(query)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal(errorMessage))
+			})
+			it("throws an error when the image base64 encoded content cannot be obtained due to a read-error", func() {
+				imageFile := &os.File{}
+
+				subject := factory.buildClientWithoutConfig()
+				subject.Config.Image = image
+				subject.Config.Role = systemRole
+
+				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
+				mockReader.EXPECT().Open(image).Return(imageFile, nil)
+				mockReader.EXPECT().ReadBufferFromFile(imageFile).Return(nil, nil)
+				mockReader.EXPECT().ReadFile(image).Return(nil, errors.New(errorMessage))
+
+				_, _, err := subject.Query(query)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal(errorMessage))
+			})
+			it("should update a callout as expected when a valid local image is provided", func() {
+				imageFile := &os.File{}
+
+				subject := factory.buildClientWithoutConfig()
+				subject.Config.Image = image
+				subject.Config.Role = systemRole
+
+				mockReader.EXPECT().Open(image).Return(imageFile, nil)
+				mockReader.EXPECT().ReadBufferFromFile(imageFile).Return(nil, nil)
+				mockReader.EXPECT().ReadFile(image).Return(nil, nil)
+
+				expectedBody, err := createBody([]api.Message{
+					{Role: client.SystemRole, Content: systemRole},
+					{Role: client.UserRole, Content: query},
+					{Role: client.UserRole, Content: []api.ImageContent{{
+						Type: "image_url",
+						ImageURL: struct {
+							URL string `json:"url"`
+						}{
+							URL: "data:text/plain; charset=utf-8;base64,",
+						},
+					}}},
+				}, false)
+				Expect(err).NotTo(HaveOccurred())
+
+				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
+				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
+
+				_, _, _ = subject.Query(query)
 			})
 		})
 	})
@@ -656,7 +770,7 @@ func newClientFactory(mhs *MockStore) *clientFactory {
 func (f *clientFactory) buildClientWithoutConfig() *client.Client {
 	f.mockHistoryStore.EXPECT().SetThread(config.Thread).Times(1)
 
-	c := client.New(mockCallerFactory, f.mockHistoryStore, mockTimer, MockConfig(), commandLineMode)
+	c := client.New(mockCallerFactory, f.mockHistoryStore, mockTimer, mockReader, MockConfig(), commandLineMode)
 
 	return c.WithContextWindow(config.ContextWindow)
 }

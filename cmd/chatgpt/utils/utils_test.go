@@ -141,4 +141,51 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			Expect(utils.FormatPrompt(input, counter, usage, now)).To(Equal(expected))
 		})
 	})
+
+	when("IsBinary()", func() {
+		it("should return false for a regular string", func() {
+			Expect(utils.IsBinary([]byte("regular string"))).To(BeFalse())
+		})
+		it("should return false for a string containing emojis", func() {
+			Expect(utils.IsBinary([]byte("☮️✅❤️"))).To(BeFalse())
+		})
+		it("should return true for a binary string", func() {
+			Expect(utils.IsBinary([]byte{0xFF, 0xFE, 0xFD, 0xFC, 0xFB})).To(BeTrue())
+		})
+		it("should return false when the data is empty", func() {
+			Expect(utils.IsBinary([]byte{})).To(BeFalse())
+		})
+		it("should handle large text files correctly", func() {
+			// Create a large slice > 512KB with normal text
+			largeText := make([]byte, 1024*1024) // 1MB
+			for i := range largeText {
+				largeText[i] = 'a'
+			}
+
+			Expect(utils.IsBinary(largeText)).To(BeFalse())
+		})
+		it("should return true when data contains null bytes", func() {
+			Expect(utils.IsBinary([]byte{'h', 'e', 'l', 'l', 0x00, 'o'})).To(BeTrue())
+		})
+
+		it("should return true for invalid UTF-8 sequences", func() {
+			// Invalid UTF-8: 0xED 0xA0 0x80 is a surrogate pair which is invalid in UTF-8
+			Expect(utils.IsBinary([]byte{0xED, 0xA0, 0x80})).To(BeTrue())
+		})
+
+		it("should return false for valid UTF-8 special characters", func() {
+			// Testing with Chinese characters, Arabic, and other non-ASCII but valid UTF-8
+			Expect(utils.IsBinary([]byte("你好世界مرحبا"))).To(BeFalse())
+		})
+
+		it("should handle control characters correctly", func() {
+			// Test with allowed control characters (tab, newline, carriage return)
+			Expect(utils.IsBinary([]byte("Hello\tWorld\r\nTest"))).To(BeFalse())
+
+			// Test with other control characters that should trigger binary detection
+			data := []byte{0x01, 0x02, 0x03, 0x04}
+			Expect(utils.IsBinary(data)).To(BeTrue())
+		})
+
+	})
 }

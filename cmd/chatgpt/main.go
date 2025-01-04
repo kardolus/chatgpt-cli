@@ -263,6 +263,10 @@ func run(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to read from pipe: %w", err)
 		}
 
+		if utils.IsBinary(pipeContent) {
+			c.Config.Binary = pipeContent
+		}
+
 		context := string(pipeContent)
 
 		if strings.Trim(context, "\n ") != "" {

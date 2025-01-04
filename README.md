@@ -63,7 +63,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
   context can be piped in from any source, such as local files, standard input, or even another program. This
   flexibility allows the model to adapt to a wide range of conversational scenarios.
 * **Support for images**: Upload an image or provide an image URL using the `--image` flag. Note that image support may
-  not be available for all models.
+  not be available for all models. You can also pipe an image directly: `pngpaste - | chatgpt "What is this photo?"`
 * **Model listing**: Access a list of available models using the `-l` or `--list-models` flag.
 * **Thread listing**: Display a list of active threads using the `--list-threads` flag.
 * **Advanced configuration options**: The CLI supports a layered configuration system where settings can be specified

@@ -716,6 +716,19 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(contextMessage.Role).To(Equal(client.UserRole))
 			Expect(contextMessage.Content).To(Equal(context))
 		})
+		it("does not update history if Config.Binary is provided", func() {
+			subject := factory.buildClientWithoutConfig()
+
+			subject.Config.Binary = []byte("binary data")
+
+			mockHistoryStore.EXPECT().Read().Times(0) // No read should be called, early return happens
+			mockTimer.EXPECT().Now().Times(0)         // No need to mock time since we should not enter the function body
+
+			initialHistoryLength := len(subject.History)
+			subject.ProvideContext("some context")
+
+			Expect(len(subject.History)).To(Equal(initialHistoryLength))
+		})
 	})
 }
 

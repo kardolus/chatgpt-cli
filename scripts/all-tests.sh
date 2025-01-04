@@ -30,6 +30,13 @@ if ! golangci-lint run; then
   exit 1
 fi
 
+# Search for TODOs in the codebase, excluding vendor and scripts directories.
+log "Searching for TODOs..."
+if ag TODO --ignore-dir vendor --ignore scripts; then
+  log "Error: Found TODOs in the codebase. Please address them before proceeding."
+  exit 1
+fi
+
 # Run tests in parallel for faster execution
 log "Running unit tests..."
 cd "$( dirname "${BASH_SOURCE[0]}" )/.."

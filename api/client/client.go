@@ -156,6 +156,10 @@ func (c *Client) ListModels() ([]string, error) {
 // and the method will split it into messages, preserving punctuation and special
 // characters.
 func (c *Client) ProvideContext(context string) {
+	if len(c.Config.Binary) > 0 {
+		return
+	}
+
 	c.initHistory()
 	historyEntries := c.createHistoryEntriesFromString(context)
 	c.History = append(c.History, historyEntries...)
@@ -253,39 +257,20 @@ func (c *Client) createBody(stream bool) ([]byte, error) {
 		Stream:           stream,
 	}
 
-	if c.Config.Image != "" {
-		var content api.ImageContent
-
-		if isValidURL(c.Config.Image) {
-			content = api.ImageContent{
-				Type: imageURLType,
-				ImageURL: struct {
-					URL string `json:"url"`
-				}{
-					URL: c.Config.Image,
-				},
-			}
-		} else {
-			mime, err := c.getMimeTypeFromFileContent(c.Config.Image)
-			if err != nil {
-				return nil, err
-			}
-
-			image, err := c.base64EncodeImage(c.Config.Image)
-			if err != nil {
-				return nil, err
-			}
-
-			content = api.ImageContent{
-				Type: imageURLType,
-				ImageURL: struct {
-					URL string `json:"url"`
-				}{
-					URL: fmt.Sprintf(imageContent, mime, image),
-				},
-			}
+	if len(c.Config.Binary) > 0 {
+		content, err := c.createImageContentFromBinary(c.Config.Binary)
+		if err != nil {
+			return nil, err
 		}
-
+		body.Messages = append(body.Messages, api.Message{
+			Role:    UserRole,
+			Content: []api.ImageContent{content},
+		})
+	} else if c.Config.Image != "" {
+		content, err := c.createImageContentFromURLOrFile(c.Config.Image)
+		if err != nil {
+			return nil, err
+		}
 		body.Messages = append(body.Messages, api.Message{
 			Role:    UserRole,
 			Content: []api.ImageContent{content},
@@ -293,6 +278,61 @@ func (c *Client) createBody(stream bool) ([]byte, error) {
 	}
 
 	return json.Marshal(body)
+}
+
+func (c *Client) createImageContentFromBinary(binary []byte) (api.ImageContent, error) {
+	mime, err := c.getMimeTypeFromBytes(binary)
+	if err != nil {
+		return api.ImageContent{}, err
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(binary)
+	content := api.ImageContent{
+		Type: imageURLType,
+		ImageURL: struct {
+			URL string `json:"url"`
+		}{
+			URL: fmt.Sprintf(imageContent, mime, encoded),
+		},
+	}
+
+	return content, nil
+}
+
+func (c *Client) createImageContentFromURLOrFile(image string) (api.ImageContent, error) {
+	var content api.ImageContent
+
+	if isValidURL(image) {
+		content = api.ImageContent{
+			Type: imageURLType,
+			ImageURL: struct {
+				URL string `json:"url"`
+			}{
+				URL: image,
+			},
+		}
+	} else {
+		mime, err := c.getMimeTypeFromFileContent(image)
+		if err != nil {
+			return content, err
+		}
+
+		encodedImage, err := c.base64EncodeImage(image)
+		if err != nil {
+			return content, err
+		}
+
+		content = api.ImageContent{
+			Type: imageURLType,
+			ImageURL: struct {
+				URL string `json:"url"`
+			}{
+				URL: fmt.Sprintf(imageContent, mime, encodedImage),
+			},
+		}
+	}
+
+	return content, nil
 }
 
 func (c *Client) initHistory() {
@@ -420,6 +460,12 @@ func (c *Client) createHistoryEntriesFromString(input string) []history.History 
 	}
 
 	return result
+}
+
+func (c *Client) getMimeTypeFromBytes(data []byte) (string, error) {
+	mimeType := stdhttp.DetectContentType(data)
+
+	return mimeType, nil
 }
 
 func (c *Client) getMimeTypeFromFileContent(path string) (string, error) {

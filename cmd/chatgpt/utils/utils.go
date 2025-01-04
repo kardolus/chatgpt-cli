@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 func ColorToAnsi(color string) (string, string) {
@@ -63,4 +64,37 @@ func FormatPrompt(str string, counter, usage int, now time.Time) string {
 	str = strings.ReplaceAll(str, "\\n", "\n")
 
 	return str
+}
+
+func IsBinary(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+
+	// Only check up to 512KB to avoid memory issues with large files
+	const maxBytes = 512 * 1024
+	checkSize := len(data)
+	if checkSize > maxBytes {
+		checkSize = maxBytes
+	}
+
+	// Check if the sample is valid UTF-8
+	if !utf8.Valid(data[:checkSize]) {
+		return true
+	}
+
+	// Count suspicious bytes in the sample
+	binaryCount := 0
+	for _, b := range data[:checkSize] {
+		if b == 0 {
+			return true
+		}
+
+		if b < 32 && b != 9 && b != 10 && b != 13 {
+			binaryCount++
+		}
+	}
+
+	threshold := checkSize * 10 / 100
+	return binaryCount > threshold
 }

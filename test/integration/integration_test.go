@@ -711,6 +711,58 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				Expect(output).To(ContainSubstring("- thread3"))
 			})
 
+			it("should delete the expected threads using the --delete-threads flag with a wildcard", func() {
+				historyDir := filepath.Join(filePath, "history")
+				Expect(os.Mkdir(historyDir, 0755)).To(Succeed())
+
+				files := []string{
+					"start1.json", "start2.json", "start3.json",
+					"1end.json", "2end.json", "3end.json",
+					"1middle1.json", "2middle2.json", "3middle3.json",
+					"other1.json", "other2.json",
+				}
+
+				createTestFiles := func(dir string, filenames []string) {
+					for _, filename := range filenames {
+						file, err := os.Create(filepath.Join(dir, filename))
+						Expect(err).NotTo(HaveOccurred())
+						Expect(file.Close()).To(Succeed())
+					}
+				}
+
+				createTestFiles(historyDir, files)
+
+				output := runCommand("--list-threads")
+				expectedThreads := []string{
+					"start1", "start2", "start3",
+					"1end", "2end", "3end",
+					"1middle1", "2middle2", "3middle3",
+					"other1", "other2",
+				}
+				for _, thread := range expectedThreads {
+					Expect(output).To(ContainSubstring("- " + thread))
+				}
+
+				tests := []struct {
+					pattern        string
+					remainingAfter []string
+				}{
+					{"start*", []string{"1end", "2end", "3end", "1middle1", "2middle2", "3middle3", "other1", "other2"}},
+					{"*end", []string{"1middle1", "2middle2", "3middle3", "other1", "other2"}},
+					{"*middle*", []string{"other1", "other2"}},
+					{"*", []string{}}, // Should delete all remaining threads
+				}
+
+				for _, tt := range tests {
+					runCommand("--delete-thread", tt.pattern)
+					output = runCommand("--list-threads")
+
+					for _, thread := range tt.remainingAfter {
+						Expect(output).To(ContainSubstring("- " + thread))
+					}
+				}
+			})
+
 			it("should throw an error when a non-existent thread is deleted using the --delete-threads flag", func() {
 				command := exec.Command(binaryPath, "--delete-thread", "does-not-exist")
 				session, err := gexec.Start(command, io.Discard, io.Discard)

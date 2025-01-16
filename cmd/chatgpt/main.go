@@ -590,7 +590,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("-v, --version", "Display the version information")
 		printFlagWithPadding("-l, --list-models", "List available models")
 		printFlagWithPadding("--list-threads", "List available threads")
-		printFlagWithPadding("--delete-thread", "Delete the specified thread")
+		printFlagWithPadding("--delete-thread", "Delete the specified thread (supports wildcards)")
 		printFlagWithPadding("--clear-history", "Clear the history of the current thread")
 		printFlagWithPadding("--show-history [thread]", "Show the human-readable conversation history")
 		printFlagWithPadding("--image", "Upload an image from the specified local path or URL")

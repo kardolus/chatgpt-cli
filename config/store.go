@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -43,7 +44,7 @@ type FileNotFoundError struct {
 }
 
 func (e *FileNotFoundError) Error() string {
-	return fmt.Sprintf("file does not exist: %s", e.Path)
+	return fmt.Sprintf("no threads matched the pattern %s", e.Path)
 }
 
 // Ensure FileIO implements ConfigStore interface
@@ -74,17 +75,31 @@ func (f *FileIO) WithHistoryPath(historyPath string) *FileIO {
 	return f
 }
 
-func (f *FileIO) Delete(name string) error {
-	path := filepath.Join(f.historyFilePath, name+".json")
-
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return &FileNotFoundError{Path: path}
-		}
-		return err
+func (f *FileIO) Delete(pattern string) error {
+	if !strings.HasSuffix(pattern, "*") && !strings.HasSuffix(pattern, ".json") {
+		pattern += ".json"
+	} else if strings.HasSuffix(pattern, "*") {
+		pattern += ".json"
 	}
 
-	return os.Remove(path)
+	fullPattern := filepath.Join(f.historyFilePath, pattern)
+
+	matches, err := filepath.Glob(fullPattern)
+	if err != nil {
+		return fmt.Errorf("failed to process pattern %s: %w", fullPattern, err)
+	}
+
+	if len(matches) == 0 {
+		return &FileNotFoundError{Path: fullPattern}
+	}
+
+	for _, path := range matches {
+		if err := os.Remove(path); err != nil {
+			return fmt.Errorf("failed to delete file %s: %w", path, err)
+		}
+	}
+
+	return nil
 }
 
 func (f *FileIO) List() ([]string, error) {

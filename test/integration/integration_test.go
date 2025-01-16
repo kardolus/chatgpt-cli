@@ -711,8 +711,16 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				Expect(output).To(ContainSubstring("- thread3"))
 			})
 
-			it("should not throw an error when a non-existent thread is deleted using the --delete-threads flag", func() {
+			it("should throw an error when a non-existent thread is deleted using the --delete-threads flag", func() {
 				command := exec.Command(binaryPath, "--delete-thread", "does-not-exist")
+				session, err := gexec.Start(command, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(exitFailure))
+			})
+
+			it("should not throw an error --clear-history is called without there being a history", func() {
+				command := exec.Command(binaryPath, "--clear-history")
 				session, err := gexec.Start(command, io.Discard, io.Discard)
 				Expect(err).NotTo(HaveOccurred())
 

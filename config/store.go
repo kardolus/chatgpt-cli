@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"github.com/kardolus/chatgpt-cli/internal"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -36,6 +37,15 @@ type Store interface {
 	Write(Config) error
 }
 
+// FileNotFoundError is a custom error type for non-existent files
+type FileNotFoundError struct {
+	Path string
+}
+
+func (e *FileNotFoundError) Error() string {
+	return fmt.Sprintf("file does not exist: %s", e.Path)
+}
+
 // Ensure FileIO implements ConfigStore interface
 var _ Store = &FileIO{}
 
@@ -67,10 +77,14 @@ func (f *FileIO) WithHistoryPath(historyPath string) *FileIO {
 func (f *FileIO) Delete(name string) error {
 	path := filepath.Join(f.historyFilePath, name+".json")
 
-	if _, err := os.Stat(path); err == nil {
-		return os.Remove(path)
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return &FileNotFoundError{Path: path}
+		}
+		return err
 	}
-	return nil
+
+	return os.Remove(path)
 }
 
 func (f *FileIO) List() ([]string, error) {

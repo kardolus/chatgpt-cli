@@ -169,10 +169,15 @@ func run(cmd *cobra.Command, args []string) error {
 		cm := config.NewManager(config.NewStore())
 
 		if err := cm.DeleteThread(cfg.Thread); err != nil {
+			var fileNotFoundError *config.FileNotFoundError
+			if errors.As(err, &fileNotFoundError) {
+				fmt.Println("Thread history does not exist; nothing to clear.")
+				return nil
+			}
 			return err
 		}
 
-		fmt.Println("History successfully cleared.")
+		fmt.Println("History cleared successfully.")
 		return nil
 	}
 

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/api/http"
 	"github.com/kardolus/chatgpt-cli/config"
+	"github.com/kardolus/chatgpt-cli/internal"
 	"net/url"
 	"os"
 	"strings"
@@ -156,23 +158,31 @@ func (c *Client) ListModels() ([]string, error) {
 // and the method will split it into messages, preserving punctuation and special
 // characters.
 func (c *Client) ProvideContext(context string) {
-	if len(c.Config.Binary) > 0 {
-		return
-	}
-
 	c.initHistory()
 	historyEntries := c.createHistoryEntriesFromString(context)
 	c.History = append(c.History, historyEntries...)
 }
 
 // Query sends a query to the API, returning the response as a string along with the token usage.
-// It takes an input string, constructs a request body, and makes a POST API call.
+//
+// It takes a context `ctx` and an input string, constructs a request body, and makes a POST API call.
+// The context allows for request scoping, timeouts, and cancellation handling.
+//
 // Returns the API response string, the number of tokens used, and an error if any issues occur.
 // If the response contains choices, it decodes the JSON and returns the content of the first choice.
-func (c *Client) Query(input string) (string, int, error) {
+//
+// Parameters:
+//   - ctx: A context.Context that controls request cancellation and deadlines.
+//   - input: The query string to send to the API.
+//
+// Returns:
+//   - string: The content of the first response choice from the API.
+//   - int: The total number of tokens used in the request.
+//   - error: An error if the request fails or the response is invalid.
+func (c *Client) Query(ctx context.Context, input string) (string, int, error) {
 	c.prepareQuery(input)
 
-	body, err := c.createBody(false)
+	body, err := c.createBody(ctx, false)
 	if err != nil {
 		return "", 0, err
 	}
@@ -207,14 +217,23 @@ func (c *Client) Query(input string) (string, int, error) {
 }
 
 // Stream sends a query to the API and processes the response as a stream.
-// It takes an input string as a parameter and returns an error if there's
-// any issue during the process. The method creates a request body with the
-// input and then makes an API call using the Post method. The actual
-// processing of the streamed response is done in the Post method.
-func (c *Client) Stream(input string) error {
+//
+// It takes a context `ctx` and an input string, constructs a request body, and makes a POST API call.
+// The context allows for request scoping, timeouts, and cancellation handling.
+//
+// The method creates a request body with the input and calls the API using the `Post` method.
+// The actual processing of the streamed response is handled inside the `Post` method.
+//
+// Parameters:
+//   - ctx: A context.Context that controls request cancellation and deadlines.
+//   - input: The query string to send to the API.
+//
+// Returns:
+//   - error: An error if the request fails or the response is invalid.
+func (c *Client) Stream(ctx context.Context, input string) error {
 	c.prepareQuery(input)
 
-	body, err := c.createBody(true)
+	body, err := c.createBody(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -235,7 +254,7 @@ func (c *Client) Stream(input string) error {
 	return nil
 }
 
-func (c *Client) createBody(stream bool) ([]byte, error) {
+func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
 	var messages []api.Message
 
 	for index, item := range c.History {
@@ -257,8 +276,8 @@ func (c *Client) createBody(stream bool) ([]byte, error) {
 		Stream:           stream,
 	}
 
-	if len(c.Config.Binary) > 0 {
-		content, err := c.createImageContentFromBinary(c.Config.Binary)
+	if data, ok := ctx.Value(internal.BinaryDataKey).([]byte); ok {
+		content, err := c.createImageContentFromBinary(data)
 		if err != nil {
 			return nil, err
 		}
@@ -266,8 +285,8 @@ func (c *Client) createBody(stream bool) ([]byte, error) {
 			Role:    UserRole,
 			Content: []api.ImageContent{content},
 		})
-	} else if c.Config.Image != "" {
-		content, err := c.createImageContentFromURLOrFile(c.Config.Image)
+	} else if path, ok := ctx.Value(internal.ImagePathKey).(string); ok {
+		content, err := c.createImageContentFromURLOrFile(path)
 		if err != nil {
 			return nil, err
 		}

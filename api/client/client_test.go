@@ -1,6 +1,7 @@
 package client_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/golang/mock/gomock"
@@ -10,6 +11,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/api/http"
 	config2 "github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/history"
+	"github.com/kardolus/chatgpt-cli/internal"
 	"github.com/kardolus/chatgpt-cli/test"
 	"os"
 	"strings"
@@ -175,7 +177,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 				mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
 
-				_, _, err = subject.Query(query)
+				_, _, err = subject.Query(context.TODO(), query)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(tt.expectedError))
 			})
@@ -235,7 +237,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					}))
 				}
 
-				result, usage, err := subject.Query(query)
+				result, usage, err := subject.Query(context.TODO(), query)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).To(Equal(answer))
 				Expect(usage).To(Equal(tokens))
@@ -378,7 +380,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
 				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
 
-				_, _, _ = subject.Query("test query")
+				_, _, _ = subject.Query(context.TODO(), "test query")
 			})
 			it("should include all messages when the model does not start with o1Prefix", func() {
 				const systemRole = "System role for this test"
@@ -405,7 +407,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
 				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
 
-				_, _, _ = subject.Query("test query")
+				_, _, _ = subject.Query(context.TODO(), "test query")
 			})
 		})
 
@@ -424,8 +426,11 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			it("should update a callout as expected when a valid image URL is provided", func() {
 				subject := factory.buildClientWithoutConfig()
-				subject.Config.Image = website
+
 				subject.Config.Role = systemRole
+
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, internal.ImagePathKey, website)
 
 				expectedBody, err := createBody([]api.Message{
 					{Role: client.SystemRole, Content: systemRole},
@@ -444,17 +449,19 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
 				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
 
-				_, _, _ = subject.Query(query)
+				_, _, _ = subject.Query(ctx, query)
 			})
 			it("throws an error when the image mime type cannot be obtained due to an open-error", func() {
 				subject := factory.buildClientWithoutConfig()
-				subject.Config.Image = image
 				subject.Config.Role = systemRole
+
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, internal.ImagePathKey, image)
 
 				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
 				mockReader.EXPECT().Open(image).Return(nil, errors.New(errorMessage))
 
-				_, _, err := subject.Query(query)
+				_, _, err := subject.Query(ctx, query)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(Equal(errorMessage))
 			})
@@ -462,14 +469,16 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				imageFile := &os.File{}
 
 				subject := factory.buildClientWithoutConfig()
-				subject.Config.Image = image
 				subject.Config.Role = systemRole
+
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, internal.ImagePathKey, image)
 
 				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
 				mockReader.EXPECT().Open(image).Return(imageFile, nil)
 				mockReader.EXPECT().ReadBufferFromFile(imageFile).Return(nil, errors.New(errorMessage))
 
-				_, _, err := subject.Query(query)
+				_, _, err := subject.Query(ctx, query)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(Equal(errorMessage))
 			})
@@ -477,15 +486,17 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				imageFile := &os.File{}
 
 				subject := factory.buildClientWithoutConfig()
-				subject.Config.Image = image
 				subject.Config.Role = systemRole
+
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, internal.ImagePathKey, image)
 
 				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
 				mockReader.EXPECT().Open(image).Return(imageFile, nil)
 				mockReader.EXPECT().ReadBufferFromFile(imageFile).Return(nil, nil)
 				mockReader.EXPECT().ReadFile(image).Return(nil, errors.New(errorMessage))
 
-				_, _, err := subject.Query(query)
+				_, _, err := subject.Query(ctx, query)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(Equal(errorMessage))
 			})
@@ -493,8 +504,10 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				imageFile := &os.File{}
 
 				subject := factory.buildClientWithoutConfig()
-				subject.Config.Image = image
 				subject.Config.Role = systemRole
+
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, internal.ImagePathKey, image)
 
 				mockReader.EXPECT().Open(image).Return(imageFile, nil)
 				mockReader.EXPECT().ReadBufferFromFile(imageFile).Return(nil, nil)
@@ -517,7 +530,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
 				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
 
-				_, _, _ = subject.Query(query)
+				_, _, _ = subject.Query(ctx, query)
 			})
 		})
 	})
@@ -541,7 +554,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
 
-			err := subject.Stream(query)
+			err := subject.Stream(context.TODO(), query)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal(errorMsg))
 		})
@@ -574,7 +587,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					},
 				}))
 
-				err := subject.Stream(query)
+				err := subject.Stream(context.TODO(), query)
 				Expect(err).NotTo(HaveOccurred())
 			}
 
@@ -671,12 +684,12 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		it("updates the history with the provided context", func() {
 			subject := factory.buildClientWithoutConfig()
 
-			context := "This is a story about a dog named Kya. Kya loves to play fetch and swim in the lake."
+			chatContext := "This is a story about a dog named Kya. Kya loves to play fetch and swim in the lake."
 			mockHistoryStore.EXPECT().Read().Return(nil, nil).Times(1)
 
 			mockTimer.EXPECT().Now().Return(time.Time{}).AnyTimes()
 
-			subject.ProvideContext(context)
+			subject.ProvideContext(chatContext)
 
 			Expect(len(subject.History)).To(Equal(2)) // The system message and the provided context
 
@@ -686,7 +699,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			contextMessage := subject.History[1]
 			Expect(contextMessage.Role).To(Equal(client.UserRole))
-			Expect(contextMessage.Content).To(Equal(context))
+			Expect(contextMessage.Content).To(Equal(chatContext))
 		})
 		it("behaves as expected with a non empty initial history", func() {
 			subject := factory.buildClientWithoutConfig()
@@ -707,27 +720,14 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			mockTimer.EXPECT().Now().Return(time.Time{}).AnyTimes()
 
-			context := "test context"
-			subject.ProvideContext(context)
+			chatContext := "test context"
+			subject.ProvideContext(chatContext)
 
 			Expect(len(subject.History)).To(Equal(3))
 
 			contextMessage := subject.History[2]
 			Expect(contextMessage.Role).To(Equal(client.UserRole))
-			Expect(contextMessage.Content).To(Equal(context))
-		})
-		it("does not update history if Config.Binary is provided", func() {
-			subject := factory.buildClientWithoutConfig()
-
-			subject.Config.Binary = []byte("binary data")
-
-			mockHistoryStore.EXPECT().Read().Times(0) // No read should be called, early return happens
-			mockTimer.EXPECT().Now().Times(0)         // No need to mock time since we should not enter the function body
-
-			initialHistoryLength := len(subject.History)
-			subject.ProvideContext("some context")
-
-			Expect(len(subject.History)).To(Equal(initialHistoryLength))
+			Expect(contextMessage.Content).To(Equal(chatContext))
 		})
 	})
 }

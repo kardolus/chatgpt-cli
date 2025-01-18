@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/api/client"
@@ -214,11 +215,6 @@ func run(cmd *cobra.Command, args []string) error {
 		viper.Set("role", role)
 	}
 
-	if cmd.Flag("image").Changed {
-		cfg.Image = imageFile
-		viper.Set("image", imageFile)
-	}
-
 	if showConfig {
 		allSettings := viper.AllSettings()
 
@@ -234,6 +230,8 @@ func run(cmd *cobra.Command, args []string) error {
 	if viper.GetString("api_key") == "" {
 		return errors.New("API key is required. Please set it using the --set-api-key flag, with the runtime flag --api-key or via environment variables")
 	}
+
+	ctx := context.Background()
 
 	hs, _ := history.New() // do not error out
 	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, &client.RealImageReader{}, cfg, interactiveMode)
@@ -260,6 +258,10 @@ func run(cmd *cobra.Command, args []string) error {
 		c.ProvideContext(prompt)
 	}
 
+	if cmd.Flag("image").Changed {
+		ctx = context.WithValue(ctx, internal.ImagePathKey, imageFile)
+	}
+
 	// Check if there is input from the pipe (stdin)
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) == 0 {
@@ -268,16 +270,20 @@ func run(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to read from pipe: %w", err)
 		}
 
-		if utils.IsBinary(pipeContent) {
-			c.Config.Binary = pipeContent
+		isBinary := utils.IsBinary(pipeContent)
+		if isBinary {
+			ctx = context.WithValue(ctx, internal.BinaryDataKey, pipeContent)
 		}
 
-		context := string(pipeContent)
+		chatContext := string(pipeContent)
 
-		if strings.Trim(context, "\n ") != "" {
+		if strings.Trim(chatContext, "\n ") != "" {
 			hasPipe = true
 		}
-		c.ProvideContext(context)
+
+		if !isBinary {
+			c.ProvideContext(chatContext)
+		}
 	}
 
 	if listModels {
@@ -327,7 +333,7 @@ func run(cmd *cobra.Command, args []string) error {
 			fmtOutputPrompt := utils.FormatPrompt(c.Config.OutputPrompt, qNum, usage, time.Now())
 
 			if queryMode {
-				result, qUsage, err := c.Query(input)
+				result, qUsage, err := c.Query(ctx, input)
 				if err != nil {
 					fmt.Println("Error:", err)
 				} else {
@@ -337,7 +343,7 @@ func run(cmd *cobra.Command, args []string) error {
 				}
 			} else {
 				fmt.Print(outputColor + fmtOutputPrompt)
-				if err := c.Stream(input); err != nil {
+				if err := c.Stream(ctx, input); err != nil {
 					_, _ = fmt.Fprintln(os.Stderr, "Error:", err)
 				} else {
 					fmt.Println()
@@ -351,7 +357,7 @@ func run(cmd *cobra.Command, args []string) error {
 			return errors.New("you must specify your query or provide input via a pipe")
 		}
 		if queryMode {
-			result, usage, err := c.Query(strings.Join(args, " "))
+			result, usage, err := c.Query(ctx, strings.Join(args, " "))
 			if err != nil {
 				return err
 			}
@@ -360,10 +366,8 @@ func run(cmd *cobra.Command, args []string) error {
 			if c.Config.TrackTokenUsage {
 				fmt.Printf("\n[Token Usage: %d]\n", usage)
 			}
-		} else {
-			if err := c.Stream(strings.Join(args, " ")); err != nil {
-				return err
-			}
+		} else if err := c.Stream(ctx, strings.Join(args, " ")); err != nil {
+			return err
 		}
 	}
 	return nil

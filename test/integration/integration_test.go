@@ -256,6 +256,22 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			return string(session.Out.Contents())
 		}
 
+		runCommandWithStdin := func(stdin io.Reader, args ...string) string {
+			command := exec.Command(binaryPath, args...)
+			command.Stdin = stdin
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+
+			ExpectWithOffset(1, err).NotTo(HaveOccurred())
+			<-session.Exited
+
+			if tmp := string(session.Err.Contents()); tmp != "" {
+				fmt.Printf("error output: %s", tmp)
+			}
+
+			ExpectWithOffset(1, session).Should(gexec.Exit(0))
+			return string(session.Out.Contents())
+		}
+
 		checkConfigFileContent := func(expectedContent string) {
 			content, err := os.ReadFile(configFile)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
@@ -661,6 +677,38 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 				// Cleanup: Unset the environment variable
 				Expect(os.Unsetenv(omitHistoryEnvKey)).To(Succeed())
+			})
+
+			it("should not add binary data to the history", func() {
+				historyDir := path.Join(filePath, "history")
+				historyFile := path.Join(historyDir, "default.json")
+				Expect(historyFile).NotTo(BeAnExistingFile())
+
+				response := `I don't have personal opinions about bars, but here are some popular bars in Red Hook, Brooklyn:`
+
+				// Create a pipe to simulate binary input
+				r, w := io.Pipe()
+				defer r.Close()
+
+				// Run the command with piped binary input
+				binaryData := []byte{0x00, 0xFF, 0x42, 0x10}
+				go func() {
+					defer w.Close()
+					_, err := w.Write(binaryData)
+					Expect(err).NotTo(HaveOccurred())
+				}()
+
+				// Run the command with stdin redirected
+				output := runCommandWithStdin(r, "--query", "some-query")
+				Expect(output).To(ContainSubstring(response))
+
+				Expect(historyDir).To(BeADirectory())
+				checkHistoryContent := func(expectedContent string) {
+					content, err := os.ReadFile(historyFile)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(string(content)).To(ContainSubstring(expectedContent))
+				}
+				checkHistoryContent(response)
 			})
 
 			it("should return the expected result for the --list-threads flag", func() {

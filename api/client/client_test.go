@@ -177,7 +177,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 				mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
 
-				_, _, err = subject.Query(context.TODO(), query)
+				_, _, err = subject.Query(context.Background(), query)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(tt.expectedError))
 			})
@@ -237,7 +237,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					}))
 				}
 
-				result, usage, err := subject.Query(context.TODO(), query)
+				result, usage, err := subject.Query(context.Background(), query)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).To(Equal(answer))
 				Expect(usage).To(Equal(tokens))
@@ -380,7 +380,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
 				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
 
-				_, _, _ = subject.Query(context.TODO(), "test query")
+				_, _, _ = subject.Query(context.Background(), "test query")
 			})
 			it("should include all messages when the model does not start with o1Prefix", func() {
 				const systemRole = "System role for this test"
@@ -407,7 +407,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
 				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
 
-				_, _, _ = subject.Query(context.TODO(), "test query")
+				_, _, _ = subject.Query(context.Background(), "test query")
 			})
 		})
 
@@ -554,7 +554,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 			mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
 
-			err := subject.Stream(context.TODO(), query)
+			err := subject.Stream(context.Background(), query)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal(errorMsg))
 		})
@@ -587,7 +587,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 					},
 				}))
 
-				err := subject.Stream(context.TODO(), query)
+				err := subject.Stream(context.Background(), query)
 				Expect(err).NotTo(HaveOccurred())
 			}
 

@@ -422,7 +422,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 			Eventually(session).Should(gexec.Exit(exitSuccess))
 
-			output := string(session.Out.Contents())
+			output := string(session.Err.Contents())
 			Expect(output).To(ContainSubstring(fmt.Sprintf("Warning: config.yaml doesn't exist in %s, create it", configHomeDir)))
 
 			// Unset the variable to prevent pollution
@@ -534,9 +534,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("prints debug information with the --debug flag", func() {
-			Expect(os.Setenv("OPENAI_DEBUG", "true")).To(Succeed())
-
-			output := runCommand("--query", "tell me a joke")
+			output := runCommand("--query", "tell me a joke", "--debug")
 
 			Expect(output).To(ContainSubstring("Generated cURL command"))
 			Expect(output).To(ContainSubstring("/v1/chat/completions"))

@@ -9,6 +9,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
 	"github.com/kardolus/chatgpt-cli/internal"
 	"github.com/spf13/pflag"
+	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v3"
 	"io"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 var (
@@ -29,6 +31,7 @@ var (
 	clearHistory    bool
 	showHistory     bool
 	showVersion     bool
+	showDebug       bool
 	newThread       bool
 	showConfig      bool
 	interactiveMode bool
@@ -75,10 +78,13 @@ var configMetadata = []ConfigMetadata{
 	{"auto_create_new_thread", "set-auto-create-new-thread", true, "Create a new thread for each interactive session"},
 	{"track_token_usage", "set-track-token-usage", true, "Track token usage"},
 	{"skip_tls_verify", "set-skip-tls-verify", false, "Skip TLS certificate verification"},
-	{"debug", "set-debug", false, "Enable debug mode"},
 	{"multiline", "set-multiline", false, "Enables multiline mode while in interactive mode"},
 	{"seed", "set-seed", 0, "Sets the seed for deterministic sampling (Beta)"},
 	{"name", "set-name", "openai", "The prefix for environment variable overrides"},
+}
+
+func init() {
+	internal.SetAllowedLogLevels(zapcore.InfoLevel)
 }
 
 func main() {
@@ -96,15 +102,15 @@ func main() {
 	setCustomHelp(rootCmd)
 	setupFlags(rootCmd)
 
+	sugar := zap.S()
+
 	var err error
 	if cfg, err = initConfig(rootCmd); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Config initialization failed: %v\n", err)
-		os.Exit(1)
+		sugar.Fatalf("Config initialization failed: %v", err)
 	}
 
 	if err := rootCmd.Execute(); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		sugar.Fatalln(err)
 	}
 }
 
@@ -134,11 +140,13 @@ func run(cmd *cobra.Command, args []string) error {
 		return config.GenCompletions(cmd, shell)
 	}
 
+	sugar := zap.S()
+
 	if showVersion {
 		if GitCommit != "homebrew" {
 			GitCommit = "commit " + GitCommit
 		}
-		fmt.Printf("ChatGPT CLI version %s (%s)\n", GitVersion, GitCommit)
+		sugar.Infof("ChatGPT CLI version %s (%s)", GitVersion, GitCommit)
 		return nil
 	}
 
@@ -148,7 +156,7 @@ func run(cmd *cobra.Command, args []string) error {
 		if err := cm.DeleteThread(threadName); err != nil {
 			return err
 		}
-		fmt.Printf("Successfully deleted thread %s\n", threadName)
+		sugar.Infof("Successfully deleted thread %s", threadName)
 		return nil
 	}
 
@@ -159,9 +167,9 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("Available threads:")
+		sugar.Infoln("Available threads:")
 		for _, thread := range threads {
-			fmt.Println(thread)
+			sugar.Infoln(thread)
 		}
 		return nil
 	}
@@ -172,13 +180,13 @@ func run(cmd *cobra.Command, args []string) error {
 		if err := cm.DeleteThread(cfg.Thread); err != nil {
 			var fileNotFoundError *config.FileNotFoundError
 			if errors.As(err, &fileNotFoundError) {
-				fmt.Println("Thread history does not exist; nothing to clear.")
+				sugar.Infoln("Thread history does not exist; nothing to clear.")
 				return nil
 			}
 			return err
 		}
 
-		fmt.Println("History cleared successfully.")
+		sugar.Infoln("History cleared successfully.")
 		return nil
 	}
 
@@ -202,8 +210,12 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		fmt.Println(output)
+		sugar.Infoln(output)
 		return nil
+	}
+
+	if showDebug {
+		internal.SetAllowedLogLevels(zapcore.InfoLevel, zapcore.DebugLevel)
 	}
 
 	if cmd.Flag("role-file").Changed {
@@ -223,7 +235,7 @@ func run(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to marshal config: %w", err)
 		}
 
-		fmt.Println(string(configBytes))
+		sugar.Infoln(string(configBytes))
 		return nil
 	}
 
@@ -291,19 +303,19 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("Available models:")
+		sugar.Infoln("Available models:")
 		for _, model := range models {
-			fmt.Println(model)
+			sugar.Infoln(model)
 		}
 		return nil
 	}
 
 	if tmp := os.Getenv(internal.ConfigHomeEnv); tmp != "" && !fileExists(viper.ConfigFileUsed()) {
-		fmt.Printf("Warning: config.yaml doesn't exist in %s, create it\n", tmp)
+		sugar.Warnf("Warning: config.yaml doesn't exist in %s, create it\n", tmp)
 	}
 
 	if interactiveMode {
-		fmt.Printf("Entering interactive mode. Using thread '%s'. Type 'clear' to clear the screen, 'exit' to quit, or press Ctrl+C.\n\n", hs.GetThread())
+		sugar.Infof("Entering interactive mode. Using thread '%s'. Type 'clear' to clear the screen, 'exit' to quit, or press Ctrl+C.\n\n", hs.GetThread())
 		rl, err := readline.New("")
 		if err != nil {
 			return err
@@ -326,7 +338,7 @@ func run(cmd *cobra.Command, args []string) error {
 			fmt.Print(cmdReset)
 
 			if err == io.EOF {
-				fmt.Println("Bye!")
+				sugar.Infoln("Bye!")
 				return nil
 			}
 
@@ -335,9 +347,9 @@ func run(cmd *cobra.Command, args []string) error {
 			if queryMode {
 				result, qUsage, err := c.Query(ctx, input)
 				if err != nil {
-					fmt.Println("Error:", err)
+					sugar.Infoln("Error:", err)
 				} else {
-					fmt.Printf("%s%s%s\n\n", outputColor, fmtOutputPrompt+result, outPutReset)
+					sugar.Infof("%s%s%s\n\n", outputColor, fmtOutputPrompt+result, outPutReset)
 					usage += qUsage
 					qNum++
 				}
@@ -346,7 +358,7 @@ func run(cmd *cobra.Command, args []string) error {
 				if err := c.Stream(ctx, input); err != nil {
 					_, _ = fmt.Fprintln(os.Stderr, "Error:", err)
 				} else {
-					fmt.Println()
+					sugar.Infoln()
 					qNum++
 				}
 				fmt.Print(outPutReset)
@@ -361,10 +373,10 @@ func run(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return err
 			}
-			fmt.Println(result)
+			sugar.Infoln(result)
 
 			if c.Config.TrackTokenUsage {
-				fmt.Printf("\n[Token Usage: %d]\n", usage)
+				sugar.Infof("\n[Token Usage: %d]\n", usage)
 			}
 		} else if err := c.Stream(ctx, strings.Join(args, " ")); err != nil {
 			return err
@@ -423,8 +435,9 @@ func readConfigWithComments(configPath string) (*yaml.Node, error) {
 func readInput(rl *readline.Instance, multiline bool) (string, error) {
 	var lines []string
 
+	sugar := zap.S()
 	if multiline {
-		fmt.Println("Multiline mode enabled. Type 'EOF' on a new line to submit your query.")
+		sugar.Infoln("Multiline mode enabled. Type 'EOF' on a new line to submit your query.")
 	}
 
 	// Custom keybinding to handle backspace in multiline mode
@@ -579,13 +592,14 @@ func saveConfig(changedValues map[string]interface{}) error {
 }
 
 func setCustomHelp(rootCmd *cobra.Command) {
+	sugar := zap.S()
 	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		fmt.Println("ChatGPT CLI - A powerful client for interacting with GPT models.")
+		sugar.Infoln("ChatGPT CLI - A powerful client for interacting with GPT models.")
 
-		fmt.Println("\nUsage:")
-		fmt.Printf("  chatgpt [flags]\n\n")
+		sugar.Infoln("\nUsage:")
+		sugar.Infof("  chatgpt [flags]\n")
 
-		fmt.Println("General Flags:")
+		sugar.Infoln("General Flags:")
 		printFlagWithPadding("-q, --query", "Use query mode instead of stream mode")
 		printFlagWithPadding("-i, --interactive", "Use interactive mode")
 		printFlagWithPadding("-p, --prompt", "Provide a prompt file for context")
@@ -599,34 +613,34 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--show-history [thread]", "Show the human-readable conversation history")
 		printFlagWithPadding("--image", "Upload an image from the specified local path or URL")
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
+		printFlagWithPadding("--debug", "Print debug messages")
 		printFlagWithPadding("--set-completions", "Generate autocompletion script for your current shell")
-		fmt.Println()
+		sugar.Infoln()
 
-		fmt.Println("Persistent Configuration Setters:")
+		sugar.Infoln("Persistent Configuration Setters:")
 		cmd.Flags().VisitAll(func(f *pflag.Flag) {
 			if strings.HasPrefix(f.Name, "set-") && !isNonConfigSetter(f.Name) {
 				printFlagWithPadding("--"+f.Name, f.Usage)
 			}
 		})
 
-		fmt.Println("\nRuntime Value Overrides:")
+		sugar.Infoln("\nRuntime Value Overrides:")
 		cmd.Flags().VisitAll(func(f *pflag.Flag) {
 			if isConfigAlias(f.Name) {
 				printFlagWithPadding("--"+f.Name, "Override value for "+strings.ReplaceAll(f.Name, "_", "-"))
 			}
 		})
 
-		fmt.Println("\nEnvironment Variables:")
-		fmt.Println("  You can also use environment variables to set config values. For example:")
-		fmt.Printf("  %s_API_KEY=your_api_key chatgpt --query 'Hello'\n", strings.ToUpper(viper.GetEnvPrefix()))
+		sugar.Infoln("\nEnvironment Variables:")
+		sugar.Infoln("  You can also use environment variables to set config values. For example:")
+		sugar.Infof("  %s_API_KEY=your_api_key chatgpt --query 'Hello'", strings.ToUpper(viper.GetEnvPrefix()))
 
 		configHome, _ := internal.GetConfigHome()
 
-		fmt.Println("\nConfiguration File:")
-		fmt.Println("  All configuration changes made with the setters will be saved in the config.yaml file.")
-		fmt.Printf("  The config.yaml file is located in the following path:")
-		fmt.Printf(" %s/config.yaml\n", configHome)
-		fmt.Println("  You can edit this file manually to change configuration settings as well.")
+		sugar.Infoln("\nConfiguration File:")
+		sugar.Infoln("  All configuration changes made with the setters will be saved in the config.yaml file.")
+		sugar.Infof("  The config.yaml file is located in the following path: %s/config.yaml", configHome)
+		sugar.Infoln("  You can edit this file manually to change configuration settings as well.")
 	})
 }
 
@@ -636,6 +650,7 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().BoolVar(&clearHistory, "clear-history", false, "Clear all prior conversation context for the current thread")
 	rootCmd.PersistentFlags().BoolVarP(&showConfig, "config", "c", false, "Display the configuration")
 	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "Display the version information")
+	rootCmd.PersistentFlags().BoolVarP(&showDebug, "debug", "", false, "Enable debug mode")
 	rootCmd.PersistentFlags().BoolVarP(&newThread, "new-thread", "n", false, "Create a new thread with a random name and target it")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
 	rootCmd.PersistentFlags().StringVarP(&promptFile, "prompt", "p", "", "Provide a prompt file")
@@ -689,8 +704,9 @@ func isConfigAlias(name string) bool {
 }
 
 func printFlagWithPadding(name, description string) {
+	sugar := zap.S()
 	padding := 30
-	fmt.Printf("  %-*s %s\n", padding, name, description)
+	sugar.Infof("  %-*s %s", padding, name, description)
 }
 
 func syncFlagsWithViper(cmd *cobra.Command) error {
@@ -768,7 +784,6 @@ func createConfigFromViper() config.Config {
 		AutoCreateNewThread: viper.GetBool("auto_create_new_thread"),
 		TrackTokenUsage:     viper.GetBool("track_token_usage"),
 		SkipTLSVerify:       viper.GetBool("skip_tls_verify"),
-		Debug:               viper.GetBool("debug"),
 		Multiline:           viper.GetBool("multiline"),
 		Seed:                viper.GetInt("seed"),
 	}

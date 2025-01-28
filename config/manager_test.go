@@ -36,7 +36,6 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		defaultOmitHistory         = false
 		defaultAutoCreateNewThread = false
 		defaultTrackTokenUsage     = false
-		defaultDebug               = false
 		defaultSkipTLSVerify       = false
 		defaultTemperature         = 1.1
 		defaultTopP                = 2.2
@@ -80,7 +79,6 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			OutputPrompt:        defaultOutputPrompt,
 			AutoCreateNewThread: defaultAutoCreateNewThread,
 			TrackTokenUsage:     defaultTrackTokenUsage,
-			Debug:               defaultDebug,
 			SkipTLSVerify:       defaultSkipTLSVerify,
 		}
 
@@ -119,7 +117,6 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.OutputPrompt).To(Equal(defaultOutputPrompt))
 		Expect(subject.Config.AutoCreateNewThread).To(Equal(defaultAutoCreateNewThread))
 		Expect(subject.Config.TrackTokenUsage).To(Equal(defaultTrackTokenUsage))
-		Expect(subject.Config.Debug).To(Equal(defaultDebug))
 		Expect(subject.Config.SkipTLSVerify).To(Equal(defaultSkipTLSVerify))
 	})
 
@@ -144,7 +141,6 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			OutputPrompt:        "user-output-prompt",
 			AutoCreateNewThread: true,
 			TrackTokenUsage:     true,
-			Debug:               true,
 			SkipTLSVerify:       true,
 		}
 
@@ -164,7 +160,6 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.OmitHistory).To(BeTrue())
 		Expect(subject.Config.AutoCreateNewThread).To(BeTrue())
 		Expect(subject.Config.TrackTokenUsage).To(BeTrue())
-		Expect(subject.Config.Debug).To(BeTrue())
 		Expect(subject.Config.SkipTLSVerify).To(BeTrue())
 		Expect(subject.Config.Role).To(Equal("user-role"))
 		Expect(subject.Config.Thread).To(Equal("user-thread"))
@@ -217,7 +212,6 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.OmitHistory).To(BeTrue())
 		Expect(subject.Config.AutoCreateNewThread).To(BeTrue())
 		Expect(subject.Config.TrackTokenUsage).To(BeTrue())
-		Expect(subject.Config.Debug).To(BeTrue())
 		Expect(subject.Config.SkipTLSVerify).To(BeTrue())
 		Expect(subject.Config.Role).To(Equal("env-role"))
 		Expect(subject.Config.Thread).To(Equal("env-thread"))
@@ -267,7 +261,6 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 			AutoCreateNewThread: false,
 			TrackTokenUsage:     false,
 			SkipTLSVerify:       false,
-			Debug:               true,
 			Role:                "user-role",
 			Thread:              "user-thread",
 			Temperature:         1.5,
@@ -296,7 +289,6 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.AutoCreateNewThread).To(BeTrue())
 		Expect(subject.Config.TrackTokenUsage).To(BeTrue())
 		Expect(subject.Config.SkipTLSVerify).To(BeTrue())
-		Expect(subject.Config.Debug).To(BeFalse())
 		Expect(subject.Config.Role).To(Equal("env-role"))
 		Expect(subject.Config.Thread).To(Equal("env-thread"))
 		Expect(subject.Config.Temperature).To(Equal(2.2))

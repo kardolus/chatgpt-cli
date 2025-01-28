@@ -11,6 +11,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/api/http"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/internal"
+	"go.uber.org/zap"
 	"net/url"
 	"os"
 	"strings"
@@ -119,14 +120,10 @@ func (c *Client) ListModels() ([]string, error) {
 
 	endpoint := c.getEndpoint(c.Config.ModelsPath)
 
-	if c.Config.Debug {
-		c.printRequestDebugInfo(endpoint, nil)
-	}
+	c.printRequestDebugInfo(endpoint, nil)
 
 	raw, err := c.caller.Get(c.getEndpoint(c.Config.ModelsPath))
-	if c.Config.Debug {
-		c.printResponseDebugInfo(raw)
-	}
+	c.printResponseDebugInfo(raw)
 
 	if err != nil {
 		return nil, err
@@ -189,14 +186,10 @@ func (c *Client) Query(ctx context.Context, input string) (string, int, error) {
 
 	endpoint := c.getEndpoint(c.Config.CompletionsPath)
 
-	if c.Config.Debug {
-		c.printRequestDebugInfo(endpoint, body)
-	}
+	c.printRequestDebugInfo(endpoint, body)
 
 	raw, err := c.caller.Post(endpoint, body, false)
-	if c.Config.Debug {
-		c.printResponseDebugInfo(raw)
-	}
+	c.printResponseDebugInfo(raw)
 
 	if err != nil {
 		return "", 0, err
@@ -240,9 +233,7 @@ func (c *Client) Stream(ctx context.Context, input string) error {
 
 	endpoint := c.getEndpoint(c.Config.CompletionsPath)
 
-	if c.Config.Debug {
-		c.printRequestDebugInfo(endpoint, body)
-	}
+	c.printRequestDebugInfo(endpoint, body)
 
 	result, err := c.caller.Post(endpoint, body, true)
 	if err != nil {
@@ -505,25 +496,26 @@ func (c *Client) getMimeTypeFromFileContent(path string) (string, error) {
 }
 
 func (c *Client) printRequestDebugInfo(endpoint string, body []byte) {
-	fmt.Printf("\nGenerated cURL command:\n\n")
+	sugar := zap.S()
+	sugar.Debugf("\nGenerated cURL command:\n")
 	method := "POST"
 	if body == nil {
 		method = "GET"
 	}
-	fmt.Printf("curl --location --insecure --request %s '%s' \\\n", method, endpoint)
-	fmt.Printf("  --header \"Authorization: Bearer ${%s_API_KEY}\" \\\n", strings.ToUpper(c.Config.Name))
-	fmt.Printf("  --header 'Content-Type: application/json'")
+	sugar.Debugf("curl --location --insecure --request %s '%s' \\", method, endpoint)
+	sugar.Debugf("  --header \"Authorization: Bearer ${%s_API_KEY}\" \\", strings.ToUpper(c.Config.Name))
+	sugar.Debugf("  --header 'Content-Type: application/json' \\")
 
 	if body != nil {
 		bodyString := strings.ReplaceAll(string(body), "'", "'\"'\"'") // Escape single quotes
-		fmt.Printf(" \\\n  --data-raw '%s'", bodyString)
+		sugar.Debugf("  --data-raw '%s'", bodyString)
 	}
-	fmt.Println() // Print a newline at the end
 }
 
 func (c *Client) printResponseDebugInfo(raw []byte) {
-	fmt.Printf("\nResponse\n\n")
-	fmt.Printf("%s\n\n", raw)
+	sugar := zap.S()
+	sugar.Debugf("\nResponse\n")
+	sugar.Debugf("%s\n", raw)
 }
 
 func GenerateUniqueSlug(prefix string) string {

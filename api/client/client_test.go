@@ -824,7 +824,6 @@ func MockConfig() config2.Config {
 		AutoCreateNewThread: true,
 		TrackTokenUsage:     true,
 		SkipTLSVerify:       false,
-		Debug:               false,
 		Seed:                1,
 	}
 }

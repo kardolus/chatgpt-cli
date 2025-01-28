@@ -25,7 +25,6 @@ type Config struct {
 	AutoCreateNewThread bool    `yaml:"auto_create_new_thread"`
 	TrackTokenUsage     bool    `yaml:"track_token_usage"`
 	SkipTLSVerify       bool    `yaml:"skip_tls_verify"`
-	Debug               bool    `yaml:"debug"`
 	Multiline           bool    `yaml:"multiline"`
 	Seed                int     `yaml:"seed"`
 }

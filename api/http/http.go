@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/config"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"os"
@@ -73,16 +74,15 @@ func (r *RestCaller) Post(url string, body []byte, stream bool) ([]byte, error) 
 func (r *RestCaller) ProcessResponse(reader io.Reader, writer io.Writer) []byte {
 	var result []byte
 
-	if r.config.Debug {
-		fmt.Printf("\nResponse\n\n")
-	}
+	sugar := zap.S()
+	sugar.Debugln("\nResponse\n")
 
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		if r.config.Debug {
-			fmt.Println(line)
+		if zap.L().Core().Enabled(zap.DebugLevel) {
+			sugar.Debugln(line)
 			continue
 		}
 

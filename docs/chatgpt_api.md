@@ -121,6 +121,53 @@ curl --location --insecure --request POST 'https://api.openai.com/v1/chat/comple
     }' | jq .
 ```
 
+### Using functions
+
+1. User Query → OpenAI API
+2. OpenAI API → Function Call (local machine)
+3. Function Call → External Function 
+4. External Function → Function Response 
+5. Function Response → OpenAI API 
+6. OpenAI API → Final Response to User
+
+```shell
+curl https://api.openai.com/v1/chat/completions \
+-H "Content-Type: application/json" \
+-H "Authorization: Bearer $OPENAI_API_KEY" \
+-d '{
+  "model": "gpt-4",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is the weather like in Paris today?"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_weather",
+        "description": "Get current temperature for a given location.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "City and country e.g. Bogotá, Colombia"
+            }
+          },
+          "required": ["location"]
+        }
+      }
+    }
+  ],
+  "tool_choice": {
+    "type": "function",
+    "function": {"name": "get_weather"}
+  }
+}'
+```
+
 ### Providing custom context
 
 You can provide your own context in the messages array in your callout. You can split this data over multiple lines. For

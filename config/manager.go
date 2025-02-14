@@ -31,7 +31,7 @@ func (c *Manager) WithEnvironment() *Manager {
 }
 
 func (c *Manager) APIKeyEnvVarName() string {
-	return strings.ToUpper(c.Config.Name) + "_" + "API_KEY"
+	return strings.ToUpper(c.Config.Providers[c.Config.Target].Name) + "_" + "API_KEY"
 }
 
 // DeleteThread removes the specified thread from the configuration store.
@@ -53,7 +53,7 @@ func (c *Manager) ListThreads() ([]string, error) {
 
 	for _, thread := range threads {
 		thread = strings.ReplaceAll(thread, ".json", "")
-		if thread != c.Config.Thread {
+		if thread != c.Config.Providers[c.Config.Target].Thread {
 			result = append(result, fmt.Sprintf("- %s", thread))
 			continue
 		}
@@ -108,7 +108,7 @@ func replaceByEnvironment(configuration Config) Config {
 	t := reflect.TypeOf(configuration)
 	v := reflect.ValueOf(&configuration).Elem()
 
-	prefix := strings.ToUpper(configuration.Name) + "_"
+	prefix := strings.ToUpper(configuration.Providers[configuration.Target].Name) + "_"
 	for i := 0; i < t.NumField(); i++ {
 		tag := t.Field(i).Tag.Get("yaml")
 		if tag == "name" {

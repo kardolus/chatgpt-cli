@@ -107,7 +107,7 @@ func migrate() error {
 		defaults := config.NewStore().ReadDefaults()
 
 		// move the legacy "history" file to "default.json"
-		if err := os.Rename(historyFile, path.Join(hiddenDir, defaults.Thread+jsonExtension)); err != nil {
+		if err := os.Rename(historyFile, path.Join(hiddenDir, defaults.Providers[defaults.Target].Thread+jsonExtension)); err != nil {
 			return err
 		}
 
@@ -117,7 +117,7 @@ func migrate() error {
 		}
 
 		// move default.json to the "history" directory
-		if err := os.Rename(path.Join(hiddenDir, defaults.Thread+jsonExtension), path.Join(historyFile, defaults.Thread+jsonExtension)); err != nil {
+		if err := os.Rename(path.Join(hiddenDir, defaults.Providers[defaults.Target].Thread+jsonExtension), path.Join(historyFile, defaults.Providers[defaults.Target].Thread+jsonExtension)); err != nil {
 			return err
 		}
 	}

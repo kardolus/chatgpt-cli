@@ -127,7 +127,12 @@ func (f *FileIO) Read() (Config, error) {
 }
 
 func (f *FileIO) ReadDefaults() Config {
-	return Config{
+	cfg := Config{
+		Target:    openAIName,
+		Providers: make(map[string]Provider),
+	}
+
+	cfg.Providers[openAIName] = Provider{
 		Name:             openAIName,
 		Model:            openAIModel,
 		Role:             openAIRole,
@@ -145,6 +150,8 @@ func (f *FileIO) ReadDefaults() Config {
 		PresencePenalty:  openAIPresencePenalty,
 		CommandPrompt:    openAICommandPrompt,
 	}
+
+	return cfg
 }
 
 func (f *FileIO) Write(config Config) error {
@@ -192,14 +199,15 @@ func getPath() (string, error) {
 
 func migrate(config Config) Config {
 	// the "old" max_tokens became context_window
-	if config.ContextWindow == 0 && config.MaxTokens > 0 {
-		config.ContextWindow = config.MaxTokens
-		// set it to the default in case the value is small
-		if config.ContextWindow < openAIContextWindow {
-			config.ContextWindow = openAIContextWindow
-		}
-		config.MaxTokens = openAIMaxTokens
-	}
+	// TODO implement the below
+	//if config.ContextWindow == 0 && config.MaxTokens > 0 {
+	//	config.ContextWindow = config.MaxTokens
+	//	// set it to the default in case the value is small
+	//	if config.ContextWindow < openAIContextWindow {
+	//		config.ContextWindow = openAIContextWindow
+	//	}
+	//	config.MaxTokens = openAIMaxTokens
+	//}
 	return config
 }
 

@@ -40,7 +40,7 @@ var _ Caller = &RestCaller{}
 
 func New(cfg config.Config) *RestCaller {
 	var client *http.Client
-	if cfg.SkipTLSVerify {
+	if cfg.Providers[cfg.Target].SkipTLSVerify {
 		transport := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
@@ -160,8 +160,8 @@ func (r *RestCaller) newRequest(method, url string, body []byte) (*http.Request,
 		return nil, err
 	}
 
-	if r.config.APIKey != "" {
-		req.Header.Set(r.config.AuthHeader, r.config.AuthTokenPrefix+r.config.APIKey)
+	if r.config.Providers[r.config.Target].APIKey != "" {
+		req.Header.Set(r.config.Providers[r.config.Target].AuthHeader, r.config.Providers[r.config.Target].AuthTokenPrefix+r.config.Providers[r.config.Target].APIKey)
 	}
 	req.Header.Set(headerContentType, contentType)
 

@@ -84,10 +84,10 @@ type Client struct {
 func New(callerFactory http.CallerFactory, hs history.Store, t Timer, r ImageReader, cfg config.Config, interactiveMode bool) *Client {
 	caller := callerFactory(cfg)
 
-	if interactiveMode && cfg.AutoCreateNewThread {
+	if interactiveMode && cfg.Providers[cfg.Target].AutoCreateNewThread {
 		hs.SetThread(GenerateUniqueSlug(InteractiveThreadPrefix))
 	} else {
-		hs.SetThread(cfg.Thread)
+		hs.SetThread(cfg.Providers[cfg.Target].Thread)
 	}
 
 	return &Client{
@@ -100,12 +100,14 @@ func New(callerFactory http.CallerFactory, hs history.Store, t Timer, r ImageRea
 }
 
 func (c *Client) WithContextWindow(window int) *Client {
-	c.Config.ContextWindow = window
+	cfg := c.Config.Providers[c.Config.Target]
+	cfg.ContextWindow = window // TODO yikes! NPE!!
 	return c
 }
 
 func (c *Client) WithServiceURL(url string) *Client {
-	c.Config.URL = url
+	cfg := c.Config.Providers[c.Config.Target]
+	cfg.URL = url
 	return c
 }
 
@@ -118,11 +120,11 @@ func (c *Client) WithServiceURL(url string) *Client {
 func (c *Client) ListModels() ([]string, error) {
 	var result []string
 
-	endpoint := c.getEndpoint(c.Config.ModelsPath)
+	endpoint := c.getEndpoint(c.Config.Providers[c.Config.Target].ModelsPath)
 
 	c.printRequestDebugInfo(endpoint, nil)
 
-	raw, err := c.caller.Get(c.getEndpoint(c.Config.ModelsPath))
+	raw, err := c.caller.Get(c.getEndpoint(c.Config.Providers[c.Config.Target].ModelsPath))
 	c.printResponseDebugInfo(raw)
 
 	if err != nil {
@@ -136,7 +138,7 @@ func (c *Client) ListModels() ([]string, error) {
 
 	for _, model := range response.Data {
 		if strings.HasPrefix(model.Id, gptPrefix) || strings.HasPrefix(model.Id, o1Prefix) {
-			if model.Id != c.Config.Model {
+			if model.Id != c.Config.Providers[c.Config.Target].Model {
 				result = append(result, fmt.Sprintf("- %s", model.Id))
 				continue
 			}
@@ -184,7 +186,7 @@ func (c *Client) Query(ctx context.Context, input string) (string, int, error) {
 		return "", 0, err
 	}
 
-	endpoint := c.getEndpoint(c.Config.CompletionsPath)
+	endpoint := c.getEndpoint(c.Config.Providers[c.Config.Target].CompletionsPath)
 
 	c.printRequestDebugInfo(endpoint, body)
 
@@ -231,7 +233,7 @@ func (c *Client) Stream(ctx context.Context, input string) error {
 		return err
 	}
 
-	endpoint := c.getEndpoint(c.Config.CompletionsPath)
+	endpoint := c.getEndpoint(c.Config.Providers[c.Config.Target].CompletionsPath)
 
 	c.printRequestDebugInfo(endpoint, body)
 
@@ -249,7 +251,7 @@ func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
 	var messages []api.Message
 
 	for index, item := range c.History {
-		if strings.HasPrefix(c.Config.Model, o1Prefix) && index == 0 {
+		if strings.HasPrefix(c.Config.Providers[c.Config.Target].Model, o1Prefix) && index == 0 {
 			continue
 		}
 		messages = append(messages, item.Message)
@@ -257,13 +259,13 @@ func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
 
 	body := api.CompletionsRequest{
 		Messages:         messages,
-		Model:            c.Config.Model,
-		MaxTokens:        c.Config.MaxTokens,
-		Temperature:      c.Config.Temperature,
-		TopP:             c.Config.TopP,
-		FrequencyPenalty: c.Config.FrequencyPenalty,
-		PresencePenalty:  c.Config.PresencePenalty,
-		Seed:             c.Config.Seed,
+		Model:            c.Config.Providers[c.Config.Target].Model,
+		MaxTokens:        c.Config.Providers[c.Config.Target].MaxTokens,
+		Temperature:      c.Config.Providers[c.Config.Target].Temperature,
+		TopP:             c.Config.Providers[c.Config.Target].TopP,
+		FrequencyPenalty: c.Config.Providers[c.Config.Target].FrequencyPenalty,
+		PresencePenalty:  c.Config.Providers[c.Config.Target].PresencePenalty,
+		Seed:             c.Config.Providers[c.Config.Target].Seed,
 		Stream:           stream,
 	}
 
@@ -350,7 +352,7 @@ func (c *Client) initHistory() {
 		return
 	}
 
-	if !c.Config.OmitHistory {
+	if !c.Config.Providers[c.Config.Target].OmitHistory {
 		c.History, _ = c.historyStore.Read()
 	}
 
@@ -363,7 +365,7 @@ func (c *Client) initHistory() {
 		}}
 	}
 
-	c.History[0].Content = c.Config.Role
+	c.History[0].Content = c.Config.Providers[c.Config.Target].Role
 }
 
 func (c *Client) addQuery(query string) {
@@ -380,7 +382,7 @@ func (c *Client) addQuery(query string) {
 }
 
 func (c *Client) getEndpoint(path string) string {
-	return c.Config.URL + path
+	return c.Config.Providers[c.Config.Target].URL + path
 }
 
 func (c *Client) prepareQuery(input string) {
@@ -402,7 +404,7 @@ func (c *Client) processResponse(raw []byte, v interface{}) error {
 
 func (c *Client) truncateHistory() {
 	tokens, rolling := countTokens(c.History)
-	effectiveTokenSize := calculateEffectiveContextWindow(c.Config.ContextWindow, MaxTokenBufferPercentage)
+	effectiveTokenSize := calculateEffectiveContextWindow(c.Config.Providers[c.Config.Target].ContextWindow, MaxTokenBufferPercentage)
 
 	if tokens <= effectiveTokenSize {
 		return
@@ -432,7 +434,7 @@ func (c *Client) updateHistory(response string) {
 		Timestamp: c.timer.Now(),
 	})
 
-	if !c.Config.OmitHistory {
+	if !c.Config.Providers[c.Config.Target].OmitHistory {
 		_ = c.historyStore.Write(c.History)
 	}
 }
@@ -503,7 +505,7 @@ func (c *Client) printRequestDebugInfo(endpoint string, body []byte) {
 		method = "GET"
 	}
 	sugar.Debugf("curl --location --insecure --request %s '%s' \\", method, endpoint)
-	sugar.Debugf("  --header \"Authorization: Bearer ${%s_API_KEY}\" \\", strings.ToUpper(c.Config.Name))
+	sugar.Debugf("  --header \"Authorization: Bearer ${%s_API_KEY}\" \\", strings.ToUpper(c.Config.Target))
 	sugar.Debugf("  --header 'Content-Type: application/json' \\")
 
 	if body != nil {

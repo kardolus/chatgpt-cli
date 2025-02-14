@@ -1,6 +1,6 @@
 package config
 
-type Config struct {
+type Provider struct {
 	Name                string  `yaml:"name"`
 	APIKey              string  `yaml:"api_key"`
 	Model               string  `yaml:"model"`
@@ -27,4 +27,9 @@ type Config struct {
 	SkipTLSVerify       bool    `yaml:"skip_tls_verify"`
 	Multiline           bool    `yaml:"multiline"`
 	Seed                int     `yaml:"seed"`
+}
+
+type Config struct {
+	Target    string              `yaml:"target"`
+	Providers map[string]Provider `yaml:"providers"`
 }

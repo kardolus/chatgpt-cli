@@ -177,7 +177,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if clearHistory {
 		cm := config.NewManager(config.NewStore())
 
-		if err := cm.DeleteThread(cfg.Thread); err != nil {
+		if err := cm.DeleteThread(cfg.Providers[cfg.Target].Thread); err != nil {
 			var fileNotFoundError *config.FileNotFoundError
 			if errors.As(err, &fileNotFoundError) {
 				sugar.Infoln("Thread history does not exist; nothing to clear.")
@@ -195,7 +195,7 @@ func run(cmd *cobra.Command, args []string) error {
 		if len(args) > 0 {
 			targetThread = args[0]
 		} else {
-			targetThread = cfg.Thread
+			targetThread = cfg.Providers[cfg.Target].Thread
 		}
 
 		store, err := history.New()
@@ -223,7 +223,9 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		cfg.Role = role
+		prov := cfg.Providers[cfg.Target]
+		prov.Role = role // TODO yikes! NPE??
+
 		viper.Set("role", role)
 	}
 
@@ -323,18 +325,18 @@ func run(cmd *cobra.Command, args []string) error {
 		defer rl.Close()
 
 		commandPrompt := func(counter, usage int) string {
-			return utils.FormatPrompt(c.Config.CommandPrompt, counter, usage, time.Now())
+			return utils.FormatPrompt(c.Config.Providers[cfg.Target].CommandPrompt, counter, usage, time.Now())
 		}
 
-		cmdColor, cmdReset := utils.ColorToAnsi(c.Config.CommandPromptColor)
-		outputColor, outPutReset := utils.ColorToAnsi(c.Config.OutputPromptColor)
+		cmdColor, cmdReset := utils.ColorToAnsi(c.Config.Providers[cfg.Target].CommandPromptColor)
+		outputColor, outPutReset := utils.ColorToAnsi(c.Config.Providers[cfg.Target].OutputPromptColor)
 
 		qNum, usage := 1, 0
 		for {
 			rl.SetPrompt(commandPrompt(qNum, usage))
 
 			fmt.Print(cmdColor)
-			input, err := readInput(rl, cfg.Multiline)
+			input, err := readInput(rl, cfg.Providers[cfg.Target].Multiline)
 			fmt.Print(cmdReset)
 
 			if err == io.EOF {
@@ -342,7 +344,7 @@ func run(cmd *cobra.Command, args []string) error {
 				return nil
 			}
 
-			fmtOutputPrompt := utils.FormatPrompt(c.Config.OutputPrompt, qNum, usage, time.Now())
+			fmtOutputPrompt := utils.FormatPrompt(c.Config.Providers[cfg.Target].OutputPrompt, qNum, usage, time.Now())
 
 			if queryMode {
 				result, qUsage, err := c.Query(ctx, input)
@@ -375,7 +377,7 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 			sugar.Infoln(result)
 
-			if c.Config.TrackTokenUsage {
+			if c.Config.Providers[cfg.Target].TrackTokenUsage {
 				sugar.Infof("\n[Token Usage: %d]\n", usage)
 			}
 		} else if err := c.Stream(ctx, strings.Join(args, " ")); err != nil {
@@ -397,6 +399,10 @@ func initConfig(rootCmd *cobra.Command) (config.Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(configHome)
+
+	// TODO throw an error when the target configuration doesn't exist in Providers
+	// TODO redo the migration "script"
+	// TODO investigate if we can be backwards compatible and can skip additional migration
 
 	// Attempt to read the configuration file to get the `name` before setting env prefix.
 	if err := viper.ReadInConfig(); err != nil {
@@ -759,34 +765,17 @@ func syncFlag(cmd *cobra.Command, meta ConfigMetadata, alias string) error {
 }
 
 func createConfigFromViper() config.Config {
-	return config.Config{
-		Name:                viper.GetString("name"),
-		APIKey:              viper.GetString("api_key"),
-		Model:               viper.GetString("model"),
-		MaxTokens:           viper.GetInt("max_tokens"),
-		ContextWindow:       viper.GetInt("context_window"),
-		Role:                viper.GetString("role"),
-		Temperature:         viper.GetFloat64("temperature"),
-		TopP:                viper.GetFloat64("top_p"),
-		FrequencyPenalty:    viper.GetFloat64("frequency_penalty"),
-		PresencePenalty:     viper.GetFloat64("presence_penalty"),
-		Thread:              viper.GetString("thread"),
-		OmitHistory:         viper.GetBool("omit_history"),
-		URL:                 viper.GetString("url"),
-		CompletionsPath:     viper.GetString("completions_path"),
-		ModelsPath:          viper.GetString("models_path"),
-		AuthHeader:          viper.GetString("auth_header"),
-		AuthTokenPrefix:     viper.GetString("auth_token_prefix"),
-		CommandPrompt:       viper.GetString("command_prompt"),
-		CommandPromptColor:  viper.GetString("command_prompt_color"),
-		OutputPrompt:        viper.GetString("output_prompt"),
-		OutputPromptColor:   viper.GetString("output_prompt_color"),
-		AutoCreateNewThread: viper.GetBool("auto_create_new_thread"),
-		TrackTokenUsage:     viper.GetBool("track_token_usage"),
-		SkipTLSVerify:       viper.GetBool("skip_tls_verify"),
-		Multiline:           viper.GetBool("multiline"),
-		Seed:                viper.GetInt("seed"),
+	var cfg config.Config
+
+	if err := viper.Unmarshal(&cfg); err != nil {
+		panic(fmt.Errorf("failed to unmarshal config: %w", err)) // TODO do not panic!!
 	}
+
+	if _, exists := cfg.Providers[cfg.Target]; !exists {
+		panic(fmt.Errorf("target provider %q not found in config", cfg.Target)) // TODO do not panic!!
+	}
+
+	return cfg
 }
 
 func fileExists(filename string) bool {

@@ -195,18 +195,23 @@ func (c *Client) Query(ctx context.Context, input string) (string, int, error) {
 		return "", 0, err
 	}
 
-	var response api.CompletionsResponse
-	if err := c.processResponse(raw, &response); err != nil {
+	var completionsResponse api.CompletionsResponse
+	if err := c.processResponse(raw, &completionsResponse); err != nil {
 		return "", 0, err
 	}
 
-	if len(response.Choices) == 0 {
-		return "", response.Usage.TotalTokens, errors.New("no responses returned")
+	if len(completionsResponse.Choices) == 0 {
+		return "", completionsResponse.Usage.TotalTokens, errors.New("no responses returned")
 	}
 
-	c.updateHistory(response.Choices[0].Message.Content.(string))
+	response, ok := completionsResponse.Choices[0].Message.Content.(string)
+	if !ok {
+		return "", completionsResponse.Usage.TotalTokens, errors.New("response cannot be converted to a string")
+	}
 
-	return response.Choices[0].Message.Content.(string), response.Usage.TotalTokens, nil
+	c.updateHistory(response)
+
+	return response, completionsResponse.Usage.TotalTokens, nil
 }
 
 // Stream sends a query to the API and processes the response as a stream.

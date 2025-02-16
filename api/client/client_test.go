@@ -160,6 +160,32 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				postError:     nil,
 				expectedError: "no responses returned",
 			},
+			{
+				description: "throws an error when the response cannot be casted to a string",
+				setupPostReturn: func() ([]byte, error) {
+					response := &api.CompletionsResponse{
+						ID:      "id",
+						Object:  "object",
+						Created: 0,
+						Model:   "model",
+						Choices: []api.Choice{
+							{
+								Message: api.Message{
+									Role:    client.AssistantRole,
+									Content: 123, // cannot be converted to a string
+								},
+								FinishReason: "",
+								Index:        0,
+							},
+						},
+					}
+
+					respBytes, err := json.Marshal(response)
+					return respBytes, err
+				},
+				postError:     nil,
+				expectedError: "response cannot be converted to a string",
+			},
 		}
 
 		for _, tt := range tests {

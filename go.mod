@@ -1,6 +1,7 @@
 module github.com/kardolus/chatgpt-cli
 
 go 1.24.1
+
 require (
 	github.com/chzyer/readline v1.5.1
 	github.com/golang/mock v1.6.0

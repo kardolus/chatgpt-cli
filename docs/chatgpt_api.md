@@ -384,6 +384,148 @@ Output:
 }
 ```
 
+## o1-models
+
+Request o1-mini:
+
+```shell
+curl --location --insecure --request POST 'https://api.openai.com/v1/chat/completions' \
+  --header "Authorization: Bearer ${OPENAI_API_KEY}" \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+     "model": "o1-mini",
+     "messages": [{"role": "user", "content": "What is the capital of Sweden"}],
+     "stream": false
+  }' | jq .
+```
+
+Response o1-mini:
+
+```json
+{
+  "id": "chatcmpl-BL8F2fgGiRxr23ZtyVetxc8LoQNiu",
+  "object": "chat.completion",
+  "created": 1744376268,
+  "model": "o1-mini-2024-09-12",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The capital of Sweden is **Stockholm**.",
+        "refusal": null,
+        "annotations": []
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 14,
+    "completion_tokens": 214,
+    "total_tokens": 228,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 192,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "service_tier": "default",
+  "system_fingerprint": "fp_75b1d33e66"
+}
+```
+
+Request o1-pro:
+
+```shell
+curl https://api.openai.com/v1/responses \
+  -H "Authorization: Bearer ${OPENAI_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "o1-pro",
+    "input": [
+      {
+        "role": "user",
+        "content": "What is the capital of Sweden?"
+      }
+    ],
+    "max_output_tokens": 300,
+    "reasoning": {
+      "effort": "low"
+    }
+  }'
+```
+
+Response o1-pro: 
+
+```json
+{
+  "id": "resp_67f911721e088191b6df6955f02eabde0bd3d5754fe5fadc",
+  "object": "response",
+  "created_at": 1744376178,
+  "status": "completed",
+  "error": null,
+  "incomplete_details": null,
+  "instructions": null,
+  "max_output_tokens": 300,
+  "model": "o1-pro-2025-03-19",
+  "output": [
+    {
+      "id": "rs_67f9118176008191a072d0d5a6a60d060bd3d5754fe5fadc",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "msg_67f9118176e88191bad766e124fe48890bd3d5754fe5fadc",
+      "type": "message",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "annotations": [],
+          "text": "The capital of Sweden is Stockholm."
+        }
+      ],
+      "role": "assistant"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": "low",
+    "generate_summary": null
+  },
+  "store": true,
+  "temperature": 1.0,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [],
+  "top_p": 1.0,
+  "truncation": "disabled",
+  "usage": {
+    "input_tokens": 13,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 8,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 21
+  },
+  "user": null,
+  "metadata": {}
+}
+```
+
 ## Azure
 
 Request:

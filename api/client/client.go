@@ -29,6 +29,7 @@ const (
 	SystemRole               = "system"
 	UserRole                 = "user"
 	InteractiveThreadPrefix  = "int_"
+	SearchModelPattern       = "-search-"
 	gptPrefix                = "gpt"
 	o1Prefix                 = "o1"
 	imageURLType             = "image_url"
@@ -264,12 +265,15 @@ func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
 		Messages:         messages,
 		Model:            c.Config.Model,
 		MaxTokens:        c.Config.MaxTokens,
-		Temperature:      c.Config.Temperature,
-		TopP:             c.Config.TopP,
 		FrequencyPenalty: c.Config.FrequencyPenalty,
 		PresencePenalty:  c.Config.PresencePenalty,
 		Seed:             c.Config.Seed,
 		Stream:           stream,
+	}
+
+	if !strings.Contains(c.Config.Model, SearchModelPattern) {
+		body.Temperature = c.Config.Temperature
+		body.TopP = c.Config.TopP
 	}
 
 	if data, ok := ctx.Value(internal.BinaryDataKey).([]byte); ok {

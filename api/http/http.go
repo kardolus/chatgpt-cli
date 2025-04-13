@@ -106,7 +106,7 @@ func (r *RestCaller) ProcessResponse(reader io.Reader, writer io.Writer) []byte 
 			}
 
 			for _, choice := range data.Choices {
-				if content, ok := choice.Delta["content"]; ok {
+				if content, ok := choice.Delta["content"].(string); ok {
 					_, _ = writer.Write([]byte(content))
 					result = append(result, []byte(content)...)
 				}

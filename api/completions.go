@@ -15,8 +15,8 @@ func (f Float64) MarshalJSON() ([]byte, error) {
 
 type CompletionsRequest struct {
 	Model            string    `json:"model"`
-	Temperature      float64   `json:"temperature"`
-	TopP             float64   `json:"top_p"`
+	Temperature      float64   `json:"temperature,omitempty"`
+	TopP             float64   `json:"top_p,omitempty"`
 	FrequencyPenalty float64   `json:"frequency_penalty,omitempty"`
 	MaxTokens        int       `json:"max_completion_tokens"`
 	PresencePenalty  float64   `json:"presence_penalty,omitempty"`
@@ -68,9 +68,9 @@ type Data struct {
 	FrequencyPenalty float64 `json:"frequency_penalty"`
 	PresencePenalty  float64 `json:"presence_penalty"`
 	Choices          []struct {
-		Delta        map[string]string `json:"delta"`
-		Index        int               `json:"index"`
-		FinishReason string            `json:"finish_reason"`
+		Delta        map[string]interface{} `json:"delta"`
+		Index        int                    `json:"index"`
+		FinishReason string                 `json:"finish_reason"`
 	} `json:"choices"`
 }
 

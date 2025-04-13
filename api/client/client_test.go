@@ -435,6 +435,63 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 				_, _, _ = subject.Query(context.Background(), "test query")
 			})
+			it("should omit Temperature and TopP when the model matches SearchModelPattern", func() {
+				searchModel := "gpt-4o-search-preview"
+				config.Model = searchModel
+				config.Role = "role for search test"
+
+				factory.withHistory([]history.History{
+					{Message: api.Message{Role: client.SystemRole, Content: config.Role}},
+				})
+
+				subject := factory.buildClientWithoutConfig()
+				subject.Config.Model = searchModel
+
+				mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
+
+				mockCaller.EXPECT().
+					Post(gomock.Any(), gomock.Any(), false).
+					DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+						var req map[string]interface{}
+						Expect(json.Unmarshal(body, &req)).To(Succeed())
+
+						// Should not include Temperature or TopP
+						Expect(req).NotTo(HaveKey("temperature"))
+						Expect(req).NotTo(HaveKey("top_p"))
+
+						return nil, nil
+					})
+
+				_, _, _ = subject.Query(context.Background(), "test query")
+			})
+			it("should include Temperature and TopP when the model does not match SearchModelPattern", func() {
+				regularModel := "gpt-4o"
+				config.Model = regularModel
+				config.Role = "regular model test"
+
+				factory.withHistory([]history.History{
+					{Message: api.Message{Role: client.SystemRole, Content: config.Role}},
+				})
+
+				subject := factory.buildClientWithoutConfig()
+				subject.Config.Model = regularModel
+
+				mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
+
+				mockCaller.EXPECT().
+					Post(gomock.Any(), gomock.Any(), false).
+					DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+						var req map[string]interface{}
+						Expect(json.Unmarshal(body, &req)).To(Succeed())
+
+						Expect(req).To(HaveKeyWithValue("temperature", BeNumerically("==", config.Temperature)))
+						Expect(req).To(HaveKeyWithValue("top_p", BeNumerically("==", config.TopP)))
+
+						return nil, nil
+					})
+
+				_, _, _ = subject.Query(context.Background(), "test query")
+			})
 		})
 
 		when("an image is provided", func() {

@@ -384,9 +384,11 @@ Output:
 }
 ```
 
+## Non standard models
+
 ## o1-models
 
-Request o1-mini:
+Request o1-mini ("system" key in "messages" is not allowed):
 
 ```shell
 curl --location --insecure --request POST 'https://api.openai.com/v1/chat/completions' \
@@ -524,6 +526,234 @@ Response o1-pro:
   "user": null,
   "metadata": {}
 }
+```
+
+### gpt-4o-search
+
+Does not support `temperature` and `top_p`.
+
+Request: 
+```shell
+curl https://api.openai.com/v1/chat/completions \
+  -H "Authorization: Bearer ${OPENAI_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-search-preview",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful assistant that provides concise, accurate answers using web search results."
+      },
+      {
+        "role": "user",
+        "content": "What is the latest news about AI in healthcare?"
+      }
+    ]
+  }'
+```
+
+Response: 
+
+```json
+{
+  "id": "chatcmpl-70883d76-ce0c-44d9-946f-f839bb5c153b",
+  "object": "chat.completion",
+  "created": 1744567305,
+  "model": "gpt-4o-search-preview-2025-03-11",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Recent developments in artificial intelligence (AI) within the healthcare sector encompass advancements in diagnostics, operational efficiency, and regulatory frameworks, alongside emerging challenges.\n\n**Advancements in Diagnostics and Patient Care**\n\nAI is significantly enhancing diagnostic accuracy and early disease detection. Advanced algorithms, particularly deep learning models, are analyzing medical imaging data with impressive precision, augmenting radiologists' capabilities and enabling more personalized screening schedules based on individual risk factors. ([forbes.com](https://www.forbes.com/councils/forbestechcouncil/2024/11/14/ai-in-healthcare-a-new-era-of-personalized-patient-care/?utm_source=openai))\n\nIn mental health, AI systems are being developed to predict and plan treatments effectively. For instance, AI models have demonstrated higher diagnostic accuracy for depression and post-traumatic stress disorder compared to general practitioners in controlled studies. ([en.wikipedia.org](https://en.wikipedia.org/wiki/Artificial_intelligence_in_mental_health?utm_source=openai))\n\n**Operational Efficiency and AI Integration**\n\nHospitals worldwide are adopting AI to improve patient care and operational efficiency. The \"smart hospital\" market, incorporating AI, IoT, and robotics, is projected to grow to $148 billion by 2029. Implementations include AI systems that allow patients to control their environment via smartphones and predict sepsis risks, as well as the use of robots for surgeries and supply deliveries. ([ft.com](https://www.ft.com/content/2805edfd-36db-4a58-b93f-411a18c6e003?utm_source=openai))\n\nIn India, Apollo Hospitals plans to increase its investment in AI to reduce the workload of medical staff by automating routine tasks like medical documentation. The goal is to free up two to three hours per day for healthcare professionals, addressing high nurse attrition rates and expanding bed capacity. ([reuters.com](https://www.reuters.com/business/healthcare-pharmaceuticals/indias-apollo-hospitals-bets-ai-tackle-staff-workload-2025-03-13/?utm_source=openai))\n\n**Regulatory Developments**\n\nThe UK's Medicines and Healthcare products Regulatory Agency (MHRA) has introduced the AI Airlock, a regulatory sandbox designed to address challenges in regulating AI medical devices. This initiative aims to enhance the safe development and deployment of AI in healthcare by simulating regulatory processes, balancing innovation with patient safety. ([healthcareai.news](https://healthcareai.news/?utm_source=openai))\n\nIn the United States, the Paragon Health Institute has issued a report titled \"Healthcare AI Regulation: Guidelines for Maintaining Public Protections & Innovation.\" The report emphasizes the need for specific regulations that consider both the type of AI technology and the healthcare context, advocating for the use of existing regulatory agencies to govern AI in healthcare. ([medlatest.com](https://www.medlatest.com/device-news/ai-in-healthcare-new-report-into-regulation/?utm_source=openai))\n\n**Challenges and Ethical Considerations**\n\nDespite these advancements, challenges persist. A study published in *Nature Medicine* reveals that AI models used in healthcare can exhibit biases based on patients' socioeconomic and demographic profiles, potentially altering treatments and diagnostics in ways that mirror real-world disparities. ([reuters.com](https://www.reuters.com/business/healthcare-pharmaceuticals/health-rounds-ai-can-have-medical-care-biases-too-study-reveals-2025-04-09/?utm_source=openai))\n\nAdditionally, the integration of AI nurses in hospitals has faced pushback from nursing unions. While AI nurses assist with tasks like patient monitoring and information provision, concerns have been raised about undermining nurses' expertise and degrading patient care quality, leading to debates about the role of AI in healthcare. ([apnews.com](https://apnews.com/article/3e41c0a2768a3b4c5e002270cc2abe23?utm_source=openai))\n\nFurthermore, while AI-powered medical transcription tools have been effective in reducing clinician burnout, studies have shown no significant improvement in provider efficiency, indicating that financial benefits or efficiency improvements have not yet been realized. ([axios.com](https://www.axios.com/2025/03/27/ai-scribes-reduce-burnout-financial-improvement?utm_source=openai))\n\n\n## Recent Developments in AI and Healthcare:\n- [Health Rounds: AI can have medical care biases too, a study reveals](https://www.reuters.com/business/healthcare-pharmaceuticals/health-rounds-ai-can-have-medical-care-biases-too-study-reveals-2025-04-09/?utm_source=openai)\n- [As AI nurses reshape hospital care, human nurses are pushing back](https://apnews.com/article/3e41c0a2768a3b4c5e002270cc2abe23?utm_source=openai)\n- [Medical centres compete to achieve 'smart hospital' status](https://www.ft.com/content/2805edfd-36db-4a58-b93f-411a18c6e003?utm_source=openai) ",
+        "refusal": null,
+        "annotations": [
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 724,
+              "start_index": 573,
+              "title": "AI In Healthcare: A New Era Of Personalized Patient Care",
+              "url": "https://www.forbes.com/councils/forbestechcouncil/2024/11/14/ai-in-healthcare-a-new-era-of-personalized-patient-care/?utm_source=openai"
+            }
+          },
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 1105,
+              "start_index": 995,
+              "title": "Artificial intelligence in mental health",
+              "url": "https://en.wikipedia.org/wiki/Artificial_intelligence_in_mental_health?utm_source=openai"
+            }
+          },
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 1639,
+              "start_index": 1546,
+              "title": "Medical centres compete to achieve 'smart hospital' status",
+              "url": "https://www.ft.com/content/2805edfd-36db-4a58-b93f-411a18c6e003?utm_source=openai"
+            }
+          },
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 2109,
+              "start_index": 1949,
+              "title": "India's Apollo Hospitals bets on AI to tackle staff workload",
+              "url": "https://www.reuters.com/business/healthcare-pharmaceuticals/indias-apollo-hospitals-bets-ai-tackle-staff-workload-2025-03-13/?utm_source=openai"
+            }
+          },
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 2558,
+              "start_index": 2491,
+              "title": "AI in Healthcare",
+              "url": "https://healthcareai.news/?utm_source=openai"
+            }
+          },
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 3057,
+              "start_index": 2938,
+              "title": "AI in Healthcare: New Report into Regulation - Medlatest - Medical Device News",
+              "url": "https://www.medlatest.com/device-news/ai-in-healthcare-new-report-into-regulation/?utm_source=openai"
+            }
+          },
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 3571,
+              "start_index": 3401,
+              "title": "Health Rounds: AI can have medical care biases too, a study reveals",
+              "url": "https://www.reuters.com/business/healthcare-pharmaceuticals/health-rounds-ai-can-have-medical-care-biases-too-study-reveals-2025-04-09/?utm_source=openai"
+            }
+          },
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 4000,
+              "start_index": 3907,
+              "title": "As AI nurses reshape hospital care, human nurses are pushing back",
+              "url": "https://apnews.com/article/3e41c0a2768a3b4c5e002270cc2abe23?utm_source=openai"
+            }
+          },
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 4384,
+              "start_index": 4271,
+              "title": "Early evidence shows AI scribes reduce burnout, but without financial improvement",
+              "url": "https://www.axios.com/2025/03/27/ai-scribes-reduce-burnout-financial-improvement?utm_source=openai"
+            }
+          },
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 4658,
+              "start_index": 4434,
+              "title": "Health Rounds: AI can have medical care biases too, a study reveals",
+              "url": "https://www.reuters.com/business/healthcare-pharmaceuticals/health-rounds-ai-can-have-medical-care-biases-too-study-reveals-2025-04-09/?utm_source=openai"
+            }
+          },
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 4807,
+              "start_index": 4661,
+              "title": "As AI nurses reshape hospital care, human nurses are pushing back",
+              "url": "https://apnews.com/article/3e41c0a2768a3b4c5e002270cc2abe23?utm_source=openai"
+            }
+          },
+          {
+            "type": "url_citation",
+            "url_citation": {
+              "end_index": 4953,
+              "start_index": 4810,
+              "title": "Medical centres compete to achieve 'smart hospital' status",
+              "url": "https://www.ft.com/content/2805edfd-36db-4a58-b93f-411a18c6e003?utm_source=openai"
+            }
+          }
+        ]
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 26,
+    "completion_tokens": 1044,
+    "total_tokens": 1070,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "system_fingerprint": ""
+}
+```
+
+### gpt-4o-mini-realtime
+
+This uses a websocket rather than `REST` calls. 
+
+### gpt-4o-mini-tts
+
+```shell
+curl -X POST https://api.openai.com/v1/audio/speech \
+  -H "Authorization: Bearer ${OPENAI_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini-tts",
+    "input": "Welcome to our service! How can I assist you today?",
+    "voice": "nova",
+    "response_format": "mp3"
+  }' --output output.mp3
+```
+
+### gpt-4o-audio
+
+```shell
+# Encode your audio file to base64
+base64_input=$(base64 -w 0 your_audio.wav)
+
+# Send the request to OpenAI's API
+curl https://api.openai.com/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-audio-preview",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Please transcribe the following audio."
+          },
+          {
+            "type": "input_audio",
+            "input_audio": {
+              "data": "'"$base64_input"'",
+              "format": "wav"
+            }
+          }
+        ]
+      }
+    ],
+    "response_format": "audio",
+    "audio": {
+      "voice": "nova",
+      "format": "mp3"
+    }
+  }' --output response.mp3
 ```
 
 ## Azure

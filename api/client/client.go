@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -134,6 +135,10 @@ func (c *Client) ListModels() ([]string, error) {
 	if err := c.processResponse(raw, &response); err != nil {
 		return nil, err
 	}
+
+	sort.Slice(response.Data, func(i, j int) bool {
+		return response.Data[i].Id < response.Data[j].Id
+	})
 
 	for _, model := range response.Data {
 		if strings.HasPrefix(model.Id, gptPrefix) || strings.HasPrefix(model.Id, o1Prefix) {

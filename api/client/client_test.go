@@ -746,7 +746,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).Should(HavePrefix("failed to decode response:"))
 		})
-		it("filters gpt and o1 models as expected", func() {
+		it("filters gpt and o1 models as expected and puts them in alphabetical order", func() {
 			subject := factory.buildClientWithoutConfig()
 
 			response, err := test.FileToBytes("models.json")
@@ -758,9 +758,10 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).NotTo(BeEmpty())
 			Expect(result).To(HaveLen(4))
-			Expect(result[0]).To(Equal("* gpt-3.5-turbo (current)"))
-			Expect(result[1]).To(Equal("- o1-mini"))
+			Expect(result[0]).To(Equal("- gpt-3.5-env-model"))
+			Expect(result[1]).To(Equal("* gpt-3.5-turbo (current)"))
 			Expect(result[2]).To(Equal("- gpt-3.5-turbo-0301"))
+			Expect(result[3]).To(Equal("- o1-mini"))
 		})
 	})
 	when("ProvideContext()", func() {

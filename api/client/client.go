@@ -29,7 +29,7 @@ const (
 	SystemRole               = "system"
 	UserRole                 = "user"
 	InteractiveThreadPrefix  = "int_"
-	SearchModelPattern       = "-search-"
+	SearchModelPattern       = "-search"
 	gptPrefix                = "gpt"
 	o1Prefix                 = "o1"
 	imageURLType             = "image_url"

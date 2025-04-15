@@ -756,6 +756,19 @@ curl https://api.openai.com/v1/chat/completions \
   }' --output response.mp3
 ```
 
+### gpt-4o-transcribe
+
+```shell
+curl -L 'https://api.openai.com/v1/audio/transcriptions' \
+  -X POST \
+  -H "Authorization: Bearer ${OPENAI_API_KEY}" \
+  -H 'Content-Type: multipart/form-data' \
+  -F file="@${HOME}/Downloads/test.mp3" \
+  -F model='gpt-4o-transcribe' \
+  -F response_format='json' \
+  -F temperature='0'
+```
+
 ## Azure
 
 Request:

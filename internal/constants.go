@@ -5,4 +5,5 @@ type contextKey string
 const (
 	BinaryDataKey contextKey = "binaryData"
 	ImagePathKey  contextKey = "imagePath"
+	AudioPathKey  contextKey = "audioPath"
 )

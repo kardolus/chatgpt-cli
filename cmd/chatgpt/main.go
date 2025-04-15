@@ -41,6 +41,7 @@ var (
 	promptFile      string
 	roleFile        string
 	imageFile       string
+	audioFile       string
 	threadName      string
 	ServiceURL      string
 	shell           string
@@ -246,7 +247,7 @@ func run(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
 	hs, _ := history.New() // do not error out
-	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, &client.RealImageReader{}, cfg, interactiveMode)
+	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, &client.RealFileReader{}, cfg, interactiveMode)
 
 	if ServiceURL != "" {
 		c = c.WithServiceURL(ServiceURL)
@@ -272,6 +273,10 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if cmd.Flag("image").Changed {
 		ctx = context.WithValue(ctx, internal.ImagePathKey, imageFile)
+	}
+
+	if cmd.Flag("audio").Changed {
+		ctx = context.WithValue(ctx, internal.AudioPathKey, audioFile)
 	}
 
 	// Check if there is input from the pipe (stdin)
@@ -612,6 +617,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--clear-history", "Clear the history of the current thread")
 		printFlagWithPadding("--show-history [thread]", "Show the human-readable conversation history")
 		printFlagWithPadding("--image", "Upload an image from the specified local path or URL")
+		printFlagWithPadding("--audio", "Upload an audio file (mp3 or wav)")
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--debug", "Print debug messages")
 		printFlagWithPadding("--set-completions", "Generate autocompletion script for your current shell")
@@ -656,6 +662,7 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().StringVarP(&promptFile, "prompt", "p", "", "Provide a prompt file")
 	rootCmd.PersistentFlags().StringVarP(&roleFile, "role-file", "", "", "Provide a role file")
 	rootCmd.PersistentFlags().StringVarP(&imageFile, "image", "", "", "Provide an image from a local path or URL")
+	rootCmd.PersistentFlags().StringVarP(&audioFile, "audio", "", "", "Provide an audio file from a local path")
 	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
 	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
 	rootCmd.PersistentFlags().BoolVar(&showHistory, "show-history", false, "Show the human-readable conversation history")
@@ -692,7 +699,7 @@ func isNonConfigSetter(name string) bool {
 
 func isGeneralFlag(name string) bool {
 	switch name {
-	case "query", "interactive", "config", "version", "new-thread", "list-models", "list-threads", "clear-history", "delete-thread", "show-history", "prompt", "set-completions", "help", "role-file", "image":
+	case "query", "interactive", "config", "version", "new-thread", "list-models", "list-threads", "clear-history", "delete-thread", "show-history", "prompt", "set-completions", "help", "role-file", "image", "audio":
 		return true
 	default:
 		return false

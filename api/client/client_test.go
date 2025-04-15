@@ -26,7 +26,7 @@ import (
 //go:generate mockgen -destination=callermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/http Caller
 //go:generate mockgen -destination=historymocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/history Store
 //go:generate mockgen -destination=timermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client Timer
-//go:generate mockgen -destination=readermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client ImageReader
+//go:generate mockgen -destination=readermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client FileReader
 
 const (
 	envApiKey       = "api-key"
@@ -39,7 +39,7 @@ var (
 	mockCaller       *MockCaller
 	mockHistoryStore *MockStore
 	mockTimer        *MockTimer
-	mockReader       *MockImageReader
+	mockReader       *MockFileReader
 	factory          *clientFactory
 	apiKeyEnvVar     string
 	config           config2.Config
@@ -58,7 +58,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		mockCaller = NewMockCaller(mockCtrl)
 		mockHistoryStore = NewMockStore(mockCtrl)
 		mockTimer = NewMockTimer(mockCtrl)
-		mockReader = NewMockImageReader(mockCtrl)
+		mockReader = NewMockFileReader(mockCtrl)
 		config = MockConfig()
 
 		factory = newClientFactory(mockHistoryStore)
@@ -605,6 +605,86 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 							URL string `json:"url"`
 						}{
 							URL: "data:text/plain; charset=utf-8;base64,",
+						},
+					}}},
+				}, false)
+				Expect(err).NotTo(HaveOccurred())
+
+				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
+				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).Return(nil, nil)
+
+				_, _, _ = subject.Query(ctx, query)
+			})
+		})
+
+		when("an audio file is provided", func() {
+			const (
+				query        = "transcribe this"
+				systemRole   = "System role for audio test"
+				errorMessage = "error opening audio file"
+				audio        = "path/to/audio.wav"
+			)
+
+			it.Before(func() {
+				factory.withoutHistory()
+			})
+
+			it("throws an error when the audio file cannot be opened", func() {
+				subject := factory.buildClientWithoutConfig()
+				subject.Config.Role = systemRole
+
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, internal.AudioPathKey, audio)
+
+				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
+				mockReader.EXPECT().Open(audio).Return(nil, errors.New(errorMessage))
+
+				_, _, err := subject.Query(ctx, query)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal(errorMessage))
+			})
+
+			it("throws an error when the audio data cannot be read", func() {
+				audioFile := &os.File{}
+				subject := factory.buildClientWithoutConfig()
+				subject.Config.Role = systemRole
+
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, internal.AudioPathKey, audio)
+
+				mockTimer.EXPECT().Now().Return(time.Now()).Times(2)
+				mockReader.EXPECT().Open(audio).Return(audioFile, nil)
+				mockReader.EXPECT().ReadBufferFromFile(audioFile).Return([]byte("RIFFxxxxWAVE..."), nil)
+				mockReader.EXPECT().ReadFile(audio).Return(nil, errors.New(errorMessage))
+
+				_, _, err := subject.Query(ctx, query)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal(errorMessage))
+			})
+
+			it("adds audio as input_audio type content when valid", func() {
+				audioFile := &os.File{}
+				subject := factory.buildClientWithoutConfig()
+				subject.Config.Role = systemRole
+
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, internal.AudioPathKey, audio)
+
+				mockReader.EXPECT().Open(audio).Return(audioFile, nil)
+				mockReader.EXPECT().ReadBufferFromFile(audioFile).Return([]byte("RIFFxxxxWAVE..."), nil)
+				mockReader.EXPECT().ReadFile(audio).Return([]byte("audio-bytes"), nil)
+
+				expectedBody, err := createBody([]api.Message{
+					{Role: client.SystemRole, Content: systemRole},
+					{Role: client.UserRole, Content: query},
+					{Role: client.UserRole, Content: []api.AudioContent{{
+						Type: "input_audio",
+						InputAudio: struct {
+							Data   string `json:"data"`
+							Format string `json:"format"`
+						}{
+							Data:   "YXVkaW8tYnl0ZXM=", // base64 of "audio-bytes"
+							Format: "wav",
 						},
 					}}},
 				}, false)

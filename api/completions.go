@@ -30,6 +30,17 @@ type Message struct {
 	Content interface{} `json:"content"`
 }
 
+type AudioContent struct {
+	Type       string     `json:"type"`
+	Text       string     `json:"text,omitempty"`
+	InputAudio InputAudio `json:"input_audio,omitempty"`
+}
+
+type InputAudio struct {
+	Data   string `json:"data"`
+	Format string `json:"format"`
+}
+
 type ImageContent struct {
 	Type     string `json:"type"`
 	ImageURL struct {

@@ -33,6 +33,7 @@ const (
 	SearchModelPattern       = "-search"
 	gptPrefix                = "gpt"
 	o1Prefix                 = "o1"
+	audioType                = "input_audio"
 	imageURLType             = "image_url"
 	imageContent             = "data:%s;base64,%s"
 	httpScheme               = "http"
@@ -51,23 +52,23 @@ func (r *RealTime) Now() time.Time {
 	return time.Now()
 }
 
-type ImageReader interface {
+type FileReader interface {
 	ReadFile(name string) ([]byte, error)
 	ReadBufferFromFile(file *os.File) ([]byte, error)
 	Open(name string) (*os.File, error)
 }
 
-type RealImageReader struct{}
+type RealFileReader struct{}
 
-func (r *RealImageReader) Open(name string) (*os.File, error) {
+func (r *RealFileReader) Open(name string) (*os.File, error) {
 	return os.Open(name)
 }
 
-func (r *RealImageReader) ReadFile(name string) ([]byte, error) {
+func (r *RealFileReader) ReadFile(name string) ([]byte, error) {
 	return os.ReadFile(name)
 }
 
-func (r *RealImageReader) ReadBufferFromFile(file *os.File) ([]byte, error) {
+func (r *RealFileReader) ReadBufferFromFile(file *os.File) ([]byte, error) {
 	buffer := make([]byte, bufferSize)
 	_, err := file.Read(buffer)
 
@@ -80,10 +81,10 @@ type Client struct {
 	caller       http.Caller
 	historyStore history.Store
 	timer        Timer
-	reader       ImageReader
+	reader       FileReader
 }
 
-func New(callerFactory http.CallerFactory, hs history.Store, t Timer, r ImageReader, cfg config.Config, interactiveMode bool) *Client {
+func New(callerFactory http.CallerFactory, hs history.Store, t Timer, r FileReader, cfg config.Config, interactiveMode bool) *Client {
 	caller := callerFactory(cfg)
 
 	if interactiveMode && cfg.AutoCreateNewThread {
@@ -299,13 +300,22 @@ func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
 			Role:    UserRole,
 			Content: []api.ImageContent{content},
 		})
+	} else if path, ok := ctx.Value(internal.AudioPathKey).(string); ok {
+		content, err := c.createAudioContentFromFile(path)
+		if err != nil {
+			return nil, err
+		}
+		body.Messages = append(body.Messages, api.Message{
+			Role:    UserRole,
+			Content: []api.AudioContent{content},
+		})
 	}
 
 	return json.Marshal(body)
 }
 
 func (c *Client) createImageContentFromBinary(binary []byte) (api.ImageContent, error) {
-	mime, err := c.getMimeTypeFromBytes(binary)
+	mime, err := getMimeTypeFromBytes(binary)
 	if err != nil {
 		return api.ImageContent{}, err
 	}
@@ -321,6 +331,27 @@ func (c *Client) createImageContentFromBinary(binary []byte) (api.ImageContent, 
 	}
 
 	return content, nil
+}
+
+func (c *Client) createAudioContentFromFile(audio string) (api.AudioContent, error) {
+
+	format, err := c.detectAudioFormat(audio)
+	if err != nil {
+		return api.AudioContent{}, err
+	}
+
+	encodedAudio, err := c.base64Encode(audio)
+	if err != nil {
+		return api.AudioContent{}, err
+	}
+
+	return api.AudioContent{
+		Type: audioType,
+		InputAudio: api.InputAudio{
+			Data:   encodedAudio,
+			Format: format,
+		},
+	}, nil
 }
 
 func (c *Client) createImageContentFromURLOrFile(image string) (api.ImageContent, error) {
@@ -341,7 +372,7 @@ func (c *Client) createImageContentFromURLOrFile(image string) (api.ImageContent
 			return content, err
 		}
 
-		encodedImage, err := c.base64EncodeImage(image)
+		encodedImage, err := c.base64Encode(image)
 		if err != nil {
 			return content, err
 		}
@@ -451,7 +482,7 @@ func (c *Client) updateHistory(response string) {
 	}
 }
 
-func (c *Client) base64EncodeImage(path string) (string, error) {
+func (c *Client) base64Encode(path string) (string, error) {
 	imageData, err := c.reader.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -486,10 +517,47 @@ func (c *Client) createHistoryEntriesFromString(input string) []history.History 
 	return result
 }
 
-func (c *Client) getMimeTypeFromBytes(data []byte) (string, error) {
-	mimeType := stdhttp.DetectContentType(data)
+func (c *Client) detectAudioFormat(path string) (string, error) {
+	file, err := c.reader.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
 
-	return mimeType, nil
+	buf, err := c.reader.ReadBufferFromFile(file)
+	if err != nil {
+		return "", err
+	}
+
+	// WAV
+	if string(buf[0:4]) == "RIFF" && string(buf[8:12]) == "WAVE" {
+		return "wav", nil
+	}
+
+	// MP3 (ID3 or sync bits)
+	if string(buf[0:3]) == "ID3" || (buf[0] == 0xFF && (buf[1]&0xE0) == 0xE0) {
+		return "mp3", nil
+	}
+
+	// FLAC
+	if string(buf[0:4]) == "fLaC" {
+		return "flac", nil
+	}
+
+	// OGG
+	if string(buf[0:4]) == "OggS" {
+		return "ogg", nil
+	}
+
+	// M4A / MP4
+	if string(buf[4:8]) == "ftyp" {
+		if string(buf[8:12]) == "M4A " || string(buf[8:12]) == "isom" || string(buf[8:12]) == "mp42" {
+			return "m4a", nil
+		}
+		return "mp4", nil
+	}
+
+	return "unknown", nil
 }
 
 func (c *Client) getMimeTypeFromFileContent(path string) (string, error) {
@@ -564,6 +632,12 @@ func countTokens(entries []history.History) (int, []int) {
 	}
 
 	return result, rolling
+}
+
+func getMimeTypeFromBytes(data []byte) (string, error) {
+	mimeType := stdhttp.DetectContentType(data)
+
+	return mimeType, nil
 }
 
 func isValidURL(input string) bool {

@@ -18,6 +18,7 @@ const (
 	openAIContextWindow    = 8192
 	openAIURL              = "https://api.openai.com"
 	openAICompletionsPath  = "/v1/chat/completions"
+	openAIResponsesPath    = "/v1/responses"
 	openAIModelsPath       = "/v1/models"
 	openAIAuthHeader       = "Authorization"
 	openAIAuthTokenPrefix  = "Bearer "
@@ -28,6 +29,7 @@ const (
 	openAIFrequencyPenalty = 0.0
 	openAIPresencePenalty  = 0.0
 	openAICommandPrompt    = "[%datetime] [Q%counter]"
+	openAIEffort           = "low"
 )
 
 type Store interface {
@@ -135,6 +137,7 @@ func (f *FileIO) ReadDefaults() Config {
 		ContextWindow:    openAIContextWindow,
 		URL:              openAIURL,
 		CompletionsPath:  openAICompletionsPath,
+		ResponsesPath:    openAIResponsesPath,
 		ModelsPath:       openAIModelsPath,
 		AuthHeader:       openAIAuthHeader,
 		AuthTokenPrefix:  openAIAuthTokenPrefix,
@@ -144,6 +147,7 @@ func (f *FileIO) ReadDefaults() Config {
 		FrequencyPenalty: openAIFrequencyPenalty,
 		PresencePenalty:  openAIPresencePenalty,
 		CommandPrompt:    openAICommandPrompt,
+		Effort:           openAIEffort,
 	}
 }
 

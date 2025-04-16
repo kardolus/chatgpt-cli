@@ -64,6 +64,7 @@ var configMetadata = []ConfigMetadata{
 	{"role", "set-role", "You are a helpful assistant.", "Set the role of the AI assistant"},
 	{"url", "set-url", "https://api.openai.com", "Set the API base URL"},
 	{"completions_path", "set-completions-path", "/v1/chat/completions", "Set the completions API endpoint"},
+	{"responses_path", "set-responses-path", "/v1/responses", "Set the responses API endpoint"},
 	{"models_path", "set-models-path", "/v1/models", "Set the models API endpoint"},
 	{"auth_header", "set-auth-header", "Authorization", "Set the authorization header"},
 	{"auth_token_prefix", "set-auth-token-prefix", "Bearer ", "Set the authorization token prefix"},
@@ -82,6 +83,7 @@ var configMetadata = []ConfigMetadata{
 	{"multiline", "set-multiline", false, "Enables multiline mode while in interactive mode"},
 	{"seed", "set-seed", 0, "Sets the seed for deterministic sampling (Beta)"},
 	{"name", "set-name", "openai", "The prefix for environment variable overrides"},
+	{"effort", "set-effort", "low", "Set the reasoning effort"},
 }
 
 func init() {
@@ -317,6 +319,11 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if tmp := os.Getenv(internal.ConfigHomeEnv); tmp != "" && !fileExists(viper.ConfigFileUsed()) {
 		sugar.Warnf("Warning: config.yaml doesn't exist in %s, create it\n", tmp)
+	}
+
+	if strings.Contains(c.Config.Model, client.O1ProPattern) {
+		// o1-pro models only supports query mode
+		queryMode = true
 	}
 
 	if interactiveMode {
@@ -781,6 +788,7 @@ func createConfigFromViper() config.Config {
 		OmitHistory:         viper.GetBool("omit_history"),
 		URL:                 viper.GetString("url"),
 		CompletionsPath:     viper.GetString("completions_path"),
+		ResponsesPath:       viper.GetString("responses_path"),
 		ModelsPath:          viper.GetString("models_path"),
 		AuthHeader:          viper.GetString("auth_header"),
 		AuthTokenPrefix:     viper.GetString("auth_token_prefix"),
@@ -793,6 +801,7 @@ func createConfigFromViper() config.Config {
 		SkipTLSVerify:       viper.GetBool("skip_tls_verify"),
 		Multiline:           viper.GetBool("multiline"),
 		Seed:                viper.GetInt("seed"),
+		Effort:              viper.GetString("effort"),
 	}
 }
 

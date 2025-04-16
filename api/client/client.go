@@ -31,10 +31,13 @@ const (
 	UserRole                 = "user"
 	InteractiveThreadPrefix  = "int_"
 	SearchModelPattern       = "-search"
+	O1ProPattern             = "o1-pro"
 	gptPrefix                = "gpt"
 	o1Prefix                 = "o1"
 	audioType                = "input_audio"
 	imageURLType             = "image_url"
+	messageType              = "message"
+	outputTextType           = "output_text"
 	imageContent             = "data:%s;base64,%s"
 	httpScheme               = "http"
 	httpsScheme              = "https"
@@ -73,6 +76,20 @@ func (r *RealFileReader) ReadBufferFromFile(file *os.File) ([]byte, error) {
 	_, err := file.Read(buffer)
 
 	return buffer, err
+}
+
+type ModelCapabilities struct {
+	SupportsTemperature bool
+	UsesResponsesAPI    bool
+	OmitFirstSystemMsg  bool
+}
+
+func GetCapabilities(model string) ModelCapabilities {
+	return ModelCapabilities{
+		SupportsTemperature: !strings.Contains(model, SearchModelPattern),
+		UsesResponsesAPI:    strings.Contains(model, O1ProPattern),
+		OmitFirstSystemMsg:  strings.HasPrefix(model, o1Prefix) && !strings.Contains(model, O1ProPattern),
+	}
 }
 
 type Client struct {
@@ -191,7 +208,7 @@ func (c *Client) Query(ctx context.Context, input string) (string, int, error) {
 		return "", 0, err
 	}
 
-	endpoint := c.getEndpoint(c.Config.CompletionsPath)
+	endpoint := c.getChatEndpoint()
 
 	c.printRequestDebugInfo(endpoint, body)
 
@@ -202,23 +219,56 @@ func (c *Client) Query(ctx context.Context, input string) (string, int, error) {
 		return "", 0, err
 	}
 
-	var completionsResponse api.CompletionsResponse
-	if err := c.processResponse(raw, &completionsResponse); err != nil {
-		return "", 0, err
-	}
+	var (
+		response   string
+		tokensUsed int
+	)
 
-	if len(completionsResponse.Choices) == 0 {
-		return "", completionsResponse.Usage.TotalTokens, errors.New("no responses returned")
-	}
+	caps := GetCapabilities(c.Config.Model)
 
-	response, ok := completionsResponse.Choices[0].Message.Content.(string)
-	if !ok {
-		return "", completionsResponse.Usage.TotalTokens, errors.New("response cannot be converted to a string")
+	if caps.UsesResponsesAPI {
+		var res api.ResponsesResponse
+		if err := c.processResponse(raw, &res); err != nil {
+			return "", 0, err
+		}
+		tokensUsed = res.Usage.TotalTokens
+
+		for _, output := range res.Output {
+			if output.Type != messageType {
+				continue
+			}
+			for _, content := range output.Content {
+				if content.Type == outputTextType {
+					response = content.Text
+					break
+				}
+			}
+		}
+
+		if response == "" {
+			return "", tokensUsed, errors.New("no response returned")
+		}
+	} else {
+		var res api.CompletionsResponse
+		if err := c.processResponse(raw, &res); err != nil {
+			return "", 0, err
+		}
+		tokensUsed = res.Usage.TotalTokens
+
+		if len(res.Choices) == 0 {
+			return "", tokensUsed, errors.New("no responses returned")
+		}
+
+		var ok bool
+		response, ok = res.Choices[0].Message.Content.(string)
+		if !ok {
+			return "", tokensUsed, errors.New("response cannot be converted to a string")
+		}
 	}
 
 	c.updateHistory(response)
 
-	return response, completionsResponse.Usage.TotalTokens, nil
+	return response, tokensUsed, nil
 }
 
 // Stream sends a query to the API and processes the response as a stream.
@@ -243,7 +293,7 @@ func (c *Client) Stream(ctx context.Context, input string) error {
 		return err
 	}
 
-	endpoint := c.getEndpoint(c.Config.CompletionsPath)
+	endpoint := c.getChatEndpoint()
 
 	c.printRequestDebugInfo(endpoint, body)
 
@@ -257,17 +307,73 @@ func (c *Client) Stream(ctx context.Context, input string) error {
 	return nil
 }
 
+func (c *Client) appendMediaMessages(ctx context.Context, messages []api.Message) ([]api.Message, error) {
+	if data, ok := ctx.Value(internal.BinaryDataKey).([]byte); ok {
+		content, err := c.createImageContentFromBinary(data)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, api.Message{
+			Role:    UserRole,
+			Content: []api.ImageContent{content},
+		})
+	} else if path, ok := ctx.Value(internal.ImagePathKey).(string); ok {
+		content, err := c.createImageContentFromURLOrFile(path)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, api.Message{
+			Role:    UserRole,
+			Content: []api.ImageContent{content},
+		})
+	} else if path, ok := ctx.Value(internal.AudioPathKey).(string); ok {
+		content, err := c.createAudioContentFromFile(path)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, api.Message{
+			Role:    UserRole,
+			Content: []api.AudioContent{content},
+		})
+	}
+	return messages, nil
+}
+
 func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
+	caps := GetCapabilities(c.Config.Model)
+
+	if caps.UsesResponsesAPI {
+		req, err := c.createResponsesRequest(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(req)
+	}
+
+	req, err := c.createCompletionsRequest(ctx, stream)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(req)
+}
+
+func (c *Client) createCompletionsRequest(ctx context.Context, stream bool) (*api.CompletionsRequest, error) {
 	var messages []api.Message
+	caps := GetCapabilities(c.Config.Model)
 
 	for index, item := range c.History {
-		if strings.HasPrefix(c.Config.Model, o1Prefix) && index == 0 {
+		if caps.OmitFirstSystemMsg && index == 0 {
 			continue
 		}
 		messages = append(messages, item.Message)
 	}
 
-	body := api.CompletionsRequest{
+	messages, err := c.appendMediaMessages(ctx, messages)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &api.CompletionsRequest{
 		Messages:         messages,
 		Model:            c.Config.Model,
 		MaxTokens:        c.Config.MaxTokens,
@@ -277,41 +383,40 @@ func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
 		Stream:           stream,
 	}
 
-	if !strings.Contains(c.Config.Model, SearchModelPattern) {
-		body.Temperature = c.Config.Temperature
-		body.TopP = c.Config.TopP
+	if caps.SupportsTemperature {
+		req.Temperature = c.Config.Temperature
+		req.TopP = c.Config.TopP
 	}
 
-	if data, ok := ctx.Value(internal.BinaryDataKey).([]byte); ok {
-		content, err := c.createImageContentFromBinary(data)
-		if err != nil {
-			return nil, err
+	return req, nil
+}
+
+func (c *Client) createResponsesRequest(ctx context.Context) (*api.ResponsesRequest, error) {
+	var messages []api.Message
+	caps := GetCapabilities(c.Config.Model)
+
+	for index, item := range c.History {
+		if caps.OmitFirstSystemMsg && index == 0 {
+			continue
 		}
-		body.Messages = append(body.Messages, api.Message{
-			Role:    UserRole,
-			Content: []api.ImageContent{content},
-		})
-	} else if path, ok := ctx.Value(internal.ImagePathKey).(string); ok {
-		content, err := c.createImageContentFromURLOrFile(path)
-		if err != nil {
-			return nil, err
-		}
-		body.Messages = append(body.Messages, api.Message{
-			Role:    UserRole,
-			Content: []api.ImageContent{content},
-		})
-	} else if path, ok := ctx.Value(internal.AudioPathKey).(string); ok {
-		content, err := c.createAudioContentFromFile(path)
-		if err != nil {
-			return nil, err
-		}
-		body.Messages = append(body.Messages, api.Message{
-			Role:    UserRole,
-			Content: []api.AudioContent{content},
-		})
+		messages = append(messages, item.Message)
 	}
 
-	return json.Marshal(body)
+	messages, err := c.appendMediaMessages(ctx, messages)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &api.ResponsesRequest{
+		Model:           c.Config.Model,
+		Input:           messages,
+		MaxOutputTokens: c.Config.MaxTokens,
+		Reasoning: api.Reasoning{
+			Effort: c.Config.Effort,
+		},
+	}
+
+	return req, nil
 }
 
 func (c *Client) createImageContentFromBinary(binary []byte) (api.ImageContent, error) {
@@ -422,6 +527,18 @@ func (c *Client) addQuery(query string) {
 		Timestamp: c.timer.Now(),
 	})
 	c.truncateHistory()
+}
+
+func (c *Client) getChatEndpoint() string {
+	caps := GetCapabilities(c.Config.Model)
+
+	var endpoint string
+	if caps.UsesResponsesAPI {
+		endpoint = c.getEndpoint(c.Config.ResponsesPath)
+	} else {
+		endpoint = c.getEndpoint(c.Config.CompletionsPath)
+	}
+	return endpoint
 }
 
 func (c *Client) getEndpoint(path string) string {

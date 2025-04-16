@@ -16,6 +16,7 @@ type Config struct {
 	URL                 string  `yaml:"url"`
 	CompletionsPath     string  `yaml:"completions_path"`
 	ModelsPath          string  `yaml:"models_path"`
+	ResponsesPath       string  `yaml:"responses_path"`
 	AuthHeader          string  `yaml:"auth_header"`
 	AuthTokenPrefix     string  `yaml:"auth_token_prefix"`
 	CommandPrompt       string  `yaml:"command_prompt"`
@@ -27,4 +28,5 @@ type Config struct {
 	SkipTLSVerify       bool    `yaml:"skip_tls_verify"`
 	Multiline           bool    `yaml:"multiline"`
 	Seed                int     `yaml:"seed"`
+	Effort              string  `yaml:"effort"`
 }

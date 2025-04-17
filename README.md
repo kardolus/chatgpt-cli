@@ -71,9 +71,6 @@ Azure, featuring streaming capabilities and extensive configuration options.
 * **Advanced configuration options**: The CLI supports a layered configuration system where settings can be specified
   through default values, a `config.yaml` file, and environment variables. For quick adjustments,
   various `--set-<value>` flags are provided. To verify your current settings, use the `--config` or `-c` flag.
-* **Availability Note**: This CLI supports gpt-4, gpt-3.5-turbo, and Perplexity’s models (e.g.,
-  llama-3.1-sonar-small-128k-online). However, the specific ChatGPT model used on chat.openai.com may not be available
-  via the OpenAI API.
 
 ### Prompt Support
 

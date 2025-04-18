@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/api/http"
 	"github.com/kardolus/chatgpt-cli/config"
@@ -82,18 +81,20 @@ func (r *RealFileReader) ReadBufferFromFile(file *os.File) ([]byte, error) {
 	return buffer, err
 }
 
-type ModelCapabilities struct {
-	SupportsTemperature bool
-	UsesResponsesAPI    bool
-	OmitFirstSystemMsg  bool
+type FileWriter interface {
+	Write(file *os.File, buf []byte) error
+	Create(name string) (*os.File, error)
 }
 
-func GetCapabilities(model string) ModelCapabilities {
-	return ModelCapabilities{
-		SupportsTemperature: !strings.Contains(model, SearchModelPattern),
-		UsesResponsesAPI:    strings.Contains(model, O1ProPattern),
-		OmitFirstSystemMsg:  strings.HasPrefix(model, o1Prefix) && !strings.Contains(model, O1ProPattern),
-	}
+type RealFileWriter struct{}
+
+func (w *RealFileWriter) Create(name string) (*os.File, error) {
+	return os.Create(name)
+}
+
+func (r *RealFileWriter) Write(file *os.File, buf []byte) error {
+	_, err := file.Write(buf)
+	return err
 }
 
 type Client struct {
@@ -103,13 +104,14 @@ type Client struct {
 	historyStore history.Store
 	timer        Timer
 	reader       FileReader
+	writer       FileWriter
 }
 
-func New(callerFactory http.CallerFactory, hs history.Store, t Timer, r FileReader, cfg config.Config, interactiveMode bool) *Client {
+func New(callerFactory http.CallerFactory, hs history.Store, t Timer, r FileReader, w FileWriter, cfg config.Config, interactiveMode bool) *Client {
 	caller := callerFactory(cfg)
 
 	if interactiveMode && cfg.AutoCreateNewThread {
-		hs.SetThread(GenerateUniqueSlug(InteractiveThreadPrefix))
+		hs.SetThread(internal.GenerateUniqueSlug(InteractiveThreadPrefix))
 	} else {
 		hs.SetThread(cfg.Thread)
 	}
@@ -120,6 +122,7 @@ func New(callerFactory http.CallerFactory, hs history.Store, t Timer, r FileRead
 		historyStore: hs,
 		timer:        t,
 		reader:       r,
+		writer:       w,
 	}
 }
 
@@ -228,7 +231,7 @@ func (c *Client) Query(ctx context.Context, input string) (string, int, error) {
 		tokensUsed int
 	)
 
-	caps := GetCapabilities(c.Config.Model)
+	caps := getCapabilities(c.Config.Model)
 
 	if caps.UsesResponsesAPI {
 		var res api.ResponsesResponse
@@ -308,6 +311,52 @@ func (c *Client) Stream(ctx context.Context, input string) error {
 
 	c.updateHistory(string(result))
 
+	return nil
+}
+
+// SynthesizeSpeech converts the given input text into speech using the configured TTS model,
+// and writes the resulting audio to the specified output file.
+//
+// The audio format is inferred from the output file's extension (e.g., "mp3", "wav") and sent
+// as the "response_format" in the request to the OpenAI speech synthesis endpoint.
+//
+// Parameters:
+//   - inputText: The text to synthesize into speech.
+//   - outputPath: The path to the output audio file. The file extension determines the response format.
+//
+// Returns an error if the request fails, the response cannot be written, or the file cannot be created.
+func (c *Client) SynthesizeSpeech(inputText, outputPath string) error {
+	reqBody := api.Speech{
+		Model:          c.Config.Model,
+		Voice:          c.Config.Voice,
+		Input:          inputText,
+		ResponseFormat: getExtension(outputPath),
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	endpoint := c.getEndpoint(c.Config.SpeechPath)
+	c.printRequestDebugInfo(endpoint, body)
+
+	respBytes, err := c.caller.Post(endpoint, body, false)
+	if err != nil {
+		return fmt.Errorf("failed to synthesize speech: %w", err)
+	}
+
+	outFile, err := c.writer.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer outFile.Close()
+
+	if err := c.writer.Write(outFile, respBytes); err != nil {
+		return fmt.Errorf("failed to write output file: %w", err)
+	}
+
+	c.printResponseDebugInfo([]byte(fmt.Sprintf("[binary] %d bytes written to %s", len(respBytes), outputPath)))
 	return nil
 }
 
@@ -406,7 +455,7 @@ func (c *Client) appendMediaMessages(ctx context.Context, messages []api.Message
 }
 
 func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
-	caps := GetCapabilities(c.Config.Model)
+	caps := getCapabilities(c.Config.Model)
 
 	if caps.UsesResponsesAPI {
 		req, err := c.createResponsesRequest(ctx)
@@ -425,7 +474,7 @@ func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
 
 func (c *Client) createCompletionsRequest(ctx context.Context, stream bool) (*api.CompletionsRequest, error) {
 	var messages []api.Message
-	caps := GetCapabilities(c.Config.Model)
+	caps := getCapabilities(c.Config.Model)
 
 	for index, item := range c.History {
 		if caps.OmitFirstSystemMsg && index == 0 {
@@ -459,7 +508,7 @@ func (c *Client) createCompletionsRequest(ctx context.Context, stream bool) (*ap
 
 func (c *Client) createResponsesRequest(ctx context.Context) (*api.ResponsesRequest, error) {
 	var messages []api.Message
-	caps := GetCapabilities(c.Config.Model)
+	caps := getCapabilities(c.Config.Model)
 
 	for index, item := range c.History {
 		if caps.OmitFirstSystemMsg && index == 0 {
@@ -596,7 +645,7 @@ func (c *Client) addQuery(query string) {
 }
 
 func (c *Client) getChatEndpoint() string {
-	caps := GetCapabilities(c.Config.Model)
+	caps := getCapabilities(c.Config.Model)
 
 	var endpoint string
 	if caps.UsesResponsesAPI {
@@ -783,9 +832,10 @@ func (c *Client) printResponseDebugInfo(raw []byte) {
 	sugar.Debugf("%s\n", raw)
 }
 
-func GenerateUniqueSlug(prefix string) string {
-	guid := uuid.New()
-	return prefix + guid.String()[:4]
+type modelCapabilities struct {
+	SupportsTemperature bool
+	UsesResponsesAPI    bool
+	OmitFirstSystemMsg  bool
 }
 
 func calculateEffectiveContextWindow(window int, bufferPercentage int) int {
@@ -815,6 +865,22 @@ func countTokens(entries []history.History) (int, []int) {
 	}
 
 	return result, rolling
+}
+
+func getCapabilities(model string) modelCapabilities {
+	return modelCapabilities{
+		SupportsTemperature: !strings.Contains(model, SearchModelPattern),
+		UsesResponsesAPI:    strings.Contains(model, O1ProPattern),
+		OmitFirstSystemMsg:  strings.HasPrefix(model, o1Prefix) && !strings.Contains(model, O1ProPattern),
+	}
+}
+
+func getExtension(path string) string {
+	ext := filepath.Ext(path) // e.g. ".mp4"
+	if ext != "" {
+		return strings.TrimPrefix(ext, ".") // "mp4"
+	}
+	return ""
 }
 
 func getMimeTypeFromBytes(data []byte) (string, error) {

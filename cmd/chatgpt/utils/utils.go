@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -97,4 +98,18 @@ func IsBinary(data []byte) bool {
 
 	threshold := checkSize * 10 / 100
 	return binaryCount > threshold
+}
+
+func ValidateFlags(flags map[string]bool) error {
+	if flags["new-thread"] && (flags["set-thread"] || flags["thread"]) {
+		return errors.New("the --new-thread flag cannot be used with the --set-thread or --thread flags")
+	}
+	if flags["speak"] && !flags["output"] {
+		return errors.New("the --speak flag cannot be used without the --output flag")
+	}
+	if !flags["speak"] && flags["output"] {
+		return errors.New("the --speak flag cannot be used without the --output flag")
+	}
+
+	return nil
 }

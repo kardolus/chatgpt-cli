@@ -1,16 +1,23 @@
 package internal
 
 import (
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 )
 
 const (
-	ConfigHomeEnv    = "OPENAI_CONFIG_HOME"
-	DataHomeEnv      = "OPENAI_DATA_HOME"
-	DefaultConfigDir = ".chatgpt-cli"
-	DefaultDataDir   = "history"
+	ConfigHomeEnv     = "OPENAI_CONFIG_HOME"
+	DataHomeEnv       = "OPENAI_DATA_HOME"
+	DefaultConfigDir  = ".chatgpt-cli"
+	DefaultDataDir    = "history"
+	SlugPostfixLength = 4
 )
+
+func GenerateUniqueSlug(prefix string) string {
+	guid := uuid.New()
+	return prefix + guid.String()[:SlugPostfixLength]
+}
 
 func GetConfigHome() (string, error) {
 	var result string

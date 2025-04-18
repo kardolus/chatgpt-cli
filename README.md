@@ -70,6 +70,12 @@ Azure, featuring streaming capabilities and extensive configuration options.
 * **Transcription support**: You can also use the `--transcribe` flag to generate a transcript of the uploaded audio.
   This uses OpenAI’s transcription endpoint (compatible with models like gpt-4o-transcribe) and supports a wider range
   of formats, including `.mp3`, `.mp4`, `.mpeg`, `.mpga`, `.m4a`, `.wav`, and `.webm`.
+* **Text-to-speech support**: Use the `--speak` and `--output` flags to convert text to speech (works with models like
+  `gpt-4o-mini-tts`).
+  If you have `afplay` installed (macOS), you can even chain playback like this:
+    ```shell
+    ./bin/chatgpt --speak "convert this to audio" --output test.mp3 && afplay test.mp3
+    ```
 * **Model listing**: Access a list of available models using the `-l` or `--list-models` flag.
 * **Thread listing**: Display a list of active threads using the `--list-threads` flag.
 * **Advanced configuration options**: The CLI supports a layered configuration system where settings can be specified
@@ -274,28 +280,37 @@ environment variables, a config.yaml file, and default values, in that respectiv
 | `debug`                  | If set to true, prints the raw request and response data during API calls, useful for debugging.                                                                                                      | `false`                   |
 | `skip_tls_verify`        | If set to true, skips TLS certificate verification, allowing insecure HTTPS requests.                                                                                                                 | `false`                   |
 | `multiline`              | If set to true, enables multiline input mode in interactive sessions.                                                                                                                                 | `false`                   |
+| `role_file`              | Path to a file that overrides the system role (role).                                                                                                                                                 | ''                        |
+| `prompt`                 | Path to a file that provides additional context before the query.                                                                                                                                     | ''                        |
+| `image`                  | Local path or URL to an image used in the query.                                                                                                                                                      | ''                        |
+| `audio`                  | Path to an audio file (MP3/WAV) used as part of the query.                                                                                                                                            | ''                        |
+| `output`                 | Path where synthesized audio is saved when using --speak.                                                                                                                                             | ''                        |
+| `speak`                  | If true, enables text-to-speech synthesis for the input query.                                                                                                                                        | `false`                   |
 
 ### LLM-Specific Configuration
 
-| Variable            | Description                                                                                                                                            | Default                        |
-|---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------|
-| `api_key`           | Your API key.                                                                                                                                          | (none for security)            |
-| `model`             | The GPT model used by the application.                                                                                                                 | 'gpt-3.5-turbo'                |
-| `max_tokens`        | The maximum number of tokens that can be used in a single API call.                                                                                    | 4096                           |
-| `context_window`    | The memory limit for how much of the conversation can be remembered at one time.                                                                       | 8192                           |
-| `role`              | The system role                                                                                                                                        | 'You are a helpful assistant.' |
-| `temperature`       | What sampling temperature to use, between 0 and 2. Higher values make the output more random; lower values make it more focused and deterministic.     | 1.0                            |
-| `frequency_penalty` | Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far.                                 | 0.0                            |
-| `top_p`             | An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. | 1.0                            |
-| `presence_penalty`  | Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far.                                      | 0.0                            |
-| `seed`              | Sets the seed for deterministic sampling (Beta). Repeated requests with the same seed and parameters aim to return the same result.                    | 0                              |
-| `effort`            | Sets the reasoning effort. Used by o1-pro models.                                                                                                      | 'low'                          |
-| `url`               | The base URL for the OpenAI API.                                                                                                                       | 'https://api.openai.com'       |
-| `completions_path`  | The API endpoint for completions.                                                                                                                      | '/v1/chat/completions'         |
-| `responses_path`    | The API endpoint for responses. Used by o1-pro models.                                                                                                 | '/v1/responses'                |
-| `models_path`       | The API endpoint for accessing model information.                                                                                                      | '/v1/models'                   |
-| `auth_header`       | The header used for authorization in API requests.                                                                                                     | 'Authorization'                |
-| `auth_token_prefix` | The prefix to be added before the token in the `auth_header`.                                                                                          | 'Bearer '                      |
+| Variable              | Description                                                                                                                                            | Default                        |
+|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------|
+| `api_key`             | Your API key.                                                                                                                                          | (none for security)            |
+| `model`               | The GPT model used by the application.                                                                                                                 | 'gpt-3.5-turbo'                |
+| `max_tokens`          | The maximum number of tokens that can be used in a single API call.                                                                                    | 4096                           |
+| `context_window`      | The memory limit for how much of the conversation can be remembered at one time.                                                                       | 8192                           |
+| `role`                | The system role                                                                                                                                        | 'You are a helpful assistant.' |
+| `temperature`         | What sampling temperature to use, between 0 and 2. Higher values make the output more random; lower values make it more focused and deterministic.     | 1.0                            |
+| `frequency_penalty`   | Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far.                                 | 0.0                            |
+| `top_p`               | An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. | 1.0                            |
+| `presence_penalty`    | Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far.                                      | 0.0                            |
+| `seed`                | Sets the seed for deterministic sampling (Beta). Repeated requests with the same seed and parameters aim to return the same result.                    | 0                              |
+| `effort`              | Sets the reasoning effort. Used by o1-pro models.                                                                                                      | 'low'                          |
+| `voice`               | The voice to use when generating audio with TTS models like gpt-4o-mini-tts.                                                                           | 'nova'                         |
+| `url`                 | The base URL for the OpenAI API.                                                                                                                       | 'https://api.openai.com'       |
+| `completions_path`    | The API endpoint for completions.                                                                                                                      | '/v1/chat/completions'         |
+| `responses_path`      | The API endpoint for responses. Used by o1-pro models.                                                                                                 | '/v1/responses'                |
+| `speech_path`         | The API endpoint for text-to-speech synthesis.                                                                                                         | '/v1/audio/transcriptions'     |
+| `transcriptions_path` | The API endpoint for audio transcription requests.                                                                                                     | '/v1/audio/speech'             |
+| `models_path`         | The API endpoint for accessing model information.                                                                                                      | '/v1/models'                   |
+| `auth_header`         | The header used for authorization in API requests.                                                                                                     | 'Authorization'                |
+| `auth_token_prefix`   | The prefix to be added before the token in the `auth_header`.                                                                                          | 'Bearer '                      |
 
 ### Custom Config and Data Directory
 

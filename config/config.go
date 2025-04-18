@@ -17,6 +17,7 @@ type Config struct {
 	CompletionsPath     string  `yaml:"completions_path"`
 	ModelsPath          string  `yaml:"models_path"`
 	ResponsesPath       string  `yaml:"responses_path"`
+	SpeechPath          string  `yaml:"speech_path"`
 	TranscriptionsPath  string  `yaml:"transcriptions_path"`
 	AuthHeader          string  `yaml:"auth_header"`
 	AuthTokenPrefix     string  `yaml:"auth_token_prefix"`
@@ -30,4 +31,5 @@ type Config struct {
 	Multiline           bool    `yaml:"multiline"`
 	Seed                int     `yaml:"seed"`
 	Effort              string  `yaml:"effort"`
+	Voice               string  `yaml:"voice"`
 }

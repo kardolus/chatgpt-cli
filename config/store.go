@@ -20,6 +20,7 @@ const (
 	openAICompletionsPath    = "/v1/chat/completions"
 	openAIResponsesPath      = "/v1/responses"
 	openAITranscriptionsPath = "/v1/audio/transcriptions"
+	openAISpeechPath         = "/v1/audio/speech"
 	openAIModelsPath         = "/v1/models"
 	openAIAuthHeader         = "Authorization"
 	openAIAuthTokenPrefix    = "Bearer "
@@ -31,6 +32,7 @@ const (
 	openAIPresencePenalty    = 0.0
 	openAICommandPrompt      = "[%datetime] [Q%counter]"
 	openAIEffort             = "low"
+	openAIVoice              = "voice"
 )
 
 type Store interface {
@@ -140,6 +142,7 @@ func (f *FileIO) ReadDefaults() Config {
 		CompletionsPath:    openAICompletionsPath,
 		ResponsesPath:      openAIResponsesPath,
 		TranscriptionsPath: openAITranscriptionsPath,
+		SpeechPath:         openAISpeechPath,
 		ModelsPath:         openAIModelsPath,
 		AuthHeader:         openAIAuthHeader,
 		AuthTokenPrefix:    openAIAuthTokenPrefix,
@@ -150,6 +153,7 @@ func (f *FileIO) ReadDefaults() Config {
 		PresencePenalty:    openAIPresencePenalty,
 		CommandPrompt:      openAICommandPrompt,
 		Effort:             openAIEffort,
+		Voice:              openAIVoice,
 	}
 }
 

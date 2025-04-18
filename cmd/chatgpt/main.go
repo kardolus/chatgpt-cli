@@ -38,10 +38,12 @@ var (
 	listModels      bool
 	listThreads     bool
 	hasPipe         bool
+	useSpeak        bool
 	promptFile      string
 	roleFile        string
 	imageFile       string
 	audioFile       string
+	outputFile      string
 	threadName      string
 	ServiceURL      string
 	shell           string
@@ -66,6 +68,7 @@ var configMetadata = []ConfigMetadata{
 	{"completions_path", "set-completions-path", "/v1/chat/completions", "Set the completions API endpoint"},
 	{"responses_path", "set-responses-path", "/v1/responses", "Set the responses API endpoint"},
 	{"transcriptions_path", "set-transcriptions-path", "/v1/audio/transcriptions", "Set the transcriptions API endpoint"},
+	{"speech_path", "set-speech-path", "/v1/audio/speech", "Set the speech API endpoint"},
 	{"models_path", "set-models-path", "/v1/models", "Set the models API endpoint"},
 	{"auth_header", "set-auth-header", "Authorization", "Set the authorization header"},
 	{"auth_token_prefix", "set-auth-token-prefix", "Bearer ", "Set the authorization token prefix"},
@@ -85,6 +88,7 @@ var configMetadata = []ConfigMetadata{
 	{"seed", "set-seed", 0, "Sets the seed for deterministic sampling (Beta)"},
 	{"name", "set-name", "openai", "The prefix for environment variable overrides"},
 	{"effort", "set-effort", "low", "Set the reasoning effort"},
+	{"voice", "set-voice", "nova", "Set the voice used by tts models"},
 }
 
 func init() {
@@ -125,8 +129,13 @@ func run(cmd *cobra.Command, args []string) error {
 
 	cfg = createConfigFromViper()
 
-	if newThread && (cmd.Flag("set-thread").Changed || cmd.Flag("thread").Changed) {
-		return errors.New("the --new-thread flag cannot be used with the --set-thread or --thread flags")
+	changedFlags := make(map[string]bool)
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		changedFlags[f.Name] = true
+	})
+
+	if err := utils.ValidateFlags(changedFlags); err != nil {
+		return err
 	}
 
 	changedValues := map[string]interface{}{}
@@ -250,14 +259,14 @@ func run(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
 	hs, _ := history.New() // do not error out
-	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, &client.RealFileReader{}, cfg, interactiveMode)
+	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, &client.RealFileReader{}, &client.RealFileWriter{}, cfg, interactiveMode)
 
 	if ServiceURL != "" {
 		c = c.WithServiceURL(ServiceURL)
 	}
 
 	if hs != nil && newThread {
-		slug := client.GenerateUniqueSlug("cmd_")
+		slug := internal.GenerateUniqueSlug("cmd_")
 
 		hs.SetThread(slug)
 
@@ -390,6 +399,11 @@ func run(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 && !hasPipe {
 			return errors.New("you must specify your query or provide input via a pipe")
 		}
+
+		if cmd.Flag("speak").Changed && cmd.Flag("output").Changed {
+			return c.SynthesizeSpeech(strings.Join(args, " "), outputFile)
+		}
+
 		if queryMode {
 			result, usage, err := c.Query(ctx, strings.Join(args, " "))
 			if err != nil {
@@ -636,6 +650,8 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--image", "Upload an image from the specified local path or URL")
 		printFlagWithPadding("--audio", "Upload an audio file (mp3 or wav)")
 		printFlagWithPadding("--transcribe", "Transcribe an audio file")
+		printFlagWithPadding("--speak", "Use text-to-speech")
+		printFlagWithPadding("--output", "The output audio file for text-to-speech")
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--debug", "Print debug messages")
 		printFlagWithPadding("--set-completions", "Generate autocompletion script for your current shell")
@@ -677,9 +693,11 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().BoolVarP(&showDebug, "debug", "", false, "Enable debug mode")
 	rootCmd.PersistentFlags().BoolVarP(&newThread, "new-thread", "n", false, "Create a new thread with a random name and target it")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
+	rootCmd.PersistentFlags().BoolVarP(&useSpeak, "speak", "s", false, "Use text-to-speak")
 	rootCmd.PersistentFlags().StringVarP(&promptFile, "prompt", "p", "", "Provide a prompt file")
 	rootCmd.PersistentFlags().StringVarP(&roleFile, "role-file", "", "", "Provide a role file")
 	rootCmd.PersistentFlags().StringVarP(&imageFile, "image", "", "", "Provide an image from a local path or URL")
+	rootCmd.PersistentFlags().StringVarP(&outputFile, "output", "", "", "Provide an output file for text-to-speech")
 	rootCmd.PersistentFlags().StringVarP(&audioFile, "audio", "", "", "Provide an audio file from a local path")
 	rootCmd.PersistentFlags().StringVarP(&audioFile, "transcribe", "", "", "Provide an audio file from a local path")
 	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
@@ -734,6 +752,8 @@ func isGeneralFlag(name string) bool {
 		"role-file":       true,
 		"image":           true,
 		"audio":           true,
+		"speak":           true,
+		"output":          true,
 		"transcribe":      true,
 	}
 
@@ -817,6 +837,7 @@ func createConfigFromViper() config.Config {
 		CompletionsPath:     viper.GetString("completions_path"),
 		ResponsesPath:       viper.GetString("responses_path"),
 		TranscriptionsPath:  viper.GetString("transcriptions_path"),
+		SpeechPath:          viper.GetString("speech_path"),
 		ModelsPath:          viper.GetString("models_path"),
 		AuthHeader:          viper.GetString("auth_header"),
 		AuthTokenPrefix:     viper.GetString("auth_token_prefix"),
@@ -830,6 +851,7 @@ func createConfigFromViper() config.Config {
 		Multiline:           viper.GetBool("multiline"),
 		Seed:                viper.GetInt("seed"),
 		Effort:              viper.GetString("effort"),
+		Voice:               viper.GetString("voice"),
 	}
 }
 

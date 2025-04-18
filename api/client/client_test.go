@@ -27,6 +27,7 @@ import (
 //go:generate mockgen -destination=historymocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/history Store
 //go:generate mockgen -destination=timermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client Timer
 //go:generate mockgen -destination=readermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client FileReader
+//go:generate mockgen -destination=writermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client FileWriter
 
 const (
 	envApiKey       = "api-key"
@@ -40,6 +41,7 @@ var (
 	mockHistoryStore *MockStore
 	mockTimer        *MockTimer
 	mockReader       *MockFileReader
+	mockWriter       *MockFileWriter
 	factory          *clientFactory
 	apiKeyEnvVar     string
 	config           config2.Config
@@ -59,6 +61,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		mockHistoryStore = NewMockStore(mockCtrl)
 		mockTimer = NewMockTimer(mockCtrl)
 		mockReader = NewMockFileReader(mockCtrl)
+		mockWriter = NewMockFileWriter(mockCtrl)
 		config = MockConfig()
 
 		factory = newClientFactory(mockHistoryStore)
@@ -78,7 +81,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				capturedThread = thread
 			}).Times(1)
 
-			client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, MockConfig(), interactiveMode)
+			client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, mockWriter, MockConfig(), interactiveMode)
 
 			Expect(capturedThread).To(HavePrefix(client.InteractiveThreadPrefix))
 			Expect(len(capturedThread)).To(Equal(8)) // "int_" (4 chars) + 4 random characters
@@ -92,7 +95,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			cfg := MockConfig()
 			cfg.AutoCreateNewThread = false
 
-			client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, cfg, interactiveMode)
+			client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, mockWriter, cfg, interactiveMode)
 
 			Expect(capturedThread).To(Equal(config.Thread))
 		})
@@ -102,7 +105,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				capturedThread = thread
 			}).Times(1)
 
-			client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, MockConfig(), commandLineMode)
+			client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, mockWriter, MockConfig(), commandLineMode)
 
 			Expect(capturedThread).To(Equal(config.Thread))
 		})
@@ -305,7 +308,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				config := MockConfig()
 				config.OmitHistory = true
 
-				subject := client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, config, commandLineMode)
+				subject := client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, mockWriter, config, commandLineMode)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Read and Write are never called on the history store
@@ -961,6 +964,75 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			})
 		})
 	})
+	when("SynthesizeSpeech()", func() {
+		const (
+			inputText      = "mock-input"
+			outputFile     = "mock-output"
+			outputFileType = "mp3"
+			errorText      = "mock error occurred"
+		)
+
+		var (
+			subject  *client.Client
+			fileName = outputFile + "." + outputFileType
+			body     []byte
+			response []byte
+		)
+		it.Before(func() {
+			subject = factory.buildClientWithoutConfig()
+			request := api.Speech{
+				Model:          subject.Config.Model,
+				Voice:          subject.Config.Voice,
+				Input:          inputText,
+				ResponseFormat: outputFileType,
+			}
+			var err error
+			body, err = json.Marshal(request)
+			Expect(err).NotTo(HaveOccurred())
+
+			response = []byte("mock response")
+		})
+		it("throws an error when the http call fails", func() {
+			mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.SpeechPath, body, false).Return(nil, errors.New(errorText))
+
+			err := subject.SynthesizeSpeech(inputText, fileName)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(errorText))
+		})
+		it("throws an error when a file cannot be created", func() {
+			mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.SpeechPath, body, false).Return(response, nil)
+			mockWriter.EXPECT().Create(fileName).Return(nil, errors.New(errorText))
+
+			err := subject.SynthesizeSpeech(inputText, fileName)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(errorText))
+		})
+		it("throws an error when bytes cannot be written to the output file", func() {
+			file, err := os.Open(os.DevNull)
+			Expect(err).NotTo(HaveOccurred())
+			defer file.Close()
+
+			mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.SpeechPath, body, false).Return(response, nil)
+			mockWriter.EXPECT().Create(fileName).Return(file, nil)
+			mockWriter.EXPECT().Write(file, response).Return(errors.New(errorText))
+
+			err = subject.SynthesizeSpeech(inputText, fileName)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(errorText))
+		})
+		it("succeeds when no errors occurred", func() {
+			file, err := os.Open(os.DevNull)
+			Expect(err).NotTo(HaveOccurred())
+			defer file.Close()
+
+			mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.SpeechPath, body, false).Return(response, nil)
+			mockWriter.EXPECT().Create(fileName).Return(file, nil)
+			mockWriter.EXPECT().Write(file, response).Return(nil)
+
+			err = subject.SynthesizeSpeech(inputText, fileName)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
 	when("Transcribe()", func() {
 		const audioPath = "path/to/audio.wav"
 		const transcribedText = "Hello, this is a test."
@@ -1182,7 +1254,7 @@ func newClientFactory(mhs *MockStore) *clientFactory {
 func (f *clientFactory) buildClientWithoutConfig() *client.Client {
 	f.mockHistoryStore.EXPECT().SetThread(config.Thread).Times(1)
 
-	c := client.New(mockCallerFactory, f.mockHistoryStore, mockTimer, mockReader, MockConfig(), commandLineMode)
+	c := client.New(mockCallerFactory, f.mockHistoryStore, mockTimer, mockReader, mockWriter, MockConfig(), commandLineMode)
 
 	return c.WithContextWindow(config.ContextWindow)
 }
@@ -1226,5 +1298,8 @@ func MockConfig() config2.Config {
 		Seed:                1,
 		Effort:              "low",
 		ResponsesPath:       "/v1/responses",
+		Voice:               "mock-voice",
+		TranscriptionsPath:  "/v1/test/transcriptions",
+		SpeechPath:          "/v1/test/speech",
 	}
 }

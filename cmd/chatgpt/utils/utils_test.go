@@ -188,4 +188,41 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 		})
 
 	})
+
+	when("ValidateFlags()", func() {
+		it("doesn't throw an error when no flags are provided", func() {
+			flags := make(map[string]bool)
+			Expect(utils.ValidateFlags(flags)).To(Succeed())
+		})
+		it("should return an error when new-thread and set-thread are both used", func() {
+			flags := make(map[string]bool)
+			flags["new-thread"] = true
+			flags["set-thread"] = true
+
+			err := utils.ValidateFlags(flags)
+			Expect(err).To(HaveOccurred())
+		})
+		it("should return an error when new-thread and thread are both used", func() {
+			flags := make(map[string]bool)
+			flags["new-thread"] = true
+			flags["thread"] = true
+
+			err := utils.ValidateFlags(flags)
+			Expect(err).To(HaveOccurred())
+		})
+		it("should return an error when speak is used but output is omitted", func() {
+			flags := make(map[string]bool)
+			flags["speak"] = true
+
+			err := utils.ValidateFlags(flags)
+			Expect(err).To(HaveOccurred())
+		})
+		it("should return an error when output is used but speak is omitted", func() {
+			flags := make(map[string]bool)
+			flags["output"] = true
+
+			err := utils.ValidateFlags(flags)
+			Expect(err).To(HaveOccurred())
+		})
+	})
 }

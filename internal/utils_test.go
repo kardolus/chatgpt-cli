@@ -57,4 +57,12 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			Expect(dataHome).To(Equal(customDataHome))
 		})
 	})
+
+	when("GenerateUniqueSlug()", func() {
+		it("Has the expected length", func() {
+			prefix := "123"
+			result := internal.GenerateUniqueSlug(prefix)
+			Expect(result).To(HaveLen(len(prefix) + internal.SlugPostfixLength))
+		})
+	})
 }

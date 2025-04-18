@@ -65,7 +65,11 @@ Azure, featuring streaming capabilities and extensive configuration options.
 * **Support for images**: Upload an image or provide an image URL using the `--image` flag. Note that image support may
   not be available for all models. You can also pipe an image directly: `pngpaste - | chatgpt "What is this photo?"`
 * **Audio support**: You can upload audio files using the `--audio` flag to ask questions about spoken content.
-  This feature is compatible only with audio-capable models like gpt-4o-audio-preview. Currently, only `.mp3` and `.wav` formats are supported.
+  This feature is compatible only with audio-capable models like gpt-4o-audio-preview. Currently, only `.mp3` and `.wav`
+  formats are supported.
+* **Transcription support**: You can also use the `--transcribe` flag to generate a transcript of the uploaded audio.
+  This uses OpenAI’s transcription endpoint (compatible with models like gpt-4o-transcribe) and supports a wider range
+  of formats, including `.mp3`, `.mp4`, `.mpeg`, `.mpga`, `.m4a`, `.wav`, and `.webm`.
 * **Model listing**: Access a list of available models using the `-l` or `--list-models` flag.
 * **Thread listing**: Display a list of active threads using the `--list-threads` flag.
 * **Advanced configuration options**: The CLI supports a layered configuration system where settings can be specified

@@ -73,7 +73,8 @@ data: [DONE]
 ```
 
 ### Uploading images
-You can upload base64 encoded images from your local machine (and some models also accept URLs) using: 
+
+You can upload base64 encoded images from your local machine (and some models also accept URLs) using:
 
 ```shell
 curl --location --insecure --request POST 'https://api.openai.com/v1/chat/completions' \
@@ -125,9 +126,9 @@ curl --location --insecure --request POST 'https://api.openai.com/v1/chat/comple
 
 1. User Query → OpenAI API
 2. OpenAI API → Function Call (local machine)
-3. Function Call → External Function 
-4. External Function → Function Response 
-5. Function Response → OpenAI API 
+3. Function Call → External Function
+4. External Function → Function Response
+5. Function Response → OpenAI API
 6. OpenAI API → Final Response to User
 
 ```shell
@@ -462,7 +463,7 @@ curl https://api.openai.com/v1/responses \
   }'
 ```
 
-Response o1-pro: 
+Response o1-pro:
 
 ```json
 {
@@ -532,7 +533,8 @@ Response o1-pro:
 
 Does not support `temperature` and `top_p`.
 
-Request: 
+Request:
+
 ```shell
 curl https://api.openai.com/v1/chat/completions \
   -H "Authorization: Bearer ${OPENAI_API_KEY}" \
@@ -552,7 +554,7 @@ curl https://api.openai.com/v1/chat/completions \
   }'
 ```
 
-Response: 
+Response:
 
 ```json
 {
@@ -702,7 +704,7 @@ Response:
 
 ### gpt-4o-mini-realtime
 
-This uses a websocket rather than `REST` calls. 
+This uses a websocket rather than `REST` calls.
 
 ### gpt-4o-mini-tts
 
@@ -758,6 +760,8 @@ curl https://api.openai.com/v1/chat/completions \
 
 ### gpt-4o-transcribe
 
+Request:
+
 ```shell
 curl -L 'https://api.openai.com/v1/audio/transcriptions' \
   -X POST \
@@ -765,8 +769,14 @@ curl -L 'https://api.openai.com/v1/audio/transcriptions' \
   -H 'Content-Type: multipart/form-data' \
   -F file="@${HOME}/Downloads/test.mp3" \
   -F model='gpt-4o-transcribe' \
-  -F response_format='json' \
+  -F response_format='text' \
   -F temperature='0'
+```
+
+Response:
+
+```text
+Your State Farm car policy does not provide coverage while your personal car is being used by a transportation network company driver who is logged onto a transportation network company's digital network or is engaged in a transportation network company prearranged ride.
 ```
 
 ## Azure

@@ -961,6 +961,76 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			})
 		})
 	})
+	when("Transcribe()", func() {
+		const audioPath = "path/to/audio.wav"
+		const transcribedText = "Hello, this is a test."
+
+		it("returns an error if the audio file cannot be opened", func() {
+			subject := factory.buildClientWithoutConfig()
+
+			mockReader.EXPECT().Open(audioPath).Return(nil, errors.New("cannot open"))
+
+			_, err := subject.Transcribe(audioPath)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("cannot open"))
+		})
+
+		it("returns an error if copying audio content fails", func() {
+			subject := factory.buildClientWithoutConfig()
+
+			reader, writer, err := os.Pipe()
+			Expect(err).NotTo(HaveOccurred())
+
+			// Immediately close writer so reader will return EOF
+			_ = writer.Close()
+
+			mockReader.EXPECT().Open(audioPath).Return(reader, nil)
+
+			mockCaller.EXPECT().
+				PostWithHeaders(subject.Config.URL+subject.Config.TranscriptionsPath, gomock.Any(), gomock.Any())
+
+			_, err = subject.Transcribe(audioPath)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed"))
+		})
+
+		it("returns an error if the API call fails", func() {
+			subject := factory.buildClientWithoutConfig()
+
+			file, err := os.Open(os.DevNull)
+			Expect(err).NotTo(HaveOccurred())
+			defer file.Close()
+
+			mockReader.EXPECT().Open(audioPath).Return(file, nil)
+
+			mockCaller.EXPECT().
+				PostWithHeaders(subject.Config.URL+subject.Config.TranscriptionsPath, gomock.Any(), gomock.Any()).
+				Return(nil, errors.New("network error"))
+
+			_, err = subject.Transcribe(audioPath)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("network error"))
+		})
+
+		it("returns the transcribed text when successful", func() {
+			subject := factory.buildClientWithoutConfig()
+
+			file, err := os.Open(os.DevNull)
+			Expect(err).NotTo(HaveOccurred())
+			defer file.Close()
+
+			mockReader.EXPECT().Open(audioPath).Return(file, nil)
+
+			resp := []byte(`{"text": "Hello, this is a test."}`)
+			mockCaller.EXPECT().
+				PostWithHeaders(subject.Config.URL+subject.Config.TranscriptionsPath, gomock.Any(), gomock.Any()).
+				Return(resp, nil)
+
+			text, err := subject.Transcribe(audioPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(text).To(Equal(transcribedText))
+		})
+	})
 	when("ListModels()", func() {
 		it("throws an error when the http callout fails", func() {
 			subject := factory.buildClientWithoutConfig()

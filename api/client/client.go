@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -12,8 +13,11 @@ import (
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/internal"
 	"go.uber.org/zap"
+	"io"
+	"mime/multipart"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -305,6 +309,68 @@ func (c *Client) Stream(ctx context.Context, input string) error {
 	c.updateHistory(string(result))
 
 	return nil
+}
+
+// Transcribe uploads an audio file to the OpenAI transcription endpoint and returns the transcribed text.
+//
+// It reads the audio file from the provided `audioPath`, creates a multipart/form-data request with the model name
+// and the audio file, and sends it to the endpoint defined by the `TranscriptionsPath` in the client config.
+// The method expects a JSON response containing a "text" field with the transcription result.
+//
+// Parameters:
+//   - audioPath: The local file path to the audio file to be transcribed.
+//
+// Returns:
+//   - string: The transcribed text from the audio file.
+//   - error: An error if the file can't be read, the request fails, or the response is invalid.
+//
+// This method supports formats like mp3, mp4, mpeg, mpga, m4a, wav, and webm, depending on API compatibility.
+func (c *Client) Transcribe(audioPath string) (string, error) {
+	file, err := c.reader.Open(audioPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open audio file: %w", err)
+	}
+	defer file.Close()
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	_ = writer.WriteField("model", c.Config.Model)
+
+	part, err := writer.CreateFormFile("file", filepath.Base(audioPath))
+	if err != nil {
+		return "", err
+	}
+	if _, err := io.Copy(part, file); err != nil {
+		return "", err
+	}
+
+	if err := writer.Close(); err != nil {
+		return "", err
+	}
+
+	endpoint := c.getEndpoint(c.Config.TranscriptionsPath)
+	headers := map[string]string{
+		"Content-Type": writer.FormDataContentType(),
+	}
+
+	c.printRequestDebugInfo(endpoint, buf.Bytes())
+
+	raw, err := c.caller.PostWithHeaders(endpoint, buf.Bytes(), headers)
+	if err != nil {
+		return "", err
+	}
+
+	c.printResponseDebugInfo(raw)
+
+	var res struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return "", fmt.Errorf("failed to parse transcription: %w", err)
+	}
+
+	return res.Text, nil
 }
 
 func (c *Client) appendMediaMessages(ctx context.Context, messages []api.Message) ([]api.Message, error) {

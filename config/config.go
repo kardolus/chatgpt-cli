@@ -17,6 +17,7 @@ type Config struct {
 	CompletionsPath     string  `yaml:"completions_path"`
 	ModelsPath          string  `yaml:"models_path"`
 	ResponsesPath       string  `yaml:"responses_path"`
+	TranscriptionsPath  string  `yaml:"transcriptions_path"`
 	AuthHeader          string  `yaml:"auth_header"`
 	AuthTokenPrefix     string  `yaml:"auth_token_prefix"`
 	CommandPrompt       string  `yaml:"command_prompt"`

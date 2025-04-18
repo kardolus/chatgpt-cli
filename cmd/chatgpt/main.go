@@ -65,6 +65,7 @@ var configMetadata = []ConfigMetadata{
 	{"url", "set-url", "https://api.openai.com", "Set the API base URL"},
 	{"completions_path", "set-completions-path", "/v1/chat/completions", "Set the completions API endpoint"},
 	{"responses_path", "set-responses-path", "/v1/responses", "Set the responses API endpoint"},
+	{"transcriptions_path", "set-transcriptions-path", "/v1/audio/transcriptions", "Set the transcriptions API endpoint"},
 	{"models_path", "set-models-path", "/v1/models", "Set the models API endpoint"},
 	{"auth_header", "set-auth-header", "Authorization", "Set the authorization header"},
 	{"auth_token_prefix", "set-auth-token-prefix", "Bearer ", "Set the authorization token prefix"},
@@ -279,6 +280,15 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if cmd.Flag("audio").Changed {
 		ctx = context.WithValue(ctx, internal.AudioPathKey, audioFile)
+	}
+
+	if cmd.Flag("transcribe").Changed {
+		text, err := c.Transcribe(audioFile)
+		if err != nil {
+			return err
+		}
+		sugar.Infoln(text)
+		return nil
 	}
 
 	// Check if there is input from the pipe (stdin)
@@ -625,6 +635,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--show-history [thread]", "Show the human-readable conversation history")
 		printFlagWithPadding("--image", "Upload an image from the specified local path or URL")
 		printFlagWithPadding("--audio", "Upload an audio file (mp3 or wav)")
+		printFlagWithPadding("--transcribe", "Transcribe an audio file")
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--debug", "Print debug messages")
 		printFlagWithPadding("--set-completions", "Generate autocompletion script for your current shell")
@@ -670,6 +681,7 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().StringVarP(&roleFile, "role-file", "", "", "Provide a role file")
 	rootCmd.PersistentFlags().StringVarP(&imageFile, "image", "", "", "Provide an image from a local path or URL")
 	rootCmd.PersistentFlags().StringVarP(&audioFile, "audio", "", "", "Provide an audio file from a local path")
+	rootCmd.PersistentFlags().StringVarP(&audioFile, "transcribe", "", "", "Provide an audio file from a local path")
 	rootCmd.PersistentFlags().BoolVarP(&listThreads, "list-threads", "", false, "List available threads")
 	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
 	rootCmd.PersistentFlags().BoolVar(&showHistory, "show-history", false, "Show the human-readable conversation history")
@@ -705,12 +717,27 @@ func isNonConfigSetter(name string) bool {
 }
 
 func isGeneralFlag(name string) bool {
-	switch name {
-	case "query", "interactive", "config", "version", "new-thread", "list-models", "list-threads", "clear-history", "delete-thread", "show-history", "prompt", "set-completions", "help", "role-file", "image", "audio":
-		return true
-	default:
-		return false
+	var generalFlags = map[string]bool{
+		"query":           true,
+		"interactive":     true,
+		"config":          true,
+		"version":         true,
+		"new-thread":      true,
+		"list-models":     true,
+		"list-threads":    true,
+		"clear-history":   true,
+		"delete-thread":   true,
+		"show-history":    true,
+		"prompt":          true,
+		"set-completions": true,
+		"help":            true,
+		"role-file":       true,
+		"image":           true,
+		"audio":           true,
+		"transcribe":      true,
 	}
+
+	return generalFlags[name]
 }
 
 func isConfigAlias(name string) bool {
@@ -789,6 +816,7 @@ func createConfigFromViper() config.Config {
 		URL:                 viper.GetString("url"),
 		CompletionsPath:     viper.GetString("completions_path"),
 		ResponsesPath:       viper.GetString("responses_path"),
+		TranscriptionsPath:  viper.GetString("transcriptions_path"),
 		ModelsPath:          viper.GetString("models_path"),
 		AuthHeader:          viper.GetString("auth_header"),
 		AuthTokenPrefix:     viper.GetString("auth_token_prefix"),

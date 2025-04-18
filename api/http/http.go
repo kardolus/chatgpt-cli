@@ -27,6 +27,7 @@ const (
 
 type Caller interface {
 	Post(url string, body []byte, stream bool) ([]byte, error)
+	PostWithHeaders(url string, body []byte, headers map[string]string) ([]byte, error)
 	Get(url string) ([]byte, error)
 }
 
@@ -69,6 +70,45 @@ func (r *RestCaller) Get(url string) ([]byte, error) {
 
 func (r *RestCaller) Post(url string, body []byte, stream bool) ([]byte, error) {
 	return r.doRequest(http.MethodPost, url, body, stream)
+}
+
+func (r *RestCaller) PostWithHeaders(url string, body []byte, headers map[string]string) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf(errFailedToCreateRequest, err)
+	}
+
+	// Add auth header
+	if r.config.APIKey != "" {
+		req.Header.Set(r.config.AuthHeader, r.config.AuthTokenPrefix+r.config.APIKey)
+	}
+
+	// Add custom headers
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf(errFailedToMakeRequest, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		errorResponse, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf(errHTTPStatus, resp.StatusCode)
+		}
+
+		var errorData api.ErrorResponse
+		if err := json.Unmarshal(errorResponse, &errorData); err != nil {
+			return nil, fmt.Errorf(errHTTPStatus, resp.StatusCode)
+		}
+
+		return errorResponse, fmt.Errorf(errHTTP, resp.StatusCode, errorData.Error.Message)
+	}
+
+	return io.ReadAll(resp.Body)
 }
 
 func (r *RestCaller) ProcessResponse(reader io.Reader, writer io.Writer) []byte {

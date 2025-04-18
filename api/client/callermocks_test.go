@@ -62,3 +62,18 @@ func (mr *MockCallerMockRecorder) Post(arg0, arg1, arg2 interface{}) *gomock.Cal
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Post", reflect.TypeOf((*MockCaller)(nil).Post), arg0, arg1, arg2)
 }
+
+// PostWithHeaders mocks base method.
+func (m *MockCaller) PostWithHeaders(arg0 string, arg1 []byte, arg2 map[string]string) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PostWithHeaders", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostWithHeaders indicates an expected call of PostWithHeaders.
+func (mr *MockCallerMockRecorder) PostWithHeaders(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostWithHeaders", reflect.TypeOf((*MockCaller)(nil).PostWithHeaders), arg0, arg1, arg2)
+}

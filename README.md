@@ -74,7 +74,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
   `gpt-4o-mini-tts`).
   If you have `afplay` installed (macOS), you can even chain playback like this:
     ```shell
-    ./bin/chatgpt --speak "convert this to audio" --output test.mp3 && afplay test.mp3
+    chatgpt --speak "convert this to audio" --output test.mp3 && afplay test.mp3
     ```
 * **Model listing**: Access a list of available models using the `-l` or `--list-models` flag.
 * **Thread listing**: Display a list of active threads using the `--list-threads` flag.

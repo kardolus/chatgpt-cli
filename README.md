@@ -286,7 +286,7 @@ environment variables, a config.yaml file, and default values, in that respectiv
 | `audio`                  | Path to an audio file (MP3/WAV) used as part of the query.                                                                                                                                            | ''                        |
 | `output`                 | Path where synthesized audio is saved when using --speak.                                                                                                                                             | ''                        |
 | `speak`                  | If true, enables text-to-speech synthesis for the input query.                                                                                                                                        | `false`                   |
-| `transcribe`             | Enables transcription mode. The audio file specified via --audio will be transcribed.                                                                                                                 | `false`                   |
+| `transcribe`             | Enables transcription mode. This flags takes the path of an audio file.                                                                                                                               | `false`                   |
 
 ### LLM-Specific Configuration
 

@@ -312,15 +312,13 @@ func run(cmd *cobra.Command, args []string) error {
 		isBinary := utils.IsBinary(pipeContent)
 		if isBinary {
 			ctx = context.WithValue(ctx, internal.BinaryDataKey, pipeContent)
-		}
+		} else {
+			chatContext = string(pipeContent)
 
-		chatContext = string(pipeContent)
+			if strings.Trim(chatContext, "\n ") != "" {
+				hasPipe = true
+			}
 
-		if strings.Trim(chatContext, "\n ") != "" {
-			hasPipe = true
-		}
-
-		if !isBinary {
 			c.ProvideContext(chatContext)
 		}
 	}

@@ -190,39 +190,104 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 	})
 
 	when("ValidateFlags()", func() {
-		it("doesn't throw an error when no flags are provided", func() {
-			flags := make(map[string]bool)
-			Expect(utils.ValidateFlags(flags)).To(Succeed())
+		const defaultModel = "mock-model"
+
+		var flags map[string]bool
+
+		it.Before(func() {
+			flags = make(map[string]bool)
 		})
-		it("should return an error when new-thread and set-thread are both used", func() {
-			flags := make(map[string]bool)
+
+		it("doesn't throw an error when no flags are provided", func() {
+			Expect(utils.ValidateFlags(defaultModel, flags)).To(Succeed())
+		})
+		it("should return an error when --new-thread and --set-thread are both used", func() {
 			flags["new-thread"] = true
 			flags["set-thread"] = true
 
-			err := utils.ValidateFlags(flags)
+			err := utils.ValidateFlags(defaultModel, flags)
 			Expect(err).To(HaveOccurred())
 		})
-		it("should return an error when new-thread and thread are both used", func() {
-			flags := make(map[string]bool)
+		it("should return an error when --new-thread and --thread are both used", func() {
 			flags["new-thread"] = true
 			flags["thread"] = true
 
-			err := utils.ValidateFlags(flags)
+			err := utils.ValidateFlags(defaultModel, flags)
 			Expect(err).To(HaveOccurred())
 		})
-		it("should return an error when speak is used but output is omitted", func() {
-			flags := make(map[string]bool)
+		it("should return an error when --speak is used but --output is omitted", func() {
 			flags["speak"] = true
 
-			err := utils.ValidateFlags(flags)
+			err := utils.ValidateFlags(defaultModel, flags)
 			Expect(err).To(HaveOccurred())
 		})
-		it("should return an error when output is used but speak is omitted", func() {
-			flags := make(map[string]bool)
+		it("should return an error when --output is used but --speak is omitted", func() {
 			flags["output"] = true
 
-			err := utils.ValidateFlags(flags)
+			err := utils.ValidateFlags(defaultModel, flags)
 			Expect(err).To(HaveOccurred())
+		})
+		it("should return an error when --audio is used with an incompatible model", func() {
+			flags["audio"] = true
+
+			err := utils.ValidateFlags(defaultModel, flags)
+			Expect(err).To(HaveOccurred())
+		})
+		it("should NOT return an error when --audio is used with a compatible model", func() {
+			flags["audio"] = true
+
+			err := utils.ValidateFlags(defaultModel+utils.AudioPattern, flags)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("should return an error when --transcribe is used with an incompatible model", func() {
+			flags["transcribe"] = true
+
+			err := utils.ValidateFlags(defaultModel, flags)
+			Expect(err).To(HaveOccurred())
+		})
+		it("should NOT return an error when --transcribe is used with a compatible model", func() {
+			flags["transcribe"] = true
+
+			err := utils.ValidateFlags(defaultModel+utils.TranscribePattern, flags)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("should return an error when --speak and --output flags are used with an incompatible model", func() {
+			flags["speak"] = true
+			flags["output"] = true
+
+			err := utils.ValidateFlags(defaultModel, flags)
+			Expect(err).To(HaveOccurred())
+		})
+		it("should NOT return an error when --speak and --output flags are used with a compatible model", func() {
+			flags["speak"] = true
+			flags["output"] = true
+
+			err := utils.ValidateFlags(defaultModel+utils.TTSPattern, flags)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("should return an error when --voice is used with an incompatible model", func() {
+			flags["voice"] = true
+
+			err := utils.ValidateFlags(defaultModel, flags)
+			Expect(err).To(HaveOccurred())
+		})
+		it("should NOT return an error when --voice is used with a compatible model", func() {
+			flags["voice"] = true
+
+			err := utils.ValidateFlags(defaultModel+utils.TTSPattern, flags)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("should return an error when --effort is used with an incompatible model", func() {
+			flags["effort"] = true
+
+			err := utils.ValidateFlags(defaultModel, flags)
+			Expect(err).To(HaveOccurred())
+		})
+		it("should NOT return an error when --effort is used with a compatible model", func() {
+			flags["effort"] = true
+
+			err := utils.ValidateFlags(defaultModel+utils.O1ProPattern, flags)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 }

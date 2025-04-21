@@ -9,6 +9,13 @@ import (
 	"unicode/utf8"
 )
 
+const (
+	AudioPattern      = "-audio"
+	TranscribePattern = "-transcribe"
+	TTSPattern        = "-tts"
+	O1ProPattern      = "o1-pro"
+)
+
 func ColorToAnsi(color string) (string, string) {
 	if color == "" {
 		return "", ""
@@ -100,7 +107,7 @@ func IsBinary(data []byte) bool {
 	return binaryCount > threshold
 }
 
-func ValidateFlags(flags map[string]bool) error {
+func ValidateFlags(model string, flags map[string]bool) error {
 	if flags["new-thread"] && (flags["set-thread"] || flags["thread"]) {
 		return errors.New("the --new-thread flag cannot be used with the --set-thread or --thread flags")
 	}
@@ -109,6 +116,21 @@ func ValidateFlags(flags map[string]bool) error {
 	}
 	if !flags["speak"] && flags["output"] {
 		return errors.New("the --speak flag cannot be used without the --output flag")
+	}
+	if flags["audio"] && !strings.Contains(model, AudioPattern) {
+		return errors.New("the --audio flag cannot be used without a compatible model, ie gpt-4o-audio-preview (see --list-models)")
+	}
+	if flags["transcribe"] && !strings.Contains(model, TranscribePattern) {
+		return errors.New("the --transcribe flag cannot be used without a compatible model, ie gpt-4o-transcribe (see --list-models)")
+	}
+	if flags["speak"] && flags["output"] && !strings.Contains(model, TTSPattern) {
+		return errors.New("the --speak and --output flags cannot be used without a compatible model, ie gpt-4o-mini-tts (see --list-models)")
+	}
+	if flags["voice"] && !strings.Contains(model, TTSPattern) {
+		return errors.New("the --voice flag cannot be used without a compatible model, ie gpt-4o-mini-tts (see --list-models)")
+	}
+	if flags["effort"] && !strings.Contains(model, O1ProPattern) {
+		return errors.New("the --effort flag cannot be used with non o1-pro models (see --list-models)")
 	}
 
 	return nil

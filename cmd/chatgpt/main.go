@@ -301,6 +301,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if there is input from the pipe (stdin)
+	var chatContext string
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) == 0 {
 		pipeContent, err := io.ReadAll(os.Stdin)
@@ -313,7 +314,7 @@ func run(cmd *cobra.Command, args []string) error {
 			ctx = context.WithValue(ctx, internal.BinaryDataKey, pipeContent)
 		}
 
-		chatContext := string(pipeContent)
+		chatContext = string(pipeContent)
 
 		if strings.Trim(chatContext, "\n ") != "" {
 			hasPipe = true
@@ -401,7 +402,7 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 
 		if cmd.Flag("speak").Changed && cmd.Flag("output").Changed {
-			return c.SynthesizeSpeech(strings.Join(args, " "), outputFile)
+			return c.SynthesizeSpeech(chatContext+strings.Join(args, " "), outputFile)
 		}
 
 		if queryMode {

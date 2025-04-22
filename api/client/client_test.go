@@ -1040,6 +1040,9 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		it("returns an error if the audio file cannot be opened", func() {
 			subject := factory.buildClientWithoutConfig()
 
+			mockHistoryStore.EXPECT().Read().Return(nil, nil)
+			mockTimer.EXPECT().Now().Times(1)
+
 			mockReader.EXPECT().Open(audioPath).Return(nil, errors.New("cannot open"))
 
 			_, err := subject.Transcribe(audioPath)
@@ -1049,6 +1052,9 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 		it("returns an error if copying audio content fails", func() {
 			subject := factory.buildClientWithoutConfig()
+
+			mockHistoryStore.EXPECT().Read().Return(nil, nil)
+			mockTimer.EXPECT().Now().Times(1)
 
 			reader, writer, err := os.Pipe()
 			Expect(err).NotTo(HaveOccurred())
@@ -1069,6 +1075,9 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		it("returns an error if the API call fails", func() {
 			subject := factory.buildClientWithoutConfig()
 
+			mockHistoryStore.EXPECT().Read().Return(nil, nil)
+			mockTimer.EXPECT().Now().Times(1)
+
 			file, err := os.Open(os.DevNull)
 			Expect(err).NotTo(HaveOccurred())
 			defer file.Close()
@@ -1087,6 +1096,11 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		it("returns the transcribed text when successful", func() {
 			subject := factory.buildClientWithoutConfig()
 
+			mockHistoryStore.EXPECT().Read().Return(nil, nil)
+
+			now := time.Now()
+			mockTimer.EXPECT().Now().Return(now).Times(3)
+
 			file, err := os.Open(os.DevNull)
 			Expect(err).NotTo(HaveOccurred())
 			defer file.Close()
@@ -1097,6 +1111,32 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			mockCaller.EXPECT().
 				PostWithHeaders(subject.Config.URL+subject.Config.TranscriptionsPath, gomock.Any(), gomock.Any()).
 				Return(resp, nil)
+
+			expectedHistory := []history.History{
+				{
+					Message: api.Message{
+						Role:    client.SystemRole,
+						Content: subject.Config.Role,
+					},
+					Timestamp: now,
+				},
+				{
+					Message: api.Message{
+						Role:    client.UserRole,
+						Content: "[transcribe] audio.wav",
+					},
+					Timestamp: now,
+				},
+				{
+					Message: api.Message{
+						Role:    client.AssistantRole,
+						Content: transcribedText,
+					},
+					Timestamp: now,
+				},
+			}
+
+			mockHistoryStore.EXPECT().Write(expectedHistory)
 
 			text, err := subject.Transcribe(audioPath)
 			Expect(err).NotTo(HaveOccurred())

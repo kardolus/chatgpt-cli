@@ -375,6 +375,8 @@ func (c *Client) SynthesizeSpeech(inputText, outputPath string) error {
 //
 // This method supports formats like mp3, mp4, mpeg, mpga, m4a, wav, and webm, depending on API compatibility.
 func (c *Client) Transcribe(audioPath string) (string, error) {
+	c.initHistory()
+
 	file, err := c.reader.Open(audioPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to open audio file: %w", err)
@@ -417,6 +419,28 @@ func (c *Client) Transcribe(audioPath string) (string, error) {
 	}
 	if err := json.Unmarshal(raw, &res); err != nil {
 		return "", fmt.Errorf("failed to parse transcription: %w", err)
+	}
+
+	c.History = append(c.History, history.History{
+		Message: api.Message{
+			Role:    UserRole,
+			Content: fmt.Sprintf("[transcribe] %s", filepath.Base(audioPath)),
+		},
+		Timestamp: c.timer.Now(),
+	})
+
+	c.History = append(c.History, history.History{
+		Message: api.Message{
+			Role:    AssistantRole,
+			Content: res.Text,
+		},
+		Timestamp: c.timer.Now(),
+	})
+
+	c.truncateHistory()
+
+	if !c.Config.OmitHistory {
+		_ = c.historyStore.Write(c.History)
 	}
 
 	return res.Text, nil

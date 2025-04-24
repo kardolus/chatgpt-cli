@@ -16,6 +16,12 @@ Azure, featuring streaming capabilities and extensive configuration options.
         - [Using the prompt flag](#using-the---prompt-flag)
         - [Example](#example)
         - [Explore More Prompts](#explore-more-prompts)
+    - [MCP Support](#mcp-support)
+        - [Overview](#overview)
+        - [Examples](#examples)
+        - [Default Version Behavior](#default-version-behavior)
+        - [Handling MCP Replies](#handling-mcp-replies)
+        - [Configuration](#configuration)
 - [Installation](#installation)
     - [Using Homebrew (macOS)](#using-homebrew-macos)
     - [Direct Download](#direct-download)
@@ -117,6 +123,90 @@ the diff data from `git diff`.
 
 For a variety of ready-to-use prompts, check out this [awesome prompts repository](https://github.com/kardolus/prompts).
 These can serve as great starting points or inspiration for your own custom prompts!
+
+Here’s the updated README section for MCP Support, placed after the ### Prompt Support section you shared:
+
+### MCP Support
+
+We’re excited to introduce Model Context Protocol (MCP) support in version 1.8.3+, allowing you to enrich your chat
+sessions with structured, live data. For now, this feature is limited to Apify integrations.
+
+#### Overview
+
+MCP enables the CLI to call external plugins — like Apify actors — and inject their responses into the chat context
+before your actual query is sent. This is useful for fetching weather, scraping Google Maps, or summarizing PDFs.
+
+You can use either `--param` (for individual key=value pairs) or `--params` (for raw JSON).
+
+#### Examples
+
+Using `--param` flags:
+
+```shell
+chatgpt --mcp apify/epctex~weather-scraper \
+    --param locations='["Brooklyn"]' \
+    --param language=en \
+    --param forecasts=true \
+    "what should I wear today"
+```
+
+Using a single `--params` flag:
+
+```shell
+chatgpt --mcp apify/epctex~weather-scraper \
+    --params '{"locations": ["Brooklyn"], "language": "en", "forecasts": true}' \
+    "what should I wear today"
+```
+
+#### Default Version Behavior
+
+If no version is specified, `@latest` is assumed:
+
+```shell
+chatgpt --mcp apify/user~weather
+```
+
+is equivalent to:
+
+```shell
+chatgpt --mcp apify/user~weather@latest
+```
+
+#### Handling MCP Replies
+
+Responses from MCP plugins are automatically injected into the conversation thread as context. You can use MCP in two
+different modes:
+
+1. MCP-only mode (Context Injection Only)
+
+    ```shell
+    chatgpt --mcp apify/epctex~weather-scraper --param location=Brooklyn
+    ```
+
+   * Fetches live data
+   * Injects it into the current thread
+   * Does not trigger a GPT completion 
+   * CLI prints a confirmation
+
+2. MCP + Query mode (Context + Completion)
+
+    ```shell
+    chatgpt --mcp apify/epctex~weather-scraper --param location=Brooklyn "What should I wear today?"
+    ```
+
+   * Fetches and injects MCP data 
+   * Immediately sends your query to GPT 
+   * Returns the assistant’s response
+
+#### Configuration
+
+You’ll need to set the `APIFY_API_KEY` as an environment variable or config value
+
+Example:
+
+```shell
+export APIFY_API_KEY=your-api-key
+```
 
 ## Installation
 

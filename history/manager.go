@@ -10,6 +10,7 @@ const (
 	assistantRole = "assistant"
 	systemRole    = "system"
 	userRole      = "user"
+	functionRole  = "function"
 )
 
 type Manager struct {
@@ -85,6 +86,9 @@ func formatHistory(entry History) string {
 		if !entry.Timestamp.IsZero() {
 			timestamp = fmt.Sprintf(" [%s]", entry.Timestamp.Format("2006-01-02 15:04:05"))
 		}
+	case functionRole:
+		emoji = "🔌"
+		prefix = "---\n"
 	case assistantRole:
 		emoji = "🤖"
 		prefix = "\n"

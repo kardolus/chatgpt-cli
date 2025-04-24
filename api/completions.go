@@ -27,6 +27,7 @@ type CompletionsRequest struct {
 
 type Message struct {
 	Role    string      `json:"role"`
+	Name    string      `json:"name,omitempty"`
 	Content interface{} `json:"content"`
 }
 

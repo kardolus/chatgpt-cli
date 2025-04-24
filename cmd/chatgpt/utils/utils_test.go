@@ -289,5 +289,141 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			err := utils.ValidateFlags(defaultModel+utils.O1ProPattern, flags)
 			Expect(err).NotTo(HaveOccurred())
 		})
+		it("should return an error when the --param flag is used without --mcp", func() {
+			flags["param"] = true
+			err := utils.ValidateFlags(defaultModel, flags)
+			Expect(err).To(HaveOccurred())
+		})
+		it("should return an error when the --params flag is used without --mcp", func() {
+			flags["params"] = true
+			err := utils.ValidateFlags(defaultModel, flags)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	when("ParseMCPPlugin()", func() {
+		const (
+			invalidPattern = "apify-invalid-pattern"
+			function       = "user~actor"
+			version        = "mock-version"
+		)
+
+		it("throws an error when the pattern does not contain a slash", func() {
+			_, err := utils.ParseMCPPlugin(invalidPattern)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(utils.InvalidMCPPatter))
+		})
+		it("throws an error when the pattern starts with a slash", func() {
+			_, err := utils.ParseMCPPlugin("/" + invalidPattern)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(utils.InvalidMCPPatter))
+		})
+		it("throws an error when the pattern starts ends with a slash", func() {
+			_, err := utils.ParseMCPPlugin(invalidPattern + "/")
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(utils.InvalidMCPPatter))
+		})
+		it("throws an error when the pattern contains more than one slash", func() {
+			_, err := utils.ParseMCPPlugin("apify/apify/app")
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(utils.InvalidMCPPatter))
+		})
+		it("throws an error when the provider is not apify or smithery", func() {
+			_, err := utils.ParseMCPPlugin("unsupported/" + function)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(utils.UnsupportedProvider))
+		})
+		it("is not case dependent when it comes to providers", func() {
+			_, err := utils.ParseMCPPlugin("ApIfY/" + function)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("throws an error when the provider is apify and the function is missing a tilde", func() {
+			_, err := utils.ParseMCPPlugin("apify" + "/" + "invalid-function")
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(utils.InvalidApifyFunction))
+		})
+		it("throws an error when the provider is apify and the function is missing an actor", func() {
+			_, err := utils.ParseMCPPlugin("apify" + "/" + "user~")
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(utils.InvalidApifyFunction))
+		})
+		it("throws an error when the provider is apify and the function is missing a user", func() {
+			_, err := utils.ParseMCPPlugin("apify" + "/" + "~actor")
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(utils.InvalidApifyFunction))
+		})
+		it("sets the version to the latest when the version is not specified", func() {
+			result, err := utils.ParseMCPPlugin(utils.ApifyProvider + "/" + function)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Provider).To(Equal(utils.ApifyProvider))
+			Expect(result.Function).To(Equal(function))
+			Expect(result.Version).To(Equal(utils.LatestVersion))
+		})
+		it("sets the correct version when it is specified", func() {
+			result, err := utils.ParseMCPPlugin(utils.ApifyProvider + "/" + function + "@" + version)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Provider).To(Equal(utils.ApifyProvider))
+			Expect(result.Function).To(Equal(function))
+			Expect(result.Version).To(Equal(version))
+		})
+	})
+
+	when("ParseParams()", func() {
+		const (
+			key   = "key"
+			value = "value"
+			pair  = key + "=" + value
+		)
+
+		it("throws and error when the params are not valid JSON or a valid pair", func() {
+			_, err := utils.ParseParams("invalid-params")
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(utils.InvalidParams))
+		})
+		it("parses the input as expected when a valid pair is provided", func() {
+			result, err := utils.ParseParams(pair)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(HaveLen(1))
+			Expect(result[key]).To(Equal(value))
+		})
+		it("parses the input as expected when a valid json is provided", func() {
+			jsonInput := `{"key": "value"}`
+
+			result, err := utils.ParseParams(jsonInput)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(HaveLen(1))
+			Expect(result["key"]).To(Equal("value"))
+		})
+		it("does not throw an error when no input is provided", func() {
+			result, err := utils.ParseParams()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(BeEmpty())
+		})
+		it("throws an error when the 2nd pair is malformed", func() {
+			_, err := utils.ParseParams([]string{pair, "invalid-pair"}...)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(utils.InvalidParams))
+		})
+		it("produces the expected output when multiple pairs are provided", func() {
+			result, err := utils.ParseParams(pair, fmt.Sprintf("%s2=%s2", key, value))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(HaveLen(2))
+			Expect(result[key]).To(Equal(value))
+			Expect(result[key+"2"]).To(Equal(value + "2"))
+		})
+		it("parses key=value pairs where the value is a JSON array or boolean", func() {
+			result, err := utils.ParseParams(
+				`locations=["Brooklyn","Queens"]`,
+				`forecasts=true`,
+				`language="en"`,
+			)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(result).To(HaveLen(3))
+
+			Expect(result["locations"]).To(Equal([]interface{}{"Brooklyn", "Queens"}))
+			Expect(result["forecasts"]).To(Equal(true))
+			Expect(result["language"]).To(Equal("en")) // NOTE: quoted value gets parsed as string
+		})
 	})
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/api/client"
 	"github.com/kardolus/chatgpt-cli/api/http"
+	"github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
 	config2 "github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/internal"
@@ -1239,6 +1240,199 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			contextMessage := subject.History[2]
 			Expect(contextMessage.Role).To(Equal(client.UserRole))
 			Expect(contextMessage.Content).To(Equal(chatContext))
+		})
+	})
+	when("InjectMCPContext()", func() {
+		var subject *client.Client
+
+		const (
+			function = "mock-function"
+			version  = "mock-version"
+			param    = "mock-param"
+			value    = "mock-value"
+			apifyKey = "mock-key"
+			endpoint = client.ApifyURL + function + client.ApifyPath
+		)
+
+		req := api.MCPRequest{
+			Provider: utils.ApifyProvider,
+			Function: function,
+			Version:  version,
+			Params: map[string]interface{}{
+				param: value,
+			},
+		}
+
+		it.Before(func() {
+			subject = factory.buildClientWithoutConfig()
+			subject.Config.ApifyAPIKey = apifyKey
+		})
+
+		it("throws an error when the apify API key is missing and the apify provider is used", func() {
+			subject.Config.ApifyAPIKey = ""
+
+			err := subject.InjectMCPContext(req)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(utils.ApifyProvider))
+		})
+		it("is not reliant on specific provider casing", func() {
+			subject.Config.ApifyAPIKey = ""
+
+			req.Provider = "ApIfY"
+
+			err := subject.InjectMCPContext(req)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(utils.ApifyProvider))
+		})
+		it("throws an error when history tracking is disabled", func() {
+			subject.Config.OmitHistory = true
+
+			err := subject.InjectMCPContext(req)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(client.ErrHistoryTracking))
+		})
+		it("throws an error when the provider is not supported", func() {
+			req.Provider = "not-supported"
+
+			err := subject.InjectMCPContext(req)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(client.ErrUnsupportedProvider))
+		})
+		it("throws an error when the http call fails", func() {
+			msg := "error message"
+
+			mockCaller.EXPECT().
+				PostWithHeaders(endpoint, gomock.Any(), gomock.Any()).Return(nil, errors.New(msg))
+
+			err := subject.InjectMCPContext(req)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(msg))
+		})
+		it("throws an error when history writing fails", func() {
+			mockCaller.EXPECT().
+				PostWithHeaders(endpoint, gomock.Any(), gomock.Any()).Return([]byte(`{"key":"value"}`), nil)
+
+			mockHistoryStore.EXPECT().Read().Times(1)
+			mockTimer.EXPECT().Now().Times(2)
+
+			msg := "error message"
+			mockHistoryStore.EXPECT().Write(gomock.Any()).Return(errors.New(msg))
+
+			err := subject.InjectMCPContext(req)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(msg))
+		})
+		it("adds the formatted MCP response to history (array data)", func() {
+			mockCaller.EXPECT().
+				PostWithHeaders(endpoint, gomock.Any(), gomock.Any()).
+				Return([]byte(`[{"temperature":"15C","condition":"Sunny"}]`), nil)
+
+			mockHistoryStore.EXPECT().Read().Times(1)
+			mockTimer.EXPECT().Now().Times(2)
+
+			mockHistoryStore.EXPECT().Write(gomock.Any()).
+				DoAndReturn(func(h []history.History) error {
+					Expect(len(h)).To(Equal(2))
+					last := h[len(h)-1]
+					Expect(last.Message.Role).To(Equal("function"))
+					Expect(last.Message.Name).To(Equal("mock-function"))
+					Expect(last.Message.Content).To(ContainSubstring("Temperature: 15C"))
+					Expect(last.Message.Content).To(ContainSubstring("Condition: Sunny"))
+					Expect(last.Message.Content).To(ContainSubstring("[MCP: mock-function]"))
+					return nil
+				})
+
+			err := subject.InjectMCPContext(req)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("adds the formatted MCP response to history (single object)", func() {
+			mockCaller.EXPECT().
+				PostWithHeaders(endpoint, gomock.Any(), gomock.Any()).
+				Return([]byte(`{"foo":"bar","baz":"qux"}`), nil)
+
+			mockHistoryStore.EXPECT().Read().Times(1)
+			mockTimer.EXPECT().Now().Times(2)
+
+			mockHistoryStore.EXPECT().Write(gomock.Any()).
+				DoAndReturn(func(h []history.History) error {
+					Expect(len(h)).To(Equal(2))
+					Expect(h[len(h)-1].Message.Content).To(ContainSubstring("Foo: bar"))
+					Expect(h[len(h)-1].Message.Content).To(ContainSubstring("Baz: qux"))
+					Expect(h[len(h)-1].Message.Role).To(Equal("function"))
+					Expect(h[len(h)-1].Message.Name).To(Equal("mock-function"))
+					return nil
+				})
+
+			err := subject.InjectMCPContext(req)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("adds fallback message when array response is empty", func() {
+			mockCaller.EXPECT().
+				PostWithHeaders(endpoint, gomock.Any(), gomock.Any()).
+				Return([]byte(`[]`), nil)
+
+			mockHistoryStore.EXPECT().Read().Times(1)
+			mockTimer.EXPECT().Now().Times(2)
+
+			mockHistoryStore.EXPECT().Write(gomock.Any()).
+				DoAndReturn(func(h []history.History) error {
+					Expect(h[len(h)-1].Message.Content).To(ContainSubstring("no data returned"))
+					return nil
+				})
+
+			err := subject.InjectMCPContext(req)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("adds fallback message when array contains non-object items", func() {
+			mockCaller.EXPECT().
+				PostWithHeaders(endpoint, gomock.Any(), gomock.Any()).
+				Return([]byte(`[42, true, "string"]`), nil)
+
+			mockHistoryStore.EXPECT().Read().Times(1)
+			mockTimer.EXPECT().Now().Times(2)
+
+			mockHistoryStore.EXPECT().Write(gomock.Any()).
+				DoAndReturn(func(h []history.History) error {
+					Expect(h[len(h)-1].Message.Content).To(ContainSubstring("unexpected response format"))
+					return nil
+				})
+
+			err := subject.InjectMCPContext(req)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("adds fallback message when response is invalid JSON", func() {
+			mockCaller.EXPECT().
+				PostWithHeaders(endpoint, gomock.Any(), gomock.Any()).
+				Return([]byte(`{invalid json}`), nil)
+
+			mockHistoryStore.EXPECT().Read().Times(1)
+			mockTimer.EXPECT().Now().Times(2)
+
+			mockHistoryStore.EXPECT().Write(gomock.Any()).
+				DoAndReturn(func(h []history.History) error {
+					Expect(h[len(h)-1].Message.Content).To(ContainSubstring("failed to decode response"))
+					return nil
+				})
+
+			err := subject.InjectMCPContext(req)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("adds fallback message when top-level JSON is a string", func() {
+			mockCaller.EXPECT().
+				PostWithHeaders(endpoint, gomock.Any(), gomock.Any()).
+				Return([]byte(`"hello world"`), nil)
+
+			mockHistoryStore.EXPECT().Read().Times(1)
+			mockTimer.EXPECT().Now().Times(2)
+
+			mockHistoryStore.EXPECT().Write(gomock.Any()).
+				DoAndReturn(func(h []history.History) error {
+					Expect(h[len(h)-1].Message.Content).To(ContainSubstring("unexpected response format"))
+					return nil
+				})
+
+			err := subject.InjectMCPContext(req)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 }

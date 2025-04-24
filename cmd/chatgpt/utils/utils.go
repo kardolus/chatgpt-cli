@@ -1,8 +1,10 @@
 package utils
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kardolus/chatgpt-cli/api"
 	"os"
 	"strings"
 	"time"
@@ -10,10 +12,17 @@ import (
 )
 
 const (
-	AudioPattern      = "-audio"
-	TranscribePattern = "-transcribe"
-	TTSPattern        = "-tts"
-	O1ProPattern      = "o1-pro"
+	AudioPattern         = "-audio"
+	TranscribePattern    = "-transcribe"
+	TTSPattern           = "-tts"
+	O1ProPattern         = "o1-pro"
+	InvalidMCPPatter     = "the MCP pattern has to be of the form <provider>/<plugin>[@<version>]"
+	ApifyProvider        = "apify"
+	SmitheryProvider     = "smithery"
+	UnsupportedProvider  = "only apify and smithery are currently supported"
+	LatestVersion        = "latest"
+	InvalidParams        = "params need to be pairs or a JSON object"
+	InvalidApifyFunction = "apify functions need to be of the form user~actor"
 )
 
 func ColorToAnsi(color string) (string, string) {
@@ -117,6 +126,12 @@ func ValidateFlags(model string, flags map[string]bool) error {
 	if !flags["speak"] && flags["output"] {
 		return errors.New("the --speak flag cannot be used without the --output flag")
 	}
+	if !flags["mcp"] && flags["param"] {
+		return errors.New("the --param flag cannot be used without the --mcp flag")
+	}
+	if !flags["mcp"] && flags["params"] {
+		return errors.New("the --params flag cannot be used without the --mcp flag")
+	}
 	if flags["audio"] && !strings.Contains(model, AudioPattern) {
 		return errors.New("the --audio flag cannot be used without a compatible model, ie gpt-4o-audio-preview (see --list-models)")
 	}
@@ -134,4 +149,108 @@ func ValidateFlags(model string, flags map[string]bool) error {
 	}
 
 	return nil
+}
+
+// ParseMCPPlugin expects input for the apify provider of the form [provider]/[user]~[actor]@[version]
+// and the smithery provider of the form [provider]/[function]@[version].
+func ParseMCPPlugin(input string) (api.MCPRequest, error) {
+	var result api.MCPRequest
+
+	fields := strings.Split(input, "/")
+	if len(fields) != 2 || fields[0] == "" || fields[1] == "" {
+		return api.MCPRequest{}, errors.New(InvalidMCPPatter)
+	}
+
+	validProviders := map[string]bool{
+		ApifyProvider:    true,
+		SmitheryProvider: true,
+	}
+
+	if validProviders[strings.ToLower(fields[0])] {
+		result.Provider = fields[0]
+	} else {
+		return api.MCPRequest{}, errors.New(UnsupportedProvider)
+	}
+
+	function := strings.Split(fields[1], "@")
+
+	result.Function = function[0]
+
+	if result.Provider == ApifyProvider {
+		parts := strings.Split(result.Function, "~")
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return api.MCPRequest{}, errors.New(InvalidApifyFunction)
+		}
+	}
+
+	if len(function) == 1 {
+		result.Version = LatestVersion
+	} else if len(function) == 2 {
+		result.Version = function[1]
+	}
+
+	return result, nil
+}
+
+func ParseParams(params ...string) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+
+	if len(params) == 1 {
+		if !isJSONObject(params[0]) && !isValidPair(params[0]) {
+			return nil, errors.New(InvalidParams)
+		}
+		if isValidPair(params[0]) {
+			k, v := parseTypedValue(params[0])
+			result[k] = v
+			return result, nil
+		}
+		// the input is valid json
+		if err := json.Unmarshal([]byte(params[0]), &result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	for _, param := range params {
+		if !isValidPair(param) {
+			return nil, errors.New(InvalidParams)
+		}
+		k, v := parseTypedValue(param)
+		result[k] = v
+	}
+
+	return result, nil
+}
+
+func parseTypedValue(param string) (string, interface{}) {
+	k, raw := parsePair(param)
+
+	// Try to unmarshal the value as JSON
+	var parsed interface{}
+	if err := json.Unmarshal([]byte(raw), &parsed); err == nil {
+		return k, parsed
+	}
+
+	// Fallback to treating it as a string
+	return k, raw
+}
+
+func isJSONObject(s string) bool {
+	var js map[string]interface{}
+	return json.Unmarshal([]byte(s), &js) == nil
+}
+
+func isValidPair(s string) bool {
+	pairs := strings.Split(s, "=")
+
+	if len(pairs) == 2 && pairs[0] != "" && pairs[1] != "" {
+		return true
+	}
+
+	return false
+}
+
+func parsePair(s string) (string, string) {
+	pairs := strings.Split(s, "=")
+	return pairs[0], pairs[1]
 }

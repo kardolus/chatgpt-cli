@@ -47,6 +47,9 @@ var (
 	threadName      string
 	ServiceURL      string
 	shell           string
+	mcpTarget       string
+	paramsList      []string
+	paramsJSON      string
 	cfg             config.Config
 )
 
@@ -63,6 +66,7 @@ var configMetadata = []ConfigMetadata{
 	{"context_window", "set-context-window", 8192, "Set a new default context window size"},
 	{"thread", "set-thread", "default", "Set a new active thread by specifying the thread name"},
 	{"api_key", "set-api-key", "", "Set the API key for authentication"},
+	{"apify_api_key", "set-apify-api-key", "", "Configure Apify API key for MCP"},
 	{"role", "set-role", "You are a helpful assistant.", "Set the role of the AI assistant"},
 	{"url", "set-url", "https://api.openai.com", "Set the API base URL"},
 	{"completions_path", "set-completions-path", "/v1/chat/completions", "Set the completions API endpoint"},
@@ -344,6 +348,38 @@ func run(cmd *cobra.Command, args []string) error {
 		queryMode = true
 	}
 
+	if cmd.Flag("mcp").Changed {
+		mcp, err := utils.ParseMCPPlugin(mcpTarget)
+		if err != nil {
+			return err
+		}
+		if cmd.Flag("params").Changed {
+			mcp.Params, err = utils.ParseParams([]string{paramsJSON}...)
+			if err != nil {
+				return err
+			}
+		}
+		if cmd.Flag("param").Changed {
+			newParams, err := utils.ParseParams(paramsList...)
+			if err != nil {
+				return err
+			}
+
+			if len(mcp.Params) > 0 {
+				mergeMaps(mcp.Params, newParams)
+			} else {
+				mcp.Params = newParams
+			}
+		}
+		if err := c.InjectMCPContext(mcp); err != nil {
+			return err
+		}
+		if len(args) == 0 && !hasPipe && !interactiveMode {
+			sugar.Infof("[MCP: %s] Context injected. No query submitted.", mcp.Function)
+			return nil
+		}
+	}
+
 	if interactiveMode {
 		sugar.Infof("Entering interactive mode. Using thread '%s'. Type 'clear' to clear the screen, 'exit' to quit, or press Ctrl+C.\n\n", hs.GetThread())
 		rl, err := readline.New("")
@@ -445,6 +481,9 @@ func initConfig(rootCmd *cobra.Command) (config.Config, error) {
 	envPrefix := viper.GetString("name")
 	viper.SetEnvPrefix(envPrefix)
 	viper.AutomaticEnv()
+
+	// Bind variables without prefix manually
+	_ = viper.BindEnv("apify_api_key", "APIFY_API_KEY")
 
 	// Now, set up the flags using the fully loaded configuration metadata.
 	for _, meta := range configMetadata {
@@ -653,6 +692,9 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--output", "The output audio file for text-to-speech")
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--debug", "Print debug messages")
+		printFlagWithPadding("--mcp", "Specify the MCP plugin in the form <provider>/<plugin>@<version>")
+		printFlagWithPadding("--param", "Key-value pair as key=value. Can be specified multiple times")
+		printFlagWithPadding("--params", "Provide parameters as a raw JSON string")
 		printFlagWithPadding("--set-completions", "Generate autocompletion script for your current shell")
 		sugar.Infoln()
 
@@ -703,6 +745,9 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
 	rootCmd.PersistentFlags().BoolVar(&showHistory, "show-history", false, "Show the human-readable conversation history")
 	rootCmd.PersistentFlags().StringVar(&shell, "set-completions", "", "Generate autocompletion script for your current shell")
+	rootCmd.PersistentFlags().StringVar(&mcpTarget, "mcp", "", "Specify the MCP plugin in the form <provider>/<plugin>@<version>")
+	rootCmd.PersistentFlags().StringArrayVar(&paramsList, "param", []string{}, "Key-value pair as key=value. Can be specified multiple times")
+	rootCmd.PersistentFlags().StringVar(&paramsJSON, "params", "", "Provide parameters as a raw JSON string")
 }
 
 func setupConfigFlags(rootCmd *cobra.Command, meta ConfigMetadata) {
@@ -754,6 +799,9 @@ func isGeneralFlag(name string) bool {
 		"speak":           true,
 		"output":          true,
 		"transcribe":      true,
+		"param":           true,
+		"params":          true,
+		"mcp":             true,
 	}
 
 	return generalFlags[name]
@@ -822,6 +870,7 @@ func createConfigFromViper() config.Config {
 	return config.Config{
 		Name:                viper.GetString("name"),
 		APIKey:              viper.GetString("api_key"),
+		ApifyAPIKey:         viper.GetString("apify_api_key"),
 		Model:               viper.GetString("model"),
 		MaxTokens:           viper.GetInt("max_tokens"),
 		ContextWindow:       viper.GetInt("context_window"),
@@ -860,4 +909,11 @@ func fileExists(filename string) bool {
 		return false
 	}
 	return err == nil
+}
+
+func mergeMaps(m1, m2 map[string]interface{}) map[string]interface{} {
+	for k, v := range m2 {
+		m1[k] = v
+	}
+	return m1
 }

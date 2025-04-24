@@ -72,6 +72,9 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 					Message: api.Message{Role: "system", Content: "system message"},
 				},
 				{
+					Message: api.Message{Role: "function", Content: "function message"},
+				},
+				{
 					Message: api.Message{Role: "user", Content: "user message"},
 				},
 				{
@@ -84,6 +87,7 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 			result, err := subject.Print(threadName)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(ContainSubstring("**SYSTEM** 💻:\nsystem message\n"))
+			Expect(result).To(ContainSubstring("\n---\n**FUNCTION** 🔌:\nfunction message\n"))
 			Expect(result).To(ContainSubstring("\n---\n**USER** 👤:\nuser message\n"))
 			Expect(result).To(ContainSubstring("**ASSISTANT** 🤖:\nassistant message\n"))
 		})

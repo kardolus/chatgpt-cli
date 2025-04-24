@@ -9,9 +9,12 @@ import (
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/api/http"
+	"github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/internal"
 	"go.uber.org/zap"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"io"
 	"mime/multipart"
 	"net/url"
@@ -29,12 +32,19 @@ import (
 const (
 	AssistantRole            = "assistant"
 	ErrEmptyResponse         = "empty response"
+	ErrMissingMCPAPIKey      = "the %s api key is not configured"
+	ErrUnsupportedProvider   = "unsupported MCP provider"
+	ErrHistoryTracking       = "history tracking needs to be enabled to use this feature"
 	MaxTokenBufferPercentage = 20
 	SystemRole               = "system"
 	UserRole                 = "user"
+	FunctionRole             = "function"
 	InteractiveThreadPrefix  = "int_"
 	SearchModelPattern       = "-search"
 	O1ProPattern             = "o1-pro"
+	ApifyURL                 = "https://api.apify.com/v2/acts/"
+	ApifyPath                = "/run-sync-get-dataset-items"
+	ApifyProxyConfig         = "proxyConfiguration"
 	gptPrefix                = "gpt"
 	o1Prefix                 = "o1"
 	audioType                = "input_audio"
@@ -134,6 +144,44 @@ func (c *Client) WithContextWindow(window int) *Client {
 func (c *Client) WithServiceURL(url string) *Client {
 	c.Config.URL = url
 	return c
+}
+
+// InjectMCPContext calls an MCP plugin (e.g. Apify) with the given parameters,
+// retrieves the result, and adds it to the chat history as a function message.
+// The result is formatted as a string and tagged with the function name.
+func (c *Client) InjectMCPContext(mcp api.MCPRequest) error {
+	if c.Config.OmitHistory {
+		return errors.New(ErrHistoryTracking)
+	}
+
+	endpoint, headers, body, err := c.buildMCPRequest(mcp)
+	if err != nil {
+		return err
+	}
+
+	c.printRequestDebugInfo(endpoint, body)
+
+	raw, err := c.caller.PostWithHeaders(endpoint, body, headers)
+	if err != nil {
+		return err
+	}
+
+	c.printResponseDebugInfo(raw)
+
+	formatted := formatMCPResponse(raw, mcp.Function)
+
+	c.initHistory()
+	c.History = append(c.History, history.History{
+		Message: api.Message{
+			Role:    FunctionRole,
+			Name:    strings.ReplaceAll(mcp.Function, "~", "-"),
+			Content: formatted,
+		},
+		Timestamp: c.timer.Now(),
+	})
+	c.truncateHistory()
+
+	return c.historyStore.Write(c.History)
 }
 
 // ListModels retrieves a list of all available models from the OpenAI API.
@@ -402,7 +450,8 @@ func (c *Client) Transcribe(audioPath string) (string, error) {
 
 	endpoint := c.getEndpoint(c.Config.TranscriptionsPath)
 	headers := map[string]string{
-		"Content-Type": writer.FormDataContentType(),
+		"Content-Type":      writer.FormDataContentType(),
+		c.Config.AuthHeader: fmt.Sprintf("%s %s", c.Config.AuthTokenPrefix, c.Config.APIKey),
 	}
 
 	c.printRequestDebugInfo(endpoint, buf.Bytes())
@@ -854,6 +903,73 @@ func (c *Client) printResponseDebugInfo(raw []byte) {
 	sugar := zap.S()
 	sugar.Debugf("\nResponse\n")
 	sugar.Debugf("%s\n", raw)
+}
+
+func (c *Client) buildMCPRequest(mcp api.MCPRequest) (string, map[string]string, []byte, error) {
+	mcp.Provider = strings.ToLower(mcp.Provider)
+	params := mcp.Params
+
+	if mcp.Provider != utils.ApifyProvider {
+		return "", nil, nil, errors.New(ErrUnsupportedProvider)
+	}
+
+	apiKey := c.Config.ApifyAPIKey
+	if apiKey == "" {
+		return "", nil, nil, fmt.Errorf(ErrMissingMCPAPIKey, mcp.Provider)
+	}
+
+	params[ApifyProxyConfig] = api.ProxyConfiguration{UseApifyProxy: true}
+	endpoint := ApifyURL + mcp.Function + ApifyPath
+
+	headers := map[string]string{
+		"Content-Type":  "application/json",
+		"Authorization": fmt.Sprintf("Bearer %s", apiKey),
+	}
+
+	body, err := json.Marshal(params)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	return endpoint, headers, body, nil
+}
+
+func formatMCPResponse(raw []byte, function string) string {
+	var result interface{}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return fmt.Sprintf("[MCP: %s] (failed to decode response)", function)
+	}
+
+	var lines []string
+
+	switch v := result.(type) {
+	case []interface{}:
+		if len(v) == 0 {
+			return fmt.Sprintf("[MCP: %s] (no data returned)", function)
+		}
+		if obj, ok := v[0].(map[string]interface{}); ok {
+			lines = formatKeyValues(obj)
+		} else {
+			return fmt.Sprintf("[MCP: %s] (unexpected response format)", function)
+		}
+	case map[string]interface{}:
+		lines = formatKeyValues(v)
+	default:
+		return fmt.Sprintf("[MCP: %s] (unexpected response format)", function)
+	}
+
+	sort.Strings(lines)
+	return fmt.Sprintf("[MCP: %s]\n%s", function, strings.Join(lines, "\n"))
+}
+
+func formatKeyValues(obj map[string]interface{}) []string {
+	var lines []string
+	caser := cases.Title(language.English)
+	for k, val := range obj {
+		label := caser.String(strings.ReplaceAll(k, "_", " "))
+		lines = append(lines, fmt.Sprintf("%s: %v", label, val))
+	}
+	return lines
 }
 
 type modelCapabilities struct {

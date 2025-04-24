@@ -32,4 +32,5 @@ type Config struct {
 	Seed                int     `yaml:"seed"`
 	Effort              string  `yaml:"effort"`
 	Voice               string  `yaml:"voice"`
+	ApifyAPIKey         string  `yaml:"apify_api_key"`
 }

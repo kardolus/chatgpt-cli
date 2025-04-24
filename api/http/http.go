@@ -78,11 +78,6 @@ func (r *RestCaller) PostWithHeaders(url string, body []byte, headers map[string
 		return nil, fmt.Errorf(errFailedToCreateRequest, err)
 	}
 
-	// Add auth header
-	if r.config.APIKey != "" {
-		req.Header.Set(r.config.AuthHeader, r.config.AuthTokenPrefix+r.config.APIKey)
-	}
-
 	// Add custom headers
 	for k, v := range headers {
 		req.Header.Set(k, v)

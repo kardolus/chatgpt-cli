@@ -328,7 +328,7 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(MatchError(utils.InvalidMCPPatter))
 		})
-		it("throws an error when the provider is not apify or smithery", func() {
+		it("throws an error when the provider is not apify", func() {
 			_, err := utils.ParseMCPPlugin("unsupported/" + function)
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(MatchError(utils.UnsupportedProvider))

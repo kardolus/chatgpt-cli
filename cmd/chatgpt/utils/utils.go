@@ -18,7 +18,6 @@ const (
 	O1ProPattern         = "o1-pro"
 	InvalidMCPPatter     = "the MCP pattern has to be of the form <provider>/<plugin>[@<version>]"
 	ApifyProvider        = "apify"
-	SmitheryProvider     = "smithery"
 	UnsupportedProvider  = "only apify and smithery are currently supported"
 	LatestVersion        = "latest"
 	InvalidParams        = "params need to be pairs or a JSON object"
@@ -162,8 +161,7 @@ func ParseMCPPlugin(input string) (api.MCPRequest, error) {
 	}
 
 	validProviders := map[string]bool{
-		ApifyProvider:    true,
-		SmitheryProvider: true,
+		ApifyProvider: true,
 	}
 
 	if validProviders[strings.ToLower(fields[0])] {

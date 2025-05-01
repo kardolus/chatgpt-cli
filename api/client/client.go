@@ -159,7 +159,7 @@ func (c *Client) InjectMCPContext(mcp api.MCPRequest) error {
 		return err
 	}
 
-	c.printRequestDebugInfo(endpoint, utils.ApifyProvider, body)
+	c.printRequestDebugInfo(endpoint, body)
 
 	raw, err := c.caller.PostWithHeaders(endpoint, body, headers)
 	if err != nil {
@@ -195,7 +195,7 @@ func (c *Client) ListModels() ([]string, error) {
 
 	endpoint := c.getEndpoint(c.Config.ModelsPath)
 
-	c.printRequestDebugInfo(endpoint, c.Config.Name, nil)
+	c.printRequestDebugInfo(endpoint, nil)
 
 	raw, err := c.caller.Get(c.getEndpoint(c.Config.ModelsPath))
 	c.printResponseDebugInfo(raw)
@@ -265,7 +265,7 @@ func (c *Client) Query(ctx context.Context, input string) (string, int, error) {
 
 	endpoint := c.getChatEndpoint()
 
-	c.printRequestDebugInfo(endpoint, c.Config.Name, body)
+	c.printRequestDebugInfo(endpoint, body)
 
 	raw, err := c.caller.Post(endpoint, body, false)
 	c.printResponseDebugInfo(raw)
@@ -350,7 +350,7 @@ func (c *Client) Stream(ctx context.Context, input string) error {
 
 	endpoint := c.getChatEndpoint()
 
-	c.printRequestDebugInfo(endpoint, c.Config.Name, body)
+	c.printRequestDebugInfo(endpoint, body)
 
 	result, err := c.caller.Post(endpoint, body, true)
 	if err != nil {
@@ -387,7 +387,7 @@ func (c *Client) SynthesizeSpeech(inputText, outputPath string) error {
 	}
 
 	endpoint := c.getEndpoint(c.Config.SpeechPath)
-	c.printRequestDebugInfo(endpoint, c.Config.Name, body)
+	c.printRequestDebugInfo(endpoint, body)
 
 	respBytes, err := c.caller.Post(endpoint, body, false)
 	if err != nil {
@@ -454,7 +454,7 @@ func (c *Client) Transcribe(audioPath string) (string, error) {
 		c.Config.AuthHeader: fmt.Sprintf("%s %s", c.Config.AuthTokenPrefix, c.Config.APIKey),
 	}
 
-	c.printRequestDebugInfo(endpoint, c.Config.Name, buf.Bytes())
+	c.printRequestDebugInfo(endpoint, buf.Bytes())
 
 	raw, err := c.caller.PostWithHeaders(endpoint, buf.Bytes(), headers)
 	if err != nil {
@@ -882,7 +882,7 @@ func (c *Client) getMimeTypeFromFileContent(path string) (string, error) {
 	return mimeType, nil
 }
 
-func (c *Client) printRequestDebugInfo(endpoint, service string, body []byte) {
+func (c *Client) printRequestDebugInfo(endpoint string, body []byte) {
 	sugar := zap.S()
 	sugar.Debugf("\nGenerated cURL command:\n")
 	method := "POST"
@@ -890,7 +890,7 @@ func (c *Client) printRequestDebugInfo(endpoint, service string, body []byte) {
 		method = "GET"
 	}
 	sugar.Debugf("curl --location --insecure --request %s '%s' \\", method, endpoint)
-	sugar.Debugf("  --header \"Authorization: Bearer ${%s_API_KEY}\" \\", strings.ToUpper(service))
+	sugar.Debugf("  --header \"Authorization: Bearer ${%s_API_KEY}\" \\", strings.ToUpper(c.Config.Name))
 	sugar.Debugf("  --header 'Content-Type: application/json' \\")
 
 	if body != nil {

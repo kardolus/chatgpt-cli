@@ -2,8 +2,10 @@ package client_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/golang/mock/gomock"
 	_ "github.com/golang/mock/mockgen/model"
 	"github.com/kardolus/chatgpt-cli/api"
@@ -1031,6 +1033,102 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			mockWriter.EXPECT().Write(file, response).Return(nil)
 
 			err = subject.SynthesizeSpeech(inputText, fileName)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+	when("GenerateImage()", func() {
+		const (
+			inputText  = "draw a happy dog"
+			outputFile = "dog.png"
+			errorText  = "mock error occurred"
+		)
+
+		var (
+			subject *client.Client
+			body    []byte
+		)
+
+		it.Before(func() {
+			subject = factory.buildClientWithoutConfig()
+			request := api.Draw{
+				Model:  subject.Config.Model,
+				Prompt: inputText,
+			}
+			var err error
+			body, err = json.Marshal(request)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("throws an error when the http call fails", func() {
+			mockCaller.EXPECT().
+				Post(subject.Config.URL+subject.Config.DrawPath, body, false).
+				Return(nil, errors.New(errorText))
+
+			err := subject.GenerateImage(inputText, outputFile)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(errorText))
+		})
+		it("throws an error when no image data is returned", func() {
+			mockCaller.EXPECT().
+				Post(subject.Config.URL+subject.Config.DrawPath, body, false).
+				Return([]byte(`{"data":[]}`), nil)
+
+			err := subject.GenerateImage(inputText, outputFile)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("no image data returned"))
+		})
+		it("throws an error when base64 is invalid", func() {
+			mockCaller.EXPECT().
+				Post(subject.Config.URL+subject.Config.DrawPath, body, false).
+				Return([]byte(`{"data":[{"b64_json":"!!notbase64!!"}]}`), nil)
+
+			err := subject.GenerateImage(inputText, outputFile)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to decode base64 image"))
+		})
+		it("throws an error when a file cannot be created", func() {
+			valid := base64.StdEncoding.EncodeToString([]byte("image-bytes"))
+
+			mockCaller.EXPECT().
+				Post(subject.Config.URL+subject.Config.DrawPath, body, false).
+				Return([]byte(fmt.Sprintf(`{"data":[{"b64_json":"%s"}]}`, valid)), nil)
+
+			mockWriter.EXPECT().Create(outputFile).Return(nil, errors.New(errorText))
+
+			err := subject.GenerateImage(inputText, outputFile)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(errorText))
+		})
+		it("throws an error when bytes cannot be written to the file", func() {
+			valid := base64.StdEncoding.EncodeToString([]byte("image-bytes"))
+			file, err := os.Open(os.DevNull)
+			Expect(err).NotTo(HaveOccurred())
+			defer file.Close()
+
+			mockCaller.EXPECT().
+				Post(subject.Config.URL+subject.Config.DrawPath, body, false).
+				Return([]byte(fmt.Sprintf(`{"data":[{"b64_json":"%s"}]}`, valid)), nil)
+
+			mockWriter.EXPECT().Create(outputFile).Return(file, nil)
+			mockWriter.EXPECT().Write(file, []byte("image-bytes")).Return(errors.New(errorText))
+
+			err = subject.GenerateImage(inputText, outputFile)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(errorText))
+		})
+		it("succeeds when all steps complete", func() {
+			valid := base64.StdEncoding.EncodeToString([]byte("image-bytes"))
+			file, err := os.Open(os.DevNull)
+			Expect(err).NotTo(HaveOccurred())
+			defer file.Close()
+
+			mockCaller.EXPECT().
+				Post(subject.Config.URL+subject.Config.DrawPath, body, false).
+				Return([]byte(fmt.Sprintf(`{"data":[{"b64_json":"%s"}]}`, valid)), nil)
+
+			mockWriter.EXPECT().Create(outputFile).Return(file, nil)
+			mockWriter.EXPECT().Write(file, []byte("image-bytes")).Return(nil)
+
+			err = subject.GenerateImage(inputText, outputFile)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

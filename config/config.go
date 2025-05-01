@@ -18,6 +18,7 @@ type Config struct {
 	ModelsPath          string  `yaml:"models_path"`
 	ResponsesPath       string  `yaml:"responses_path"`
 	SpeechPath          string  `yaml:"speech_path"`
+	DrawPath            string  `yaml:"draw_path"`
 	TranscriptionsPath  string  `yaml:"transcriptions_path"`
 	AuthHeader          string  `yaml:"auth_header"`
 	AuthTokenPrefix     string  `yaml:"auth_token_prefix"`

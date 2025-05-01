@@ -221,7 +221,13 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			err := utils.ValidateFlags(defaultModel, flags)
 			Expect(err).To(HaveOccurred())
 		})
-		it("should return an error when --output is used but --speak is omitted", func() {
+		it("should return an error when --draw is used but --output is omitted", func() {
+			flags["draw"] = true
+
+			err := utils.ValidateFlags(defaultModel, flags)
+			Expect(err).To(HaveOccurred())
+		})
+		it("should return an error when --output is used but --speak or --draw are omitted", func() {
 			flags["output"] = true
 
 			err := utils.ValidateFlags(defaultModel, flags)
@@ -263,6 +269,20 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			flags["output"] = true
 
 			err := utils.ValidateFlags(defaultModel+utils.TTSPattern, flags)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("should return an error when --draw and --output flags are used with an incompatible model", func() {
+			flags["draw"] = true
+			flags["output"] = true
+
+			err := utils.ValidateFlags(defaultModel, flags)
+			Expect(err).To(HaveOccurred())
+		})
+		it("should NOT return an error when --draw and --output flags are used with a compatible model", func() {
+			flags["draw"] = true
+			flags["output"] = true
+
+			err := utils.ValidateFlags(defaultModel+utils.ImagePattern, flags)
 			Expect(err).NotTo(HaveOccurred())
 		})
 		it("should return an error when --voice is used with an incompatible model", func() {

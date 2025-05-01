@@ -15,6 +15,7 @@ const (
 	AudioPattern         = "-audio"
 	TranscribePattern    = "-transcribe"
 	TTSPattern           = "-tts"
+	ImagePattern         = "-image"
 	O1ProPattern         = "o1-pro"
 	InvalidMCPPatter     = "the MCP pattern has to be of the form <provider>/<plugin>[@<version>]"
 	ApifyProvider        = "apify"
@@ -122,8 +123,11 @@ func ValidateFlags(model string, flags map[string]bool) error {
 	if flags["speak"] && !flags["output"] {
 		return errors.New("the --speak flag cannot be used without the --output flag")
 	}
-	if !flags["speak"] && flags["output"] {
-		return errors.New("the --speak flag cannot be used without the --output flag")
+	if flags["draw"] && !flags["output"] {
+		return errors.New("the --draw flag cannot be used without the --output flag")
+	}
+	if !flags["speak"] && !flags["draw"] && flags["output"] {
+		return errors.New("the --output flag cannot be used without the --speak or --draw flag")
 	}
 	if !flags["mcp"] && flags["param"] {
 		return errors.New("the --param flag cannot be used without the --mcp flag")
@@ -139,6 +143,9 @@ func ValidateFlags(model string, flags map[string]bool) error {
 	}
 	if flags["speak"] && flags["output"] && !strings.Contains(model, TTSPattern) {
 		return errors.New("the --speak and --output flags cannot be used without a compatible model, ie gpt-4o-mini-tts (see --list-models)")
+	}
+	if flags["draw"] && flags["output"] && !strings.Contains(model, ImagePattern) {
+		return errors.New("the --draw and --output flags cannot be used without a compatible model, ie gpt-image-1 (see --list-models)")
 	}
 	if flags["voice"] && !strings.Contains(model, TTSPattern) {
 		return errors.New("the --voice flag cannot be used without a compatible model, ie gpt-4o-mini-tts (see --list-models)")

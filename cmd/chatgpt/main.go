@@ -39,6 +39,7 @@ var (
 	listThreads     bool
 	hasPipe         bool
 	useSpeak        bool
+	useDraw         bool
 	promptFile      string
 	roleFile        string
 	imageFile       string
@@ -73,6 +74,7 @@ var configMetadata = []ConfigMetadata{
 	{"responses_path", "set-responses-path", "/v1/responses", "Set the responses API endpoint"},
 	{"transcriptions_path", "set-transcriptions-path", "/v1/audio/transcriptions", "Set the transcriptions API endpoint"},
 	{"speech_path", "set-speech-path", "/v1/audio/speech", "Set the speech API endpoint"},
+	{"draw_path", "set-draw-path", "/v1/images/generations", "Set the image generation API endpoint"},
 	{"models_path", "set-models-path", "/v1/models", "Set the models API endpoint"},
 	{"auth_header", "set-auth-header", "Authorization", "Set the authorization header"},
 	{"auth_token_prefix", "set-auth-token-prefix", "Bearer ", "Set the authorization token prefix"},
@@ -439,6 +441,10 @@ func run(cmd *cobra.Command, args []string) error {
 			return c.SynthesizeSpeech(chatContext+strings.Join(args, " "), outputFile)
 		}
 
+		if cmd.Flag("draw").Changed && cmd.Flag("output").Changed {
+			return c.GenerateImage(chatContext+strings.Join(args, " "), outputFile)
+		}
+
 		if queryMode {
 			result, usage, err := c.Query(ctx, strings.Join(args, " "))
 			if err != nil {
@@ -689,6 +695,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--audio", "Upload an audio file (mp3 or wav)")
 		printFlagWithPadding("--transcribe", "Transcribe an audio file")
 		printFlagWithPadding("--speak", "Use text-to-speech")
+		printFlagWithPadding("--draw", "Draw an image")
 		printFlagWithPadding("--output", "The output audio file for text-to-speech")
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--debug", "Print debug messages")
@@ -735,6 +742,7 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().BoolVarP(&newThread, "new-thread", "n", false, "Create a new thread with a random name and target it")
 	rootCmd.PersistentFlags().BoolVarP(&listModels, "list-models", "l", false, "List available models")
 	rootCmd.PersistentFlags().BoolVarP(&useSpeak, "speak", "", false, "Use text-to-speak")
+	rootCmd.PersistentFlags().BoolVarP(&useDraw, "draw", "", false, "Draw an image")
 	rootCmd.PersistentFlags().StringVarP(&promptFile, "prompt", "p", "", "Provide a prompt file")
 	rootCmd.PersistentFlags().StringVarP(&roleFile, "role-file", "", "", "Provide a role file")
 	rootCmd.PersistentFlags().StringVarP(&imageFile, "image", "", "", "Provide an image from a local path or URL")
@@ -797,6 +805,7 @@ func isGeneralFlag(name string) bool {
 		"image":           true,
 		"audio":           true,
 		"speak":           true,
+		"draw":            true,
 		"output":          true,
 		"transcribe":      true,
 		"param":           true,
@@ -886,6 +895,7 @@ func createConfigFromViper() config.Config {
 		ResponsesPath:       viper.GetString("responses_path"),
 		TranscriptionsPath:  viper.GetString("transcriptions_path"),
 		SpeechPath:          viper.GetString("speech_path"),
+		DrawPath:            viper.GetString("draw_path"),
 		ModelsPath:          viper.GetString("models_path"),
 		AuthHeader:          viper.GetString("auth_header"),
 		AuthTokenPrefix:     viper.GetString("auth_token_prefix"),

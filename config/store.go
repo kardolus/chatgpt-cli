@@ -21,6 +21,7 @@ const (
 	openAIResponsesPath      = "/v1/responses"
 	openAITranscriptionsPath = "/v1/audio/transcriptions"
 	openAISpeechPath         = "/v1/audio/speech"
+	openAIDrawPath           = "/v1/images/generations"
 	openAIModelsPath         = "/v1/models"
 	openAIAuthHeader         = "Authorization"
 	openAIAuthTokenPrefix    = "Bearer "
@@ -143,6 +144,7 @@ func (f *FileIO) ReadDefaults() Config {
 		ResponsesPath:      openAIResponsesPath,
 		TranscriptionsPath: openAITranscriptionsPath,
 		SpeechPath:         openAISpeechPath,
+		DrawPath:           openAIDrawPath,
 		ModelsPath:         openAIModelsPath,
 		AuthHeader:         openAIAuthHeader,
 		AuthTokenPrefix:    openAIAuthTokenPrefix,

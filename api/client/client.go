@@ -374,11 +374,34 @@ func (c *Client) Stream(ctx context.Context, input string) error {
 //
 // Returns an error if the request fails, the response cannot be written, or the file cannot be created.
 func (c *Client) SynthesizeSpeech(inputText, outputPath string) error {
-	reqBody := api.Speech{
+	req := api.Speech{
 		Model:          c.Config.Model,
 		Voice:          c.Config.Voice,
 		Input:          inputText,
 		ResponseFormat: getExtension(outputPath),
+	}
+	return c.postAndWriteBinaryOutput(c.getEndpoint(c.Config.SpeechPath), req, outputPath, "binary", nil)
+}
+
+// GenerateImage sends a prompt to the configured image generation model (e.g., gpt-image-1)
+// and writes the resulting image to the specified output path.
+//
+// The method performs the following steps:
+//  1. Sends a POST request to the image generation endpoint with the provided prompt.
+//  2. Parses the response and extracts the base64-encoded image data.
+//  3. Decodes the image bytes and writes them to the given outputPath.
+//  4. Logs the number of bytes written using debug output.
+//
+// Parameters:
+//   - inputText: The prompt describing the image to be generated.
+//   - outputPath: The file path where the generated image (e.g., .png) will be saved.
+//
+// Returns:
+//   - An error if any part of the request, decoding, or file writing fails.
+func (c *Client) GenerateImage(inputText, outputPath string) error {
+	reqBody := api.Draw{
+		Model:  c.Config.Model,
+		Prompt: inputText,
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -386,12 +409,30 @@ func (c *Client) SynthesizeSpeech(inputText, outputPath string) error {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	endpoint := c.getEndpoint(c.Config.SpeechPath)
+	endpoint := c.getEndpoint(c.Config.DrawPath)
 	c.printRequestDebugInfo(endpoint, body, nil)
 
 	respBytes, err := c.caller.Post(endpoint, body, false)
 	if err != nil {
-		return fmt.Errorf("failed to synthesize speech: %w", err)
+		return fmt.Errorf("failed to generate image: %w", err)
+	}
+
+	// Parse the JSON and extract b64_json
+	var response struct {
+		Data []struct {
+			B64 string `json:"b64_json"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(respBytes, &response); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+	if len(response.Data) == 0 {
+		return fmt.Errorf("no image data returned")
+	}
+
+	imgBytes, err := base64.StdEncoding.DecodeString(response.Data[0].B64)
+	if err != nil {
+		return fmt.Errorf("failed to decode base64 image: %w", err)
 	}
 
 	outFile, err := c.writer.Create(outputPath)
@@ -400,11 +441,11 @@ func (c *Client) SynthesizeSpeech(inputText, outputPath string) error {
 	}
 	defer outFile.Close()
 
-	if err := c.writer.Write(outFile, respBytes); err != nil {
-		return fmt.Errorf("failed to write output file: %w", err)
+	if err := c.writer.Write(outFile, imgBytes); err != nil {
+		return fmt.Errorf("failed to write image: %w", err)
 	}
 
-	c.printResponseDebugInfo([]byte(fmt.Sprintf("[binary] %d bytes written to %s", len(respBytes), outputPath)))
+	c.printResponseDebugInfo([]byte(fmt.Sprintf("[image] %d bytes written to %s", len(imgBytes), outputPath)))
 	return nil
 }
 
@@ -911,6 +952,40 @@ func (c *Client) printResponseDebugInfo(raw []byte) {
 	sugar := zap.S()
 	sugar.Debugf("\nResponse\n")
 	sugar.Debugf("%s\n", raw)
+}
+
+func (c *Client) postAndWriteBinaryOutput(endpoint string, requestBody interface{}, outputPath, debugLabel string, transform func([]byte) ([]byte, error)) error {
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	c.printRequestDebugInfo(endpoint, body, nil)
+
+	respBytes, err := c.caller.Post(endpoint, body, false)
+	if err != nil {
+		return fmt.Errorf("API request failed: %w", err)
+	}
+
+	if transform != nil {
+		respBytes, err = transform(respBytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	outFile, err := c.writer.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer outFile.Close()
+
+	if err := c.writer.Write(outFile, respBytes); err != nil {
+		return fmt.Errorf("failed to write %s: %w", debugLabel, err)
+	}
+
+	c.printResponseDebugInfo([]byte(fmt.Sprintf("[%s] %d bytes written to %s", debugLabel, len(respBytes), outputPath)))
+	return nil
 }
 
 func (c *Client) buildMCPRequest(mcp api.MCPRequest) (string, map[string]string, []byte, error) {

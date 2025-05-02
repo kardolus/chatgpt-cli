@@ -72,6 +72,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
   not be available for all models. You can also pipe an image directly: `pngpaste - | chatgpt "What is this photo?"`
 * **Generate images**: Use the `--draw` and `--output` flags to generate an image from a prompt (requires image-capable
   models like `gpt-image-1`).
+* **Edit images**: Use the `--draw` flag with `--image` and `--output` to modify an existing image using a prompt (
+  e.g., "add sunglasses to the cat"). Supported formats: PNG, JPEG, and WebP.
 * **Audio support**: You can upload audio files using the `--audio` flag to ask questions about spoken content.
   This feature is compatible only with audio-capable models like gpt-4o-audio-preview. Currently, only `.mp3` and `.wav`
   formats are supported.

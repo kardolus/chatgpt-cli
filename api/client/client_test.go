@@ -1,6 +1,7 @@
 package client_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -16,6 +17,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/internal"
 	"github.com/kardolus/chatgpt-cli/test"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -1060,7 +1062,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		})
 		it("throws an error when the http call fails", func() {
 			mockCaller.EXPECT().
-				Post(subject.Config.URL+subject.Config.DrawPath, body, false).
+				Post(subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
 				Return(nil, errors.New(errorText))
 
 			err := subject.GenerateImage(inputText, outputFile)
@@ -1069,7 +1071,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		})
 		it("throws an error when no image data is returned", func() {
 			mockCaller.EXPECT().
-				Post(subject.Config.URL+subject.Config.DrawPath, body, false).
+				Post(subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
 				Return([]byte(`{"data":[]}`), nil)
 
 			err := subject.GenerateImage(inputText, outputFile)
@@ -1078,7 +1080,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		})
 		it("throws an error when base64 is invalid", func() {
 			mockCaller.EXPECT().
-				Post(subject.Config.URL+subject.Config.DrawPath, body, false).
+				Post(subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
 				Return([]byte(`{"data":[{"b64_json":"!!notbase64!!"}]}`), nil)
 
 			err := subject.GenerateImage(inputText, outputFile)
@@ -1089,7 +1091,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			valid := base64.StdEncoding.EncodeToString([]byte("image-bytes"))
 
 			mockCaller.EXPECT().
-				Post(subject.Config.URL+subject.Config.DrawPath, body, false).
+				Post(subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
 				Return([]byte(fmt.Sprintf(`{"data":[{"b64_json":"%s"}]}`, valid)), nil)
 
 			mockWriter.EXPECT().Create(outputFile).Return(nil, errors.New(errorText))
@@ -1105,7 +1107,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			defer file.Close()
 
 			mockCaller.EXPECT().
-				Post(subject.Config.URL+subject.Config.DrawPath, body, false).
+				Post(subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
 				Return([]byte(fmt.Sprintf(`{"data":[{"b64_json":"%s"}]}`, valid)), nil)
 
 			mockWriter.EXPECT().Create(outputFile).Return(file, nil)
@@ -1122,13 +1124,107 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			defer file.Close()
 
 			mockCaller.EXPECT().
-				Post(subject.Config.URL+subject.Config.DrawPath, body, false).
+				Post(subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
 				Return([]byte(fmt.Sprintf(`{"data":[{"b64_json":"%s"}]}`, valid)), nil)
 
 			mockWriter.EXPECT().Create(outputFile).Return(file, nil)
 			mockWriter.EXPECT().Write(file, []byte("image-bytes")).Return(nil)
 
 			err = subject.GenerateImage(inputText, outputFile)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+	when("EditImage()", func() {
+		const (
+			inputText  = "give the dog sunglasses"
+			inputFile  = "dog.png"
+			outputFile = "dog_cool.png"
+			errorText  = "mock error occurred"
+		)
+
+		var (
+			subject    *client.Client
+			validB64   string
+			imageBytes = []byte("image-bytes")
+			respBytes  []byte
+		)
+
+		it.Before(func() {
+			subject = factory.buildClientWithoutConfig()
+			validB64 = base64.StdEncoding.EncodeToString(imageBytes)
+			respBytes = []byte(fmt.Sprintf(`{"data":[{"b64_json":"%s"}]}`, validB64))
+		})
+
+		it("returns error when input file can't be opened", func() {
+			mockReader.EXPECT().Open(inputFile).Return(nil, errors.New(errorText))
+
+			err := subject.EditImage(inputText, inputFile, outputFile)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to open input image"))
+		})
+		it("returns error on invalid mime type", func() {
+			file := openDummy()
+			mockReader.EXPECT().Open(inputFile).Return(file, nil).Times(2)
+			mockReader.EXPECT().ReadBufferFromFile(file).Return([]byte("not an image"), nil)
+
+			err := subject.EditImage(inputText, inputFile, outputFile)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("unsupported MIME type"))
+		})
+		it("returns error when HTTP call fails", func() {
+			mockReader.EXPECT().Open(inputFile).DoAndReturn(func(string) (*os.File, error) {
+				return openDummy(), nil
+			}).Times(2)
+
+			mockReader.EXPECT().
+				ReadBufferFromFile(gomock.AssignableToTypeOf(&os.File{})).
+				Return([]byte("\x89PNG\r\n\x1a\n"), nil)
+
+			mockCaller.EXPECT().
+				PostWithHeaders(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(nil, errors.New(errorText))
+
+			err := subject.EditImage(inputText, inputFile, outputFile)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to edit image"))
+		})
+		it("returns error when base64 is invalid", func() {
+			invalidResp := []byte(`{"data":[{"b64_json":"!notbase64"}]}`)
+
+			mockReader.EXPECT().Open(inputFile).DoAndReturn(func(string) (*os.File, error) {
+				return openDummy(), nil
+			}).Times(2)
+
+			mockReader.EXPECT().
+				ReadBufferFromFile(gomock.AssignableToTypeOf(&os.File{})).
+				Return([]byte("\x89PNG\r\n\x1a\n"), nil)
+
+			mockCaller.EXPECT().
+				PostWithHeaders(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(invalidResp, nil)
+
+			err := subject.EditImage(inputText, inputFile, outputFile)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to decode base64 image"))
+		})
+		it("writes image when all steps succeed", func() {
+			file := openDummy()
+			mockReader.EXPECT().Open(inputFile).DoAndReturn(func(string) (*os.File, error) {
+				return openDummy(), nil
+			}).Times(2)
+
+			mockReader.EXPECT().
+				ReadBufferFromFile(gomock.AssignableToTypeOf(&os.File{})).
+				Return([]byte("\x89PNG\r\n\x1a\n"), nil)
+
+			mockCaller.EXPECT().
+				PostWithHeaders(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(respBytes, nil)
+
+			mockWriter.EXPECT().Create(outputFile).Return(file, nil)
+			mockWriter.EXPECT().Write(file, imageBytes).Return(nil)
+
+			err := subject.EditImage(inputText, inputFile, outputFile)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -1533,6 +1629,16 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+}
+
+func openDummy() *os.File {
+	// Use os.Pipe to get an *os.File without needing a real disk file.
+	r, w, _ := os.Pipe()
+	go func() {
+		_, _ = io.Copy(w, bytes.NewBuffer([]byte("\x89PNG\r\n\x1a\n")))
+		_ = w.Close()
+	}()
+	return r
 }
 
 func createBody(messages []api.Message, stream bool) ([]byte, error) {

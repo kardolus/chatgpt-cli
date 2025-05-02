@@ -74,7 +74,8 @@ var configMetadata = []ConfigMetadata{
 	{"responses_path", "set-responses-path", "/v1/responses", "Set the responses API endpoint"},
 	{"transcriptions_path", "set-transcriptions-path", "/v1/audio/transcriptions", "Set the transcriptions API endpoint"},
 	{"speech_path", "set-speech-path", "/v1/audio/speech", "Set the speech API endpoint"},
-	{"draw_path", "set-draw-path", "/v1/images/generations", "Set the image generation API endpoint"},
+	{"image_generations_path", "set-image-generations-path", "/v1/images/generations", "Set the image generation API endpoint"},
+	{"image_edits_path", "set-image-edits-path", "/v1/images/edits", "Set the image edits API endpoint"},
 	{"models_path", "set-models-path", "/v1/models", "Set the models API endpoint"},
 	{"auth_header", "set-auth-header", "Authorization", "Set the authorization header"},
 	{"auth_token_prefix", "set-auth-token-prefix", "Bearer ", "Set the authorization token prefix"},
@@ -442,6 +443,9 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 
 		if cmd.Flag("draw").Changed && cmd.Flag("output").Changed {
+			if cmd.Flag("image").Changed {
+				return c.EditImage(chatContext+strings.Join(args, " "), imageFile, outputFile)
+			}
 			return c.GenerateImage(chatContext+strings.Join(args, " "), outputFile)
 		}
 
@@ -877,39 +881,40 @@ func syncFlag(cmd *cobra.Command, meta ConfigMetadata, alias string) error {
 
 func createConfigFromViper() config.Config {
 	return config.Config{
-		Name:                viper.GetString("name"),
-		APIKey:              viper.GetString("api_key"),
-		ApifyAPIKey:         viper.GetString("apify_api_key"),
-		Model:               viper.GetString("model"),
-		MaxTokens:           viper.GetInt("max_tokens"),
-		ContextWindow:       viper.GetInt("context_window"),
-		Role:                viper.GetString("role"),
-		Temperature:         viper.GetFloat64("temperature"),
-		TopP:                viper.GetFloat64("top_p"),
-		FrequencyPenalty:    viper.GetFloat64("frequency_penalty"),
-		PresencePenalty:     viper.GetFloat64("presence_penalty"),
-		Thread:              viper.GetString("thread"),
-		OmitHistory:         viper.GetBool("omit_history"),
-		URL:                 viper.GetString("url"),
-		CompletionsPath:     viper.GetString("completions_path"),
-		ResponsesPath:       viper.GetString("responses_path"),
-		TranscriptionsPath:  viper.GetString("transcriptions_path"),
-		SpeechPath:          viper.GetString("speech_path"),
-		DrawPath:            viper.GetString("draw_path"),
-		ModelsPath:          viper.GetString("models_path"),
-		AuthHeader:          viper.GetString("auth_header"),
-		AuthTokenPrefix:     viper.GetString("auth_token_prefix"),
-		CommandPrompt:       viper.GetString("command_prompt"),
-		CommandPromptColor:  viper.GetString("command_prompt_color"),
-		OutputPrompt:        viper.GetString("output_prompt"),
-		OutputPromptColor:   viper.GetString("output_prompt_color"),
-		AutoCreateNewThread: viper.GetBool("auto_create_new_thread"),
-		TrackTokenUsage:     viper.GetBool("track_token_usage"),
-		SkipTLSVerify:       viper.GetBool("skip_tls_verify"),
-		Multiline:           viper.GetBool("multiline"),
-		Seed:                viper.GetInt("seed"),
-		Effort:              viper.GetString("effort"),
-		Voice:               viper.GetString("voice"),
+		Name:                 viper.GetString("name"),
+		APIKey:               viper.GetString("api_key"),
+		ApifyAPIKey:          viper.GetString("apify_api_key"),
+		Model:                viper.GetString("model"),
+		MaxTokens:            viper.GetInt("max_tokens"),
+		ContextWindow:        viper.GetInt("context_window"),
+		Role:                 viper.GetString("role"),
+		Temperature:          viper.GetFloat64("temperature"),
+		TopP:                 viper.GetFloat64("top_p"),
+		FrequencyPenalty:     viper.GetFloat64("frequency_penalty"),
+		PresencePenalty:      viper.GetFloat64("presence_penalty"),
+		Thread:               viper.GetString("thread"),
+		OmitHistory:          viper.GetBool("omit_history"),
+		URL:                  viper.GetString("url"),
+		CompletionsPath:      viper.GetString("completions_path"),
+		ResponsesPath:        viper.GetString("responses_path"),
+		TranscriptionsPath:   viper.GetString("transcriptions_path"),
+		SpeechPath:           viper.GetString("speech_path"),
+		ImageGenerationsPath: viper.GetString("image_generations_path"),
+		ImageEditsPath:       viper.GetString("image_edits_path"),
+		ModelsPath:           viper.GetString("models_path"),
+		AuthHeader:           viper.GetString("auth_header"),
+		AuthTokenPrefix:      viper.GetString("auth_token_prefix"),
+		CommandPrompt:        viper.GetString("command_prompt"),
+		CommandPromptColor:   viper.GetString("command_prompt_color"),
+		OutputPrompt:         viper.GetString("output_prompt"),
+		OutputPromptColor:    viper.GetString("output_prompt_color"),
+		AutoCreateNewThread:  viper.GetBool("auto_create_new_thread"),
+		TrackTokenUsage:      viper.GetBool("track_token_usage"),
+		SkipTLSVerify:        viper.GetBool("skip_tls_verify"),
+		Multiline:            viper.GetBool("multiline"),
+		Seed:                 viper.GetInt("seed"),
+		Effort:               viper.GetString("effort"),
+		Voice:                viper.GetString("voice"),
 	}
 }
 

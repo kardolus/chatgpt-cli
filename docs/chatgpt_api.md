@@ -779,6 +779,27 @@ Response:
 Your State Farm car policy does not provide coverage while your personal car is being used by a transportation network company driver who is logged onto a transportation network company's digital network or is engaged in a transportation network company prearranged ride.
 ```
 
+### gpt4-image-1
+Generations:
+```shell
+curl -X POST https://api.openai.com/v1/images/generations \
+  -H "Authorization: Bearer ${OPENAI_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-1",
+    "prompt": "A poster for the new matrix movie displaying a matrix hero using a stethoscope to listen to the heartbeat of a baby otter."
+  }' | jq -r '.data[0].b64_json' | base64 --decode > matrix.png
+```
+
+Edits:
+```shell
+curl -X POST "https://api.openai.com/v1/images/edits" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -F "model=gpt-image-1" \
+  -F "image=@matrix.png" \
+  -F 'prompt=The hero should be wearing a hawaii t-shirt' | jq -r '.data[0].b64_json' | base64 --decode > matrix_hawaii.png
+```
+
 ## Azure
 
 Request:

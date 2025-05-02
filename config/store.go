@@ -12,28 +12,29 @@ import (
 )
 
 const (
-	openAIName               = "openai"
-	openAIModel              = "gpt-3.5-turbo"
-	openAIMaxTokens          = 4096
-	openAIContextWindow      = 8192
-	openAIURL                = "https://api.openai.com"
-	openAICompletionsPath    = "/v1/chat/completions"
-	openAIResponsesPath      = "/v1/responses"
-	openAITranscriptionsPath = "/v1/audio/transcriptions"
-	openAISpeechPath         = "/v1/audio/speech"
-	openAIDrawPath           = "/v1/images/generations"
-	openAIModelsPath         = "/v1/models"
-	openAIAuthHeader         = "Authorization"
-	openAIAuthTokenPrefix    = "Bearer "
-	openAIRole               = "You are a helpful assistant."
-	openAIThread             = "default"
-	openAITemperature        = 1.0
-	openAITopP               = 1.0
-	openAIFrequencyPenalty   = 0.0
-	openAIPresencePenalty    = 0.0
-	openAICommandPrompt      = "[%datetime] [Q%counter]"
-	openAIEffort             = "low"
-	openAIVoice              = "voice"
+	openAIName                 = "openai"
+	openAIModel                = "gpt-3.5-turbo"
+	openAIMaxTokens            = 4096
+	openAIContextWindow        = 8192
+	openAIURL                  = "https://api.openai.com"
+	openAICompletionsPath      = "/v1/chat/completions"
+	openAIResponsesPath        = "/v1/responses"
+	openAITranscriptionsPath   = "/v1/audio/transcriptions"
+	openAISpeechPath           = "/v1/audio/speech"
+	openAIImageGenerationsPath = "/v1/images/generations"
+	openAIImageEditsPath       = "/v1/images/edits"
+	openAIModelsPath           = "/v1/models"
+	openAIAuthHeader           = "Authorization"
+	openAIAuthTokenPrefix      = "Bearer "
+	openAIRole                 = "You are a helpful assistant."
+	openAIThread               = "default"
+	openAITemperature          = 1.0
+	openAITopP                 = 1.0
+	openAIFrequencyPenalty     = 0.0
+	openAIPresencePenalty      = 0.0
+	openAICommandPrompt        = "[%datetime] [Q%counter]"
+	openAIEffort               = "low"
+	openAIVoice                = "voice"
 )
 
 type Store interface {
@@ -134,28 +135,29 @@ func (f *FileIO) Read() (Config, error) {
 
 func (f *FileIO) ReadDefaults() Config {
 	return Config{
-		Name:               openAIName,
-		Model:              openAIModel,
-		Role:               openAIRole,
-		MaxTokens:          openAIMaxTokens,
-		ContextWindow:      openAIContextWindow,
-		URL:                openAIURL,
-		CompletionsPath:    openAICompletionsPath,
-		ResponsesPath:      openAIResponsesPath,
-		TranscriptionsPath: openAITranscriptionsPath,
-		SpeechPath:         openAISpeechPath,
-		DrawPath:           openAIDrawPath,
-		ModelsPath:         openAIModelsPath,
-		AuthHeader:         openAIAuthHeader,
-		AuthTokenPrefix:    openAIAuthTokenPrefix,
-		Thread:             openAIThread,
-		Temperature:        openAITemperature,
-		TopP:               openAITopP,
-		FrequencyPenalty:   openAIFrequencyPenalty,
-		PresencePenalty:    openAIPresencePenalty,
-		CommandPrompt:      openAICommandPrompt,
-		Effort:             openAIEffort,
-		Voice:              openAIVoice,
+		Name:                 openAIName,
+		Model:                openAIModel,
+		Role:                 openAIRole,
+		MaxTokens:            openAIMaxTokens,
+		ContextWindow:        openAIContextWindow,
+		URL:                  openAIURL,
+		CompletionsPath:      openAICompletionsPath,
+		ResponsesPath:        openAIResponsesPath,
+		TranscriptionsPath:   openAITranscriptionsPath,
+		SpeechPath:           openAISpeechPath,
+		ImageGenerationsPath: openAIImageGenerationsPath,
+		ImageEditsPath:       openAIImageEditsPath,
+		ModelsPath:           openAIModelsPath,
+		AuthHeader:           openAIAuthHeader,
+		AuthTokenPrefix:      openAIAuthTokenPrefix,
+		Thread:               openAIThread,
+		Temperature:          openAITemperature,
+		TopP:                 openAITopP,
+		FrequencyPenalty:     openAIFrequencyPenalty,
+		PresencePenalty:      openAIPresencePenalty,
+		CommandPrompt:        openAICommandPrompt,
+		Effort:               openAIEffort,
+		Voice:                openAIVoice,
 	}
 }
 

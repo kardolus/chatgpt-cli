@@ -17,6 +17,7 @@ import (
 	"golang.org/x/text/language"
 	"io"
 	"mime/multipart"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -399,22 +400,115 @@ func (c *Client) SynthesizeSpeech(inputText, outputPath string) error {
 // Returns:
 //   - An error if any part of the request, decoding, or file writing fails.
 func (c *Client) GenerateImage(inputText, outputPath string) error {
-	reqBody := api.Draw{
+	req := api.Draw{
 		Model:  c.Config.Model,
 		Prompt: inputText,
 	}
 
-	body, err := json.Marshal(reqBody)
+	return c.postAndWriteBinaryOutput(
+		c.getEndpoint(c.Config.ImageGenerationsPath),
+		req,
+		outputPath,
+		"image",
+		func(respBytes []byte) ([]byte, error) {
+			var response struct {
+				Data []struct {
+					B64 string `json:"b64_json"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(respBytes, &response); err != nil {
+				return nil, fmt.Errorf("failed to decode response: %w", err)
+			}
+			if len(response.Data) == 0 {
+				return nil, fmt.Errorf("no image data returned")
+			}
+			decoded, err := base64.StdEncoding.DecodeString(response.Data[0].B64)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode base64 image: %w", err)
+			}
+			return decoded, nil
+		},
+	)
+}
+
+// EditImage edits an input image using a text prompt and writes the modified image to the specified output path.
+//
+// This method sends a multipart/form-data POST request to the image editing endpoint
+// (typically OpenAI's /v1/images/edits). The request includes:
+//   - The image file to edit.
+//   - A text prompt describing how the image should be modified.
+//   - The model ID (e.g., gpt-image-1).
+//
+// The response is expected to contain a base64-encoded image, which is decoded and written to the outputPath.
+//
+// Parameters:
+//   - inputText: A text prompt describing the desired modifications to the image.
+//   - inputPath: The file path to the source image (must be a supported format: PNG, JPEG, or WebP).
+//   - outputPath: The file path where the edited image will be saved.
+//
+// Returns:
+//   - An error if any step of the process fails: reading the file, building the request, sending it,
+//     decoding the response, or writing the output image.
+//
+// Example:
+//
+//	err := client.EditImage("Add a rainbow in the sky", "input.png", "output.png")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+func (c *Client) EditImage(inputText, inputPath, outputPath string) error {
+	endpoint := c.getEndpoint(c.Config.ImageEditsPath)
+
+	file, err := c.reader.Open(inputPath)
 	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
+		return fmt.Errorf("failed to open input image: %w", err)
+	}
+	defer file.Close()
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	mimeType, err := c.getMimeTypeFromFileContent(inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to detect MIME type: %w", err)
+	}
+	if !strings.HasPrefix(mimeType, "image/") {
+		return fmt.Errorf("unsupported MIME type: %s", mimeType)
 	}
 
-	endpoint := c.getEndpoint(c.Config.DrawPath)
-	c.printRequestDebugInfo(endpoint, body, nil)
+	header := make(textproto.MIMEHeader)
+	header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="image"; filename="%s"`, filepath.Base(inputPath)))
+	header.Set("Content-Type", mimeType)
 
-	respBytes, err := c.caller.Post(endpoint, body, false)
+	part, err := writer.CreatePart(header)
 	if err != nil {
-		return fmt.Errorf("failed to generate image: %w", err)
+		return fmt.Errorf("failed to create image part: %w", err)
+	}
+	if _, err := io.Copy(part, file); err != nil {
+		return fmt.Errorf("failed to copy image data: %w", err)
+	}
+
+	if err := writer.WriteField("prompt", inputText); err != nil {
+		return fmt.Errorf("failed to add prompt: %w", err)
+	}
+	if err := writer.WriteField("model", c.Config.Model); err != nil {
+		return fmt.Errorf("failed to add model: %w", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("failed to close multipart writer: %w", err)
+	}
+
+	c.printRequestDebugInfo(endpoint, buf.Bytes(), map[string]string{
+		"Content-Type": writer.FormDataContentType(),
+	})
+
+	respBytes, err := c.caller.PostWithHeaders(endpoint, buf.Bytes(), map[string]string{
+		c.Config.AuthHeader: fmt.Sprintf("%s %s", c.Config.AuthTokenPrefix, c.Config.APIKey),
+		"Content-Type":      writer.FormDataContentType(),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to edit image: %w", err)
 	}
 
 	// Parse the JSON and extract b64_json

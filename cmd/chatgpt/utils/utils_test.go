@@ -285,6 +285,14 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			err := utils.ValidateFlags(defaultModel+utils.ImagePattern, flags)
 			Expect(err).NotTo(HaveOccurred())
 		})
+		it("should NOT return an error when --draw, --image and --output flags are used with a compatible model", func() {
+			flags["draw"] = true
+			flags["output"] = true
+			flags["image"] = true
+
+			err := utils.ValidateFlags(defaultModel+utils.ImagePattern, flags)
+			Expect(err).NotTo(HaveOccurred())
+		})
 		it("should return an error when --voice is used with an incompatible model", func() {
 			flags["voice"] = true
 

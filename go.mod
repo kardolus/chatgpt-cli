@@ -12,7 +12,7 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1
 	go.uber.org/zap v1.27.0
-	golang.org/x/text v0.26.0
+	golang.org/x/text v0.27.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

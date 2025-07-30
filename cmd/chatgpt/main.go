@@ -387,7 +387,7 @@ func run(cmd *cobra.Command, args []string) error {
 		sugar.Infof("Entering interactive mode. Using thread '%s'. Type 'clear' to clear the screen, 'exit' to quit, or press Ctrl+C.\n\n", hs.GetThread())
 
 		var readlineCfg *readline.Config
-		if cfg.OmitHistory || cfg.AutoCreateNewThread {
+		if cfg.OmitHistory || cfg.AutoCreateNewThread || newThread {
 			readlineCfg = &readline.Config{
 				Prompt: "",
 			}

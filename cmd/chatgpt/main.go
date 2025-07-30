@@ -385,10 +385,39 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if interactiveMode {
 		sugar.Infof("Entering interactive mode. Using thread '%s'. Type 'clear' to clear the screen, 'exit' to quit, or press Ctrl+C.\n\n", hs.GetThread())
-		rl, err := readline.New("")
+
+		var readlineCfg *readline.Config
+		if cfg.OmitHistory || cfg.AutoCreateNewThread {
+			readlineCfg = &readline.Config{
+				Prompt: "",
+			}
+		} else {
+			store, err := history.New()
+			if err != nil {
+				return err
+			}
+
+			h := history.NewHistory(store)
+			userHistory, err := h.ParseUserHistory(cfg.Thread)
+			if err != nil {
+				return err
+			}
+
+			historyFile, err := utils.CreateHistoryFile(userHistory)
+			if err != nil {
+				return err
+			}
+			readlineCfg = &readline.Config{
+				Prompt:      "",
+				HistoryFile: historyFile,
+			}
+		}
+
+		rl, err := readline.NewEx(readlineCfg)
 		if err != nil {
 			return err
 		}
+
 		defer rl.Close()
 
 		commandPrompt := func(counter, usage int) string {

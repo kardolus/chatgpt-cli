@@ -21,6 +21,23 @@ func NewHistory(store Store) *Manager {
 	return &Manager{store: store}
 }
 
+func (h *Manager) ParseUserHistory(thread string) ([]string, error) {
+	var result []string
+
+	historyEntries, err := h.store.ReadThread(thread)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range historyEntries {
+		if entry.Role == userRole {
+			result = append(result, entry.Content.(string))
+		}
+	}
+
+	return result, nil
+}
+
 func (h *Manager) Print(thread string) (string, error) {
 	var result string
 

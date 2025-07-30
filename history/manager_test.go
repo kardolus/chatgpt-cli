@@ -35,6 +35,45 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 		mockCtrl.Finish()
 	})
 
+	when("ParseUserHistory()", func() {
+		const threadName = "threadName"
+
+		it("returns an error when store fails", func() {
+			mockHistoryStore.EXPECT().ReadThread(threadName).Return(nil, errors.New("store error")).Times(1)
+
+			_, err := subject.ParseUserHistory(threadName)
+			Expect(err).To(MatchError("store error"))
+		})
+
+		it("returns only user messages", func() {
+			historyEntries := []history.History{
+				{Message: api.Message{Role: "user", Content: "hello"}},
+				{Message: api.Message{Role: "assistant", Content: "hi"}},
+				{Message: api.Message{Role: "user", Content: "how are you?"}},
+				{Message: api.Message{Role: "system", Content: "ignore this"}},
+			}
+
+			mockHistoryStore.EXPECT().ReadThread(threadName).Return(historyEntries, nil).Times(1)
+
+			result, err := subject.ParseUserHistory(threadName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal([]string{"hello", "how are you?"}))
+		})
+
+		it("returns an empty list when there are no user messages", func() {
+			historyEntries := []history.History{
+				{Message: api.Message{Role: "assistant", Content: "hi"}},
+				{Message: api.Message{Role: "system", Content: "setup"}},
+			}
+
+			mockHistoryStore.EXPECT().ReadThread(threadName).Return(historyEntries, nil).Times(1)
+
+			result, err := subject.ParseUserHistory(threadName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(BeEmpty())
+		})
+	})
+
 	when("Print()", func() {
 		const threadName = "threadName"
 

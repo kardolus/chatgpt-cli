@@ -5,24 +5,27 @@ import (
 	"errors"
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/api"
+	"github.com/kardolus/chatgpt-cli/internal"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
 )
 
 const (
-	AudioPattern         = "-audio"
-	TranscribePattern    = "-transcribe"
-	TTSPattern           = "-tts"
-	ImagePattern         = "-image"
-	O1ProPattern         = "o1-pro"
-	InvalidMCPPatter     = "the MCP pattern has to be of the form <provider>/<plugin>[@<version>]"
-	ApifyProvider        = "apify"
-	UnsupportedProvider  = "only apify and smithery are currently supported"
-	LatestVersion        = "latest"
-	InvalidParams        = "params need to be pairs or a JSON object"
-	InvalidApifyFunction = "apify functions need to be of the form user~actor"
+	AudioPattern           = "-audio"
+	TranscribePattern      = "-transcribe"
+	TTSPattern             = "-tts"
+	ImagePattern           = "-image"
+	O1ProPattern           = "o1-pro"
+	InvalidMCPPatter       = "the MCP pattern has to be of the form <provider>/<plugin>[@<version>]"
+	ApifyProvider          = "apify"
+	UnsupportedProvider    = "only apify is currently supported"
+	LatestVersion          = "latest"
+	InvalidParams          = "params need to be pairs or a JSON object"
+	InvalidApifyFunction   = "apify functions need to be of the form user~actor"
+	InteractiveHistoryFile = "interactive_history.txt"
 )
 
 func ColorToAnsi(color string) (string, string) {
@@ -48,6 +51,22 @@ func ColorToAnsi(color string) (string, string) {
 	default:
 		return "", ""
 	}
+}
+
+func CreateHistoryFile(history []string) (string, error) {
+	dataHome, err := internal.GetDataHome()
+	if err != nil {
+		return "", err
+	}
+
+	fullPath := filepath.Join(dataHome, InteractiveHistoryFile)
+
+	content := strings.Join(history, "\n") + "\n"
+	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+		return "", err
+	}
+
+	return fullPath, nil
 }
 
 func FileToString(fileName string) (string, error) {
@@ -158,7 +177,6 @@ func ValidateFlags(model string, flags map[string]bool) error {
 }
 
 // ParseMCPPlugin expects input for the apify provider of the form [provider]/[user]~[actor]@[version]
-// and the smithery provider of the form [provider]/[function]@[version].
 func ParseMCPPlugin(input string) (api.MCPRequest, error) {
 	var result api.MCPRequest
 

@@ -21,7 +21,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
         - [Examples](#examples)
         - [Default Version Behavior](#default-version-behavior)
         - [Handling MCP Replies](#handling-mcp-replies)
-        - [Configuration](#configuration)
+        - [Config](#config)
 - [Installation](#installation)
     - [Using Homebrew (macOS)](#using-homebrew-macos)
     - [Direct Download](#direct-download)
@@ -201,7 +201,7 @@ different modes:
     * Immediately sends your query to GPT
     * Returns the assistant’s response
 
-#### Configuration
+#### Config
 
 You’ll need to set the `APIFY_API_KEY` as an environment variable or config value
 

@@ -62,7 +62,7 @@ type ConfigMetadata struct {
 }
 
 var configMetadata = []ConfigMetadata{
-	{"model", "set-model", "gpt-3.5-turbo", "Set a new default model by specifying the model name"},
+	{"model", "set-model", "gpt-4o", "Set a new default model by specifying the model name"},
 	{"max_tokens", "set-max-tokens", 4096, "Set a new default max token size"},
 	{"context_window", "set-context-window", 8192, "Set a new default context window size"},
 	{"thread", "set-thread", "default", "Set a new active thread by specifying the thread name"},

@@ -74,6 +74,30 @@
       "parent": null
     },
     {
+      "id": "gpt-4o",
+      "object": "model",
+      "created": 1677610602,
+      "owned_by": "openai",
+      "permission": [
+        {
+          "id": "modelperm-Gsp3SyIu7GamHB3McQv3rMf5",
+          "object": "model_permission",
+          "created": 1684434433,
+          "allow_create_engine": false,
+          "allow_sampling": true,
+          "allow_logprobs": true,
+          "allow_search_indices": false,
+          "allow_view": true,
+          "allow_fine_tuning": false,
+          "organization": "*",
+          "group": null,
+          "is_blocking": false
+        }
+      ],
+      "root": "gpt-3.5-turbo",
+      "parent": null
+    },
+    {
       "id": "davinci",
       "object": "model",
       "created": 1649359874,

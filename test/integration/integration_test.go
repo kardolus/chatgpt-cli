@@ -512,7 +512,8 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		it("should return the expected result for the --list-models flag", func() {
 			output := runCommand("--list-models")
 
-			Expect(output).To(ContainSubstring("* gpt-3.5-turbo (current)"))
+			Expect(output).To(ContainSubstring("* gpt-4o (current)"))
+			Expect(output).To(ContainSubstring("- gpt-3.5-turbo"))
 			Expect(output).To(ContainSubstring("- gpt-3.5-turbo-0301"))
 		})
 
@@ -540,7 +541,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(output).To(ContainSubstring("/v1/chat/completions"))
 			Expect(output).To(ContainSubstring("--header \"Authorization: Bearer ${OPENAI_API_KEY}\""))
 			Expect(output).To(ContainSubstring("--header 'Content-Type: application/json'"))
-			Expect(output).To(ContainSubstring("\"model\":\"gpt-3.5-turbo\""))
+			Expect(output).To(ContainSubstring("\"model\":\"gpt-4o\""))
 			Expect(output).To(ContainSubstring("\"messages\":"))
 			Expect(output).To(ContainSubstring("Response"))
 
@@ -832,7 +833,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 				})
 
 				it("has a configurable default model", func() {
-					oldModel := "gpt-3.5-turbo"
+					oldModel := "gpt-4o"
 					newModel := "gpt-3.5-turbo-0301"
 
 					// Verify initial model
@@ -939,7 +940,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 
 		when("configuration precedence", func() {
 			var (
-				defaultModel = "gpt-3.5-turbo"
+				defaultModel = "gpt-4o"
 				newModel     = "gpt-3.5-turbo-0301"
 				envModel     = "gpt-3.5-env-model"
 				envVar       string

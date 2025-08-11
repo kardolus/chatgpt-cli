@@ -106,9 +106,15 @@ func (r *RestCaller) PostWithHeaders(url string, body []byte, headers map[string
 	return io.ReadAll(resp.Body)
 }
 
-func (r *RestCaller) ProcessResponse(reader io.Reader, writer io.Writer) []byte {
-	var result []byte
+func (r *RestCaller) ProcessResponse(reader io.Reader, writer io.Writer, endpoint string) []byte {
+	if strings.Contains(endpoint, r.config.ResponsesPath) {
+		return r.processResponsesSSE(reader, writer)
+	}
+	return r.processLegacy(reader, writer)
+}
 
+func (r *RestCaller) processLegacy(reader io.Reader, writer io.Writer) []byte {
+	var result []byte
 	sugar := zap.S()
 	sugar.Debugln("\nResponse\n")
 
@@ -126,24 +132,20 @@ func (r *RestCaller) ProcessResponse(reader io.Reader, writer io.Writer) []byte 
 			if len(line) < 6 {
 				continue
 			}
-
 			if line == "[DONE]" {
 				_, _ = writer.Write([]byte("\n"))
-				result = append(result, []byte("\n")...)
+				result = append(result, '\n')
 				break
 			}
-
 			var data api.Data
-			err := json.Unmarshal([]byte(line), &data)
-			if err != nil {
+			if err := json.Unmarshal([]byte(line), &data); err != nil {
 				_, _ = fmt.Fprintf(writer, "Error: %s\n", err.Error())
 				continue
 			}
-
 			for _, choice := range data.Choices {
 				if content, ok := choice.Delta["content"].(string); ok {
 					_, _ = writer.Write([]byte(content))
-					result = append(result, []byte(content)...)
+					result = append(result, content...)
 				}
 			}
 		}
@@ -151,6 +153,101 @@ func (r *RestCaller) ProcessResponse(reader io.Reader, writer io.Writer) []byte 
 	return result
 }
 
+func (r *RestCaller) processResponsesSSE(reader io.Reader, writer io.Writer) []byte {
+	var (
+		result   []byte
+		curEvent string
+		done     bool
+		sugar    = zap.S()
+	)
+
+	sugar.Debugln("\nResponse\n")
+
+	scanner := bufio.NewScanner(reader)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if zap.L().Core().Enabled(zap.DebugLevel) {
+			sugar.Debugln(line)
+			continue
+		}
+
+		if strings.HasPrefix(line, ":") {
+			continue
+		}
+
+		switch {
+		case strings.HasPrefix(line, "event:"):
+			curEvent = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+			continue
+
+		case strings.HasPrefix(line, "data:"):
+			payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+
+			if curEvent == "" {
+				if payload == "[DONE]" {
+					_, _ = writer.Write([]byte("\n"))
+					result = append(result, '\n')
+					done = true
+					break
+				}
+				var legacy struct {
+					Choices []struct {
+						Delta map[string]any `json:"delta"`
+					} `json:"choices"`
+				}
+				if err := json.Unmarshal([]byte(payload), &legacy); err != nil {
+					_, _ = fmt.Fprintf(writer, "Error: %s\n", err.Error())
+					continue
+				}
+				for _, ch := range legacy.Choices {
+					if s, ok := ch.Delta["content"].(string); ok && s != "" {
+						_, _ = writer.Write([]byte(s))
+						result = append(result, s...)
+					}
+				}
+				continue
+			}
+
+			var env struct {
+				Type     string `json:"type"`
+				Delta    string `json:"delta"` // response.output_text.delta
+				Text     string `json:"text"`  // response.output_text.done/content_part.done (optional)
+				Response struct {
+					Status string `json:"status"`
+				} `json:"response"`
+			}
+			if err := json.Unmarshal([]byte(payload), &env); err != nil {
+				_, _ = fmt.Fprintf(writer, "Error: %s\n", err.Error())
+				continue
+			}
+
+			switch env.Type {
+			case "response.output_text.delta":
+				if env.Delta != "" {
+					_, _ = writer.Write([]byte(env.Delta))
+					result = append(result, env.Delta...)
+				}
+			case "response.completed":
+				if len(result) == 0 || !bytes.HasSuffix(result, []byte("\n")) {
+					_, _ = writer.Write([]byte("\n"))
+					result = append(result, '\n')
+				}
+				done = true
+			default:
+				// ignore other SSE types
+			}
+		}
+
+		if done {
+			break
+		}
+	}
+	return result
+}
 func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]byte, error) {
 	req, err := r.newRequest(method, url, body)
 	if err != nil {
@@ -178,7 +275,7 @@ func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]
 	}
 
 	if stream {
-		return r.ProcessResponse(response.Body, os.Stdout), nil
+		return r.ProcessResponse(response.Body, os.Stdout, url), nil
 	}
 
 	result, err := io.ReadAll(response.Body)

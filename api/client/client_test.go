@@ -705,169 +705,146 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 			})
 		})
 
-		when("model is o1-pro", func() {
-			const (
-				query       = "what's the weather"
-				model       = "o1-pro"
-				systemRole  = "you are helpful"
-				totalTokens = 777
-			)
+		when("the model is o1-pro or gpt-5", func() {
+			models := []string{"o1-pro", "gpt-5"}
 
-			it.Before(func() {
-				config.Model = model
-				config.Role = systemRole
-				factory.withoutHistory()
-			})
+			for _, m := range models {
+				m := m // capture
+				when(fmt.Sprintf("the model is %s", m), func() {
+					const (
+						query       = "what's the weather"
+						systemRole  = "you are helpful"
+						totalTokens = 777
+					)
 
-			it("returns the output_text when present", func() {
-				subject := factory.buildClientWithoutConfig()
-				subject.Config.Model = "o1-pro" // ensure o1-pro model is used
+					it.Before(func() {
+						config.Model = m
+						config.Role = systemRole
+						factory.withoutHistory()
+					})
 
-				const (
-					answer      = "yes, it does"
-					totalTokens = 42
-					systemRole  = "you are helpful"
-				)
+					it("returns the output_text when present", func() {
+						subject := factory.buildClientWithoutConfig()
+						subject.Config.Model = m
+						subject.Config.Role = systemRole
 
-				subject.Config.Role = systemRole
+						answer := "yes, it does"
+						messages := []api.Message{
+							{Role: client.SystemRole, Content: systemRole},
+							{Role: client.UserRole, Content: query},
+						}
 
-				messages := []api.Message{
-					{Role: client.SystemRole, Content: systemRole},
-					{Role: client.UserRole, Content: query},
-				}
+						body, err := json.Marshal(api.ResponsesRequest{
+							Model:           subject.Config.Model,
+							Input:           messages,
+							MaxOutputTokens: subject.Config.MaxTokens,
+							Reasoning:       api.Reasoning{Effort: "low"},
+							Stream:          false,
+							Temperature:     subject.Config.Temperature,
+							TopP:            subject.Config.TopP,
+						})
+						Expect(err).NotTo(HaveOccurred())
 
-				body, err := json.Marshal(api.ResponsesRequest{
-					Model:           "o1-pro",
-					Input:           messages,
-					MaxOutputTokens: subject.Config.MaxTokens,
-					Reasoning: api.Reasoning{
-						Effort: "low",
-					},
+						mockTimer.EXPECT().Now().Times(3)
+						mockHistoryStore.EXPECT().Write(gomock.Any())
+
+						response := api.ResponsesResponse{
+							Output: []api.Output{{
+								Type:    "message",
+								Content: []api.Content{{Type: "output_text", Text: answer}},
+							}},
+							Usage: api.TokenUsage{TotalTokens: 42},
+						}
+						raw, _ := json.Marshal(response)
+
+						mockCaller.EXPECT().
+							Post(subject.Config.URL+"/v1/responses", body, false).
+							Return(raw, nil)
+
+						text, tokens, err := subject.Query(context.Background(), query)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(text).To(Equal(answer))
+						Expect(tokens).To(Equal(42))
+					})
+
+					it("errors when no output blocks are present", func() {
+						subject := factory.buildClientWithoutConfig()
+						subject.Config.Model = m
+						subject.Config.Role = systemRole
+
+						messages := []api.Message{
+							{Role: client.SystemRole, Content: systemRole},
+							{Role: client.UserRole, Content: query},
+						}
+
+						body, _ := json.Marshal(api.ResponsesRequest{
+							Model:           subject.Config.Model,
+							Input:           messages,
+							MaxOutputTokens: subject.Config.MaxTokens,
+							Reasoning:       api.Reasoning{Effort: "low"},
+							Stream:          false,
+							Temperature:     subject.Config.Temperature,
+							TopP:            subject.Config.TopP,
+						})
+
+						mockTimer.EXPECT().Now().Times(2)
+
+						response := api.ResponsesResponse{
+							Output: []api.Output{},
+							Usage:  api.TokenUsage{TotalTokens: totalTokens},
+						}
+						raw, _ := json.Marshal(response)
+
+						mockCaller.EXPECT().
+							Post(subject.Config.URL+"/v1/responses", body, false).
+							Return(raw, nil)
+
+						_, _, err := subject.Query(context.Background(), query)
+						Expect(err).To(HaveOccurred())
+						Expect(err.Error()).To(Equal("no response returned"))
+					})
+
+					it("errors when message has no output_text", func() {
+						subject := factory.buildClientWithoutConfig()
+						subject.Config.Model = m
+						subject.Config.Role = systemRole
+
+						messages := []api.Message{
+							{Role: client.SystemRole, Content: systemRole},
+							{Role: client.UserRole, Content: query},
+						}
+
+						body, _ := json.Marshal(api.ResponsesRequest{
+							Model:           subject.Config.Model,
+							Input:           messages,
+							MaxOutputTokens: subject.Config.MaxTokens,
+							Reasoning:       api.Reasoning{Effort: "low"},
+							Stream:          false,
+							Temperature:     subject.Config.Temperature,
+							TopP:            subject.Config.TopP,
+						})
+
+						mockTimer.EXPECT().Now().Times(2)
+
+						response := api.ResponsesResponse{
+							Output: []api.Output{{
+								Type:    "message",
+								Content: []api.Content{{Type: "refusal", Text: "nope"}},
+							}},
+							Usage: api.TokenUsage{TotalTokens: totalTokens},
+						}
+						raw, _ := json.Marshal(response)
+
+						mockCaller.EXPECT().
+							Post(subject.Config.URL+"/v1/responses", body, false).
+							Return(raw, nil)
+
+						_, _, err := subject.Query(context.Background(), query)
+						Expect(err).To(HaveOccurred())
+						Expect(err.Error()).To(Equal("no response returned"))
+					})
 				})
-				Expect(err).NotTo(HaveOccurred())
-
-				// Expect 3 timestamps: 1 for init system message, 1 for query message, 1 for assistant response
-				mockTimer.EXPECT().Now().Times(3)
-
-				mockHistoryStore.EXPECT().Write(gomock.Any())
-
-				response := api.ResponsesResponse{
-					Output: []api.Output{
-						{
-							Type: "message",
-							Content: []api.Content{
-								{
-									Type: "output_text",
-									Text: answer,
-								},
-							},
-						},
-					},
-					Usage: api.TokenUsage{
-						TotalTokens: totalTokens,
-					},
-				}
-
-				raw, err := json.Marshal(response)
-				Expect(err).NotTo(HaveOccurred())
-
-				mockCaller.EXPECT().
-					Post(subject.Config.URL+"/v1/responses", body, false).
-					Return(raw, nil)
-
-				text, tokens, err := subject.Query(context.Background(), query)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(text).To(Equal(answer))
-				Expect(tokens).To(Equal(totalTokens))
-			})
-
-			it("returns an error when no output blocks are present", func() {
-				subject := factory.buildClientWithoutConfig()
-				subject.Config.Model = "o1-pro"
-				subject.Config.Role = systemRole
-
-				messages := []api.Message{
-					{Role: client.SystemRole, Content: systemRole},
-					{Role: client.UserRole, Content: query},
-				}
-
-				body, err := json.Marshal(api.ResponsesRequest{
-					Model:           "o1-pro",
-					Input:           messages,
-					MaxOutputTokens: subject.Config.MaxTokens,
-					Reasoning:       api.Reasoning{Effort: "low"},
-				})
-				Expect(err).NotTo(HaveOccurred())
-
-				mockTimer.EXPECT().Now().Times(2)
-
-				response := api.ResponsesResponse{
-					Output: []api.Output{},
-					Usage: api.TokenUsage{
-						TotalTokens: totalTokens,
-					},
-				}
-
-				raw, err := json.Marshal(response)
-				Expect(err).NotTo(HaveOccurred())
-
-				mockCaller.EXPECT().
-					Post(subject.Config.URL+"/v1/responses", body, false).
-					Return(raw, nil)
-
-				_, _, err = subject.Query(context.Background(), query)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(Equal("no response returned"))
-			})
-
-			it("returns an error when no output_text is present in message", func() {
-				subject := factory.buildClientWithoutConfig()
-				subject.Config.Model = "o1-pro"
-				subject.Config.Role = systemRole
-
-				messages := []api.Message{
-					{Role: client.SystemRole, Content: systemRole},
-					{Role: client.UserRole, Content: query},
-				}
-
-				body, err := json.Marshal(api.ResponsesRequest{
-					Model:           "o1-pro",
-					Input:           messages,
-					MaxOutputTokens: subject.Config.MaxTokens,
-					Reasoning:       api.Reasoning{Effort: "low"},
-				})
-				Expect(err).NotTo(HaveOccurred())
-
-				mockTimer.EXPECT().Now().Times(2)
-
-				response := api.ResponsesResponse{
-					Output: []api.Output{
-						{
-							Type: "message",
-							Content: []api.Content{
-								{
-									Type: "refusal", // intentionally not "output_text"
-									Text: "nope",
-								},
-							},
-						},
-					},
-					Usage: api.TokenUsage{
-						TotalTokens: totalTokens,
-					},
-				}
-
-				raw, err := json.Marshal(response)
-				Expect(err).NotTo(HaveOccurred())
-
-				mockCaller.EXPECT().
-					Post(subject.Config.URL+"/v1/responses", body, false).
-					Return(raw, nil)
-
-				_, _, err = subject.Query(context.Background(), query)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(Equal("no response returned"))
-			})
+			}
 		})
 	})
 	when("Stream()", func() {

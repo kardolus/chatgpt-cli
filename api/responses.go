@@ -5,6 +5,9 @@ type ResponsesRequest struct {
 	Input           []Message `json:"input"`
 	MaxOutputTokens int       `json:"max_output_tokens"`
 	Reasoning       Reasoning `json:"reasoning"`
+	Stream          bool      `json:"stream"`
+	Temperature     float64   `json:"temperature,omitempty"`
+	TopP            float64   `json:"top_p,omitempty"`
 }
 
 type Reasoning struct {

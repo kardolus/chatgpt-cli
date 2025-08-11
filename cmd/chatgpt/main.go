@@ -346,8 +346,7 @@ func run(cmd *cobra.Command, args []string) error {
 		sugar.Warnf("Warning: config.yaml doesn't exist in %s, create it\n", tmp)
 	}
 
-	if strings.Contains(c.Config.Model, client.O1ProPattern) {
-		// o1-pro models only supports query mode
+	if !client.GetCapabilities(c.Config.Model).SupportsStreaming {
 		queryMode = true
 	}
 

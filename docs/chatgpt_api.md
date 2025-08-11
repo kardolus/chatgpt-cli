@@ -387,7 +387,7 @@ Output:
 
 ## Non standard models
 
-## o1-models
+### o1-models
 
 Request o1-mini ("system" key in "messages" is not allowed):
 
@@ -798,6 +798,117 @@ curl -X POST "https://api.openai.com/v1/images/edits" \
   -F "model=gpt-image-1" \
   -F "image=@matrix.png" \
   -F 'prompt=The hero should be wearing a hawaii t-shirt' | jq -r '.data[0].b64_json' | base64 --decode > matrix_hawaii.png
+```
+
+### gpt-5
+
+Request
+
+```shell
+ curl --location --insecure --request POST 'https://api.openai.com/v1/responses' \
+  --header "Authorization: Bearer ${OPENAI_API_KEY}" \
+  --header 'Content-Type: application/json' \
+  --data-raw '{"model":"gpt-5","input":[{"role":"system","content":"You are a helpful assistant."},{"role":"user","content":"what is the capital of the netherlands"}],"max_output_tokens":4096,"reasoning":{"effort":"low"},"stream":true}'
+```
+
+Response:
+
+```shell
+event: response.created
+data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_689a2fd015448191a804ad63fdb613f60e5696160b26e781","object":"response","created_at":1754935248,"status":"in_progress","background":false,"error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":4096,"max_tool_calls":null,"model":"gpt-5-2025-08-07","output":[],"parallel_tool_calls":true,"previous_response_id":null,"prompt_cache_key":null,"reasoning":{"effort":"low","summary":null},"safety_identifier":null,"service_tier":"auto","store":true,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tools":[],"top_logprobs":0,"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+
+event: response.in_progress
+data: {"type":"response.in_progress","sequence_number":1,"response":{"id":"resp_689a2fd015448191a804ad63fdb613f60e5696160b26e781","object":"response","created_at":1754935248,"status":"in_progress","background":false,"error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":4096,"max_tool_calls":null,"model":"gpt-5-2025-08-07","output":[],"parallel_tool_calls":true,"previous_response_id":null,"prompt_cache_key":null,"reasoning":{"effort":"low","summary":null},"safety_identifier":null,"service_tier":"auto","store":true,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tools":[],"top_logprobs":0,"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":2,"output_index":0,"item":{"id":"rs_689a2fd0b7b08191823b9d3993c07fc70e5696160b26e781","type":"reasoning","summary":[]}}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":3,"output_index":0,"item":{"id":"rs_689a2fd0b7b08191823b9d3993c07fc70e5696160b26e781","type":"reasoning","summary":[]}}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":4,"output_index":1,"item":{"id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","type":"message","status":"in_progress","content":[],"role":"assistant"}}
+
+event: response.content_part.added
+data: {"type":"response.content_part.added","sequence_number":5,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"part":{"type":"output_text","annotations":[],"logprobs":[],"text":""}}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":6,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":"Amsterdam","logprobs":[],"obfuscation":"KLcTNXt"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":7,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" is","logprobs":[],"obfuscation":"ZqWL13Sb7YycU"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":8,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" the","logprobs":[],"obfuscation":"ChCGlzWA7n96"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":9,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" constitutional","logprobs":[],"obfuscation":"T"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":10,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" capital","logprobs":[],"obfuscation":"cCxuXtY2"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":11,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" of","logprobs":[],"obfuscation":"rUBD4vWK12Moj"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":12,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" the","logprobs":[],"obfuscation":"BezXmbbfTGzM"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":13,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" Netherlands","logprobs":[],"obfuscation":"v04l"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":14,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":".","logprobs":[],"obfuscation":"NNXZQaJgOkSBnRA"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":15,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" The","logprobs":[],"obfuscation":"w3CrBMX5NSZp"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":16,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" seat","logprobs":[],"obfuscation":"9shtEnQK0Fb"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":17,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" of","logprobs":[],"obfuscation":"RhWVzGpqrOone"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":18,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" government","logprobs":[],"obfuscation":"5KNhW"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":19,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" and","logprobs":[],"obfuscation":"OXZqa4JwGpz5"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":20,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" the","logprobs":[],"obfuscation":"Ym6dFwaThhzj"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":21,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" royal","logprobs":[],"obfuscation":"qdywNFSbae"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":22,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" residence","logprobs":[],"obfuscation":"zgJf3g"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":23,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" are","logprobs":[],"obfuscation":"tjjlVGiyrE11"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":24,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" in","logprobs":[],"obfuscation":"PJ5lZA5UfIwXh"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":25,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" The","logprobs":[],"obfuscation":"FeCDvva7NuHL"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":26,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":" Hague","logprobs":[],"obfuscation":"G5gqRw5NVG"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":27,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"delta":".","logprobs":[],"obfuscation":"5Oko165nDgjrGWK"}
+
+event: response.output_text.done
+data: {"type":"response.output_text.done","sequence_number":28,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"text":"Amsterdam is the constitutional capital of the Netherlands. The seat of government and the royal residence are in The Hague.","logprobs":[]}
+
+event: response.content_part.done
+data: {"type":"response.content_part.done","sequence_number":29,"item_id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","output_index":1,"content_index":0,"part":{"type":"output_text","annotations":[],"logprobs":[],"text":"Amsterdam is the constitutional capital of the Netherlands. The seat of government and the royal residence are in The Hague."}}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":30,"output_index":1,"item":{"id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"logprobs":[],"text":"Amsterdam is the constitutional capital of the Netherlands. The seat of government and the royal residence are in The Hague."}],"role":"assistant"}}
+
+event: response.completed
+data: {"type":"response.completed","sequence_number":31,"response":{"id":"resp_689a2fd015448191a804ad63fdb613f60e5696160b26e781","object":"response","created_at":1754935248,"status":"completed","background":false,"error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":4096,"max_tool_calls":null,"model":"gpt-5-2025-08-07","output":[{"id":"rs_689a2fd0b7b08191823b9d3993c07fc70e5696160b26e781","type":"reasoning","summary":[]},{"id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"logprobs":[],"text":"Amsterdam is the constitutional capital of the Netherlands. The seat of government and the royal residence are in The Hague."}],"role":"assistant"}],"parallel_tool_calls":true,"previous_response_id":null,"prompt_cache_key":null,"reasoning":{"effort":"low","summary":null},"safety_identifier":null,"service_tier":"auto","store":true,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tools":[],"top_logprobs":0,"top_p":1.0,"truncation":"disabled","usage":{"input_tokens":24,"input_tokens_details":{"cached_tokens":0},"output_tokens":28,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":52},"user":null,"metadata":{}}}
 ```
 
 ## Azure

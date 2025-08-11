@@ -42,12 +42,13 @@ const (
 	FunctionRole             = "function"
 	InteractiveThreadPrefix  = "int_"
 	SearchModelPattern       = "-search"
-	O1ProPattern             = "o1-pro"
 	ApifyURL                 = "https://api.apify.com/v2/acts/"
 	ApifyPath                = "/run-sync-get-dataset-items"
 	ApifyProxyConfig         = "proxyConfiguration"
 	gptPrefix                = "gpt"
 	o1Prefix                 = "o1"
+	o1ProPattern             = "o1-pro"
+	gpt5Pattern              = "gpt-5"
 	audioType                = "input_audio"
 	imageURLType             = "image_url"
 	messageType              = "message"
@@ -280,7 +281,7 @@ func (c *Client) Query(ctx context.Context, input string) (string, int, error) {
 		tokensUsed int
 	)
 
-	caps := getCapabilities(c.Config.Model)
+	caps := GetCapabilities(c.Config.Model)
 
 	if caps.UsesResponsesAPI {
 		var res api.ResponsesResponse
@@ -663,10 +664,10 @@ func (c *Client) appendMediaMessages(ctx context.Context, messages []api.Message
 }
 
 func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
-	caps := getCapabilities(c.Config.Model)
+	caps := GetCapabilities(c.Config.Model)
 
 	if caps.UsesResponsesAPI {
-		req, err := c.createResponsesRequest(ctx)
+		req, err := c.createResponsesRequest(ctx, stream)
 		if err != nil {
 			return nil, err
 		}
@@ -682,7 +683,7 @@ func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
 
 func (c *Client) createCompletionsRequest(ctx context.Context, stream bool) (*api.CompletionsRequest, error) {
 	var messages []api.Message
-	caps := getCapabilities(c.Config.Model)
+	caps := GetCapabilities(c.Config.Model)
 
 	for index, item := range c.History {
 		if caps.OmitFirstSystemMsg && index == 0 {
@@ -714,9 +715,9 @@ func (c *Client) createCompletionsRequest(ctx context.Context, stream bool) (*ap
 	return req, nil
 }
 
-func (c *Client) createResponsesRequest(ctx context.Context) (*api.ResponsesRequest, error) {
+func (c *Client) createResponsesRequest(ctx context.Context, stream bool) (*api.ResponsesRequest, error) {
 	var messages []api.Message
-	caps := getCapabilities(c.Config.Model)
+	caps := GetCapabilities(c.Config.Model)
 
 	for index, item := range c.History {
 		if caps.OmitFirstSystemMsg && index == 0 {
@@ -737,6 +738,9 @@ func (c *Client) createResponsesRequest(ctx context.Context) (*api.ResponsesRequ
 		Reasoning: api.Reasoning{
 			Effort: c.Config.Effort,
 		},
+		Stream:      stream,
+		Temperature: c.Config.Temperature,
+		TopP:        c.Config.TopP,
 	}
 
 	return req, nil
@@ -853,7 +857,7 @@ func (c *Client) addQuery(query string) {
 }
 
 func (c *Client) getChatEndpoint() string {
-	caps := getCapabilities(c.Config.Model)
+	caps := GetCapabilities(c.Config.Model)
 
 	var endpoint string
 	if caps.UsesResponsesAPI {
@@ -1111,6 +1115,22 @@ func (c *Client) buildMCPRequest(mcp api.MCPRequest) (string, map[string]string,
 	return endpoint, headers, body, nil
 }
 
+type ModelCapabilities struct {
+	SupportsTemperature bool
+	SupportsStreaming   bool
+	UsesResponsesAPI    bool
+	OmitFirstSystemMsg  bool
+}
+
+func GetCapabilities(model string) ModelCapabilities {
+	return ModelCapabilities{
+		SupportsTemperature: !strings.Contains(model, SearchModelPattern),
+		SupportsStreaming:   !strings.Contains(model, o1ProPattern),
+		UsesResponsesAPI:    strings.Contains(model, o1ProPattern) || strings.Contains(model, gpt5Pattern),
+		OmitFirstSystemMsg:  strings.HasPrefix(model, o1Prefix) && !strings.Contains(model, o1ProPattern),
+	}
+}
+
 func formatMCPResponse(raw []byte, function string) string {
 	var result interface{}
 	if err := json.Unmarshal(raw, &result); err != nil {
@@ -1149,12 +1169,6 @@ func formatKeyValues(obj map[string]interface{}) []string {
 	return lines
 }
 
-type modelCapabilities struct {
-	SupportsTemperature bool
-	UsesResponsesAPI    bool
-	OmitFirstSystemMsg  bool
-}
-
 func calculateEffectiveContextWindow(window int, bufferPercentage int) int {
 	adjustedPercentage := 100 - bufferPercentage
 	effectiveContextWindow := (window * adjustedPercentage) / 100
@@ -1182,14 +1196,6 @@ func countTokens(entries []history.History) (int, []int) {
 	}
 
 	return result, rolling
-}
-
-func getCapabilities(model string) modelCapabilities {
-	return modelCapabilities{
-		SupportsTemperature: !strings.Contains(model, SearchModelPattern),
-		UsesResponsesAPI:    strings.Contains(model, O1ProPattern),
-		OmitFirstSystemMsg:  strings.HasPrefix(model, o1Prefix) && !strings.Contains(model, O1ProPattern),
-	}
 }
 
 func getExtension(path string) string {

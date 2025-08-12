@@ -19,6 +19,7 @@ const (
 	TTSPattern             = "-tts"
 	ImagePattern           = "-image"
 	O1ProPattern           = "o1-pro"
+	GPT5Pattern            = "gpt-5"
 	InvalidMCPPatter       = "the MCP pattern has to be of the form <provider>/<plugin>[@<version>]"
 	ApifyProvider          = "apify"
 	UnsupportedProvider    = "only apify is currently supported"
@@ -169,8 +170,8 @@ func ValidateFlags(model string, flags map[string]bool) error {
 	if flags["voice"] && !strings.Contains(model, TTSPattern) {
 		return errors.New("the --voice flag cannot be used without a compatible model, ie gpt-4o-mini-tts (see --list-models)")
 	}
-	if flags["effort"] && !strings.Contains(model, O1ProPattern) {
-		return errors.New("the --effort flag cannot be used with non o1-pro models (see --list-models)")
+	if flags["effort"] && !(strings.Contains(model, O1ProPattern) || strings.Contains(model, GPT5Pattern)) {
+		return errors.New("the --effort flag cannot be used with non o1-pro or gpt-5 models (see --list-models)")
 	}
 
 	return nil

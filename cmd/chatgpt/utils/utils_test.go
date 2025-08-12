@@ -314,8 +314,8 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 		it("should NOT return an error when --effort is used with a compatible model", func() {
 			flags["effort"] = true
 
-			err := utils.ValidateFlags(defaultModel+utils.O1ProPattern, flags)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(utils.ValidateFlags(defaultModel+utils.O1ProPattern, flags)).To(Succeed())
+			Expect(utils.ValidateFlags(defaultModel+utils.GPT5Pattern, flags)).To(Succeed())
 		})
 		it("should return an error when the --param flag is used without --mcp", func() {
 			flags["param"] = true

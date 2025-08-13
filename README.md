@@ -2,7 +2,7 @@
 
 ![Test Workflow](https://github.com/kardolus/chatgpt-cli/actions/workflows/test.yml/badge.svg?branch=main) [![Public Backlog](https://img.shields.io/badge/public%20backlog-808080)](https://github.com/users/kardolus/projects/2)
 
-**Tested and Compatible with OpenAI ChatGPT, Azure OpenAI Service, Perplexity AI and Llama!**
+**Tested and Compatible with OpenAI ChatGPT, Azure OpenAI Service, Perplexity AI, Llama and 302.AI!**
 
 ChatGPT CLI provides a powerful command-line interface for seamless interaction with ChatGPT models via OpenAI and
 Azure, featuring streaming capabilities and extensive configuration options.
@@ -42,6 +42,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
         - [Variables for interactive mode](#variables-for-interactive-mode)
     - [Azure Configuration](#azure-configuration)
     - [Perplexity Configuration](#perplexity-configuration)
+    - [302 AI Configuration](#302ai-configuration)
     - [Command-Line Autocompletion](#command-line-autocompletion)
         - [Enabling Autocompletion](#enabling-autocompletion)
         - [Persistent Autocompletion](#persistent-autocompletion)
@@ -488,30 +489,15 @@ This feature allows for rapid changes to key configuration parameters, optimizin
 
 ### Azure Configuration
 
-For Azure, use a configuration similar to:
+For Azure, you need to configure these values
 
 ```yaml
 name: azure
-api_key: <your_key>
-model: <not relevant, read from the completions path>
-max_tokens: 4096
-context_window: 8192
-role: You are a helpful assistant.
-temperature: 1
-top_p: 1
-frequency_penalty: 0
-presence_penalty: 0
-thread: default
-omit_history: false
+api_key: <your azure api key>
 url: https://<your_resource>.openai.azure.com
 completions_path: /openai/deployments/<your_deployment>/chat/completions?api-version=<your_api>
-models_path: /v1/models
 auth_header: api-key
 auth_token_prefix: " "
-command_prompt: '[%datetime] [Q%counter]'
-auto_create_new_thread: false
-track_token_usage: false
-debug: false
 ```
 
 You can set the API key either in the config.yaml file as shown above or export it as an environment variable:
@@ -522,30 +508,13 @@ export AZURE_API_KEY=<your_key>
 
 ### Perplexity Configuration
 
-For Perplexity, use a configuration similar to:
+For Perplexity, you will need the following values:
 
 ```yaml
 name: perplexity
-api_key: ""
+api_key: <your perplexity api key>
 model: llama-3.1-sonar-small-128k-online
-max_tokens: 4096
-context_window: 8192
-role: Be precise and concise.
-temperature: 1
-top_p: 1
-frequency_penalty: 0
-presence_penalty: 0
-thread: test
-omit_history: false
 url: https://api.perplexity.ai
-completions_path: /chat/completions
-models_path: /models
-auth_header: Authorization
-auth_token_prefix: 'Bearer '
-command_prompt: '[%datetime] [Q%counter] [%usage]'
-auto_create_new_thread: true
-track_token_usage: true
-debug: false
 ```
 
 You can set the API key either in the config.yaml file as shown above or export it as an environment variable:
@@ -558,6 +527,22 @@ You can set the API key either in the `config.yaml` file as shown above or expor
 
 ```shell
 export AZURE_API_KEY=<your_key>
+```
+
+### 302.ai Configuration
+
+I successfully tested 302.ai with the following values
+
+```yaml
+name: ai302 # environment variables cannot start with numbers
+api_key: <your 302.ai api key>
+url: https://api.302.ai
+```
+
+You can set the API key either in the config.yaml file as shown above or export it as an environment variable:
+
+```shell
+export AI302_API_KEY=<your_key>
 ```
 
 ### Command-Line Autocompletion

@@ -489,7 +489,7 @@ This feature allows for rapid changes to key configuration parameters, optimizin
 
 ### Azure Configuration
 
-For Azure, you need to configure these values
+For Azure, you need to configure these, or similar, value
 
 ```yaml
 name: azure
@@ -508,7 +508,7 @@ export AZURE_API_KEY=<your_key>
 
 ### Perplexity Configuration
 
-For Perplexity, you will need the following values:
+For Perplexity, you will need something equivelent to the following values:
 
 ```yaml
 name: perplexity

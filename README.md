@@ -529,13 +529,13 @@ You can set the API key either in the `config.yaml` file as shown above or expor
 export AZURE_API_KEY=<your_key>
 ```
 
-### 302.ai Configuration
+### 302.AI Configuration
 
-I successfully tested 302.ai with the following values
+I successfully tested 302.AI with the following values
 
 ```yaml
 name: ai302 # environment variables cannot start with numbers
-api_key: <your 302.ai api key>
+api_key: <your 302.AI api key>
 url: https://api.302.ai
 ```
 
@@ -719,6 +719,7 @@ data. If you have any concerns about this, please feel free to delete this direc
 * [Perplexity API Reference](https://docs.perplexity.ai/reference/post_chat_completions)
 * [Perplexity Key Usage Dashboard](https://www.perplexity.ai/settings/api)
 * [Perplexity Models](https://docs.perplexity.ai/docs/model-cards)
+* [302.AI API Reference](https://302ai-en.apifox.cn/api-207705102)
 
 ## Additional Resources
 

@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
+	"os"
 	"testing"
 )
 
@@ -39,7 +40,10 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 		const threadName = "threadName"
 
 		it("returns an error when store fails", func() {
-			mockHistoryStore.EXPECT().ReadThread(threadName).Return(nil, errors.New("store error")).Times(1)
+			mockHistoryStore.EXPECT().
+				ReadThread(threadName).
+				Return(nil, errors.New("store error")).
+				Times(1)
 
 			_, err := subject.ParseUserHistory(threadName)
 			Expect(err).To(MatchError("store error"))
@@ -53,7 +57,10 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 				{Message: api.Message{Role: "system", Content: "ignore this"}},
 			}
 
-			mockHistoryStore.EXPECT().ReadThread(threadName).Return(historyEntries, nil).Times(1)
+			mockHistoryStore.EXPECT().
+				ReadThread(threadName).
+				Return(historyEntries, nil).
+				Times(1)
 
 			result, err := subject.ParseUserHistory(threadName)
 			Expect(err).NotTo(HaveOccurred())
@@ -66,7 +73,22 @@ func testHistory(t *testing.T, when spec.G, it spec.S) {
 				{Message: api.Message{Role: "system", Content: "setup"}},
 			}
 
-			mockHistoryStore.EXPECT().ReadThread(threadName).Return(historyEntries, nil).Times(1)
+			mockHistoryStore.EXPECT().
+				ReadThread(threadName).
+				Return(historyEntries, nil).
+				Times(1)
+
+			result, err := subject.ParseUserHistory(threadName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(BeEmpty())
+		})
+
+		it("returns an empty list when the thread does not exist", func() {
+			// Simulate store returning a file-not-found error
+			mockHistoryStore.EXPECT().
+				ReadThread(threadName).
+				Return(nil, os.ErrNotExist).
+				Times(1)
 
 			result, err := subject.ParseUserHistory(threadName)
 			Expect(err).NotTo(HaveOccurred())

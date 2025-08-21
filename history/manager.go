@@ -1,8 +1,10 @@
 package history
 
 import (
+	"errors"
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/api"
+	"os"
 	"strings"
 )
 
@@ -26,12 +28,19 @@ func (h *Manager) ParseUserHistory(thread string) ([]string, error) {
 
 	historyEntries, err := h.store.ReadThread(thread)
 	if err != nil {
+		// Gracefully handle missing file
+		if errors.Is(err, os.ErrNotExist) {
+			return []string{}, nil
+		}
+		// Return any other error
 		return nil, err
 	}
 
 	for _, entry := range historyEntries {
 		if entry.Role == userRole {
-			result = append(result, entry.Content.(string))
+			if s, ok := entry.Content.(string); ok {
+				result = append(result, s)
+			}
 		}
 	}
 

@@ -215,6 +215,25 @@ curl https://api.openai.com/v1/models \
   -H "Authorization: Bearer ${OPENAI_API_KEY}"
 ```
 
+### Admin Endpoints
+
+Check organization info:
+
+```shell
+curl https://api.openai.com/v1/organizations \
+  -H "Authorization: Bearer $OPENAI_ADMIN_KEY"
+```
+
+Check costs per day:
+
+```shell
+START=$(date -u -j -f "%Y-%m-%d" "$(date -u +%Y-%m-01)" +%s) 
+NOW=$(date -u +%s)
+
+curl "https://api.openai.com/v1/organization/costs?start_time=$START&end_time=$NOW" \
+  -H "Authorization: Bearer $OPENAI_ADMIN_KEY"
+```
+
 ### curl DALL-E
 
 ```shell

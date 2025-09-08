@@ -513,7 +513,7 @@ For Perplexity, you will need something equivelent to the following values:
 ```yaml
 name: perplexity
 api_key: <your perplexity api key>
-model: llama-3.1-sonar-small-128k-online
+model: sonar
 url: https://api.perplexity.ai
 ```
 

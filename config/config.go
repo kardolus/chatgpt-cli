@@ -35,4 +35,5 @@ type Config struct {
 	Effort               string  `yaml:"effort"`
 	Voice                string  `yaml:"voice"`
 	ApifyAPIKey          string  `yaml:"apify_api_key"`
+	UserAgent            string  `yaml:"user_agent"`
 }

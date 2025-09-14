@@ -6,13 +6,14 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/api"
-	"github.com/kardolus/chatgpt-cli/config"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/kardolus/chatgpt-cli/api"
+	"github.com/kardolus/chatgpt-cli/config"
+	"go.uber.org/zap"
 )
 
 const (
@@ -23,6 +24,7 @@ const (
 	errHTTP                  = "http status %d: %s"
 	errHTTPStatus            = "http status: %d"
 	headerContentType        = "Content-Type"
+	headerUserAgent          = "User-Agent"
 )
 
 type Caller interface {
@@ -296,6 +298,7 @@ func (r *RestCaller) newRequest(method, url string, body []byte) (*http.Request,
 		req.Header.Set(r.config.AuthHeader, r.config.AuthTokenPrefix+r.config.APIKey)
 	}
 	req.Header.Set(headerContentType, contentType)
+	req.Header.Set(headerUserAgent, r.config.UserAgent)
 
 	return req, nil
 }

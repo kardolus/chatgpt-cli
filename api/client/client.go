@@ -505,8 +505,8 @@ func (c *Client) EditImage(inputText, inputPath, outputPath string) error {
 	})
 
 	respBytes, err := c.caller.PostWithHeaders(endpoint, buf.Bytes(), map[string]string{
-		c.Config.AuthHeader: fmt.Sprintf("%s %s", c.Config.AuthTokenPrefix, c.Config.APIKey),
-		"Content-Type":      writer.FormDataContentType(),
+		c.Config.AuthHeader:           fmt.Sprintf("%s %s", c.Config.AuthTokenPrefix, c.Config.APIKey),
+		internal.HeaderContentTypeKey: writer.FormDataContentType(),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to edit image: %w", err)
@@ -586,8 +586,8 @@ func (c *Client) Transcribe(audioPath string) (string, error) {
 
 	endpoint := c.getEndpoint(c.Config.TranscriptionsPath)
 	headers := map[string]string{
-		"Content-Type":      writer.FormDataContentType(),
-		c.Config.AuthHeader: fmt.Sprintf("%s %s", c.Config.AuthTokenPrefix, c.Config.APIKey),
+		internal.HeaderContentTypeKey: writer.FormDataContentType(),
+		c.Config.AuthHeader:           fmt.Sprintf("%s %s", c.Config.AuthTokenPrefix, c.Config.APIKey),
 	}
 
 	c.printRequestDebugInfo(endpoint, buf.Bytes(), headers)
@@ -1036,8 +1036,9 @@ func (c *Client) printRequestDebugInfo(endpoint string, body []byte, headers map
 			sugar.Debugf("  --header '%s: %s' \\", k, v)
 		}
 	} else {
-		sugar.Debugf("  --header \"Authorization: Bearer ${%s_API_KEY}\" \\", strings.ToUpper(c.Config.Name))
-		sugar.Debugf("  --header 'Content-Type: application/json' \\")
+		sugar.Debugf("  --header \"%s: %s${%s_API_KEY}\" \\", c.Config.AuthHeader, c.Config.AuthTokenPrefix, strings.ToUpper(c.Config.Name))
+		sugar.Debugf("  --header '%s: %s' \\", internal.HeaderContentTypeKey, internal.HeaderContentTypeValue)
+		sugar.Debugf("  --header '%s: %s' \\", internal.HeaderUserAgentKey, c.Config.UserAgent)
 	}
 
 	if body != nil {
@@ -1103,8 +1104,8 @@ func (c *Client) buildMCPRequest(mcp api.MCPRequest) (string, map[string]string,
 	endpoint := ApifyURL + mcp.Function + ApifyPath
 
 	headers := map[string]string{
-		"Content-Type":  "application/json",
-		"Authorization": fmt.Sprintf("Bearer %s", apiKey),
+		internal.HeaderContentTypeKey:   internal.HeaderContentTypeValue,
+		internal.HeaderAuthorizationKey: fmt.Sprintf("Bearer %s", apiKey),
 	}
 
 	body, err := json.Marshal(params)

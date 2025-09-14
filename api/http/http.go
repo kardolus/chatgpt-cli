@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/kardolus/chatgpt-cli/internal"
 	"io"
 	"net/http"
 	"os"
@@ -17,14 +18,11 @@ import (
 )
 
 const (
-	contentType              = "application/json"
 	errFailedToRead          = "failed to read response: %w"
 	errFailedToCreateRequest = "failed to create request: %w"
 	errFailedToMakeRequest   = "failed to make request: %w"
 	errHTTP                  = "http status %d: %s"
 	errHTTPStatus            = "http status: %d"
-	headerContentType        = "Content-Type"
-	headerUserAgent          = "User-Agent"
 )
 
 type Caller interface {
@@ -297,8 +295,8 @@ func (r *RestCaller) newRequest(method, url string, body []byte) (*http.Request,
 	if r.config.APIKey != "" {
 		req.Header.Set(r.config.AuthHeader, r.config.AuthTokenPrefix+r.config.APIKey)
 	}
-	req.Header.Set(headerContentType, contentType)
-	req.Header.Set(headerUserAgent, r.config.UserAgent)
+	req.Header.Set(internal.HeaderContentTypeKey, internal.HeaderContentTypeValue)
+	req.Header.Set(internal.HeaderUserAgentKey, r.config.UserAgent)
 
 	return req, nil
 }

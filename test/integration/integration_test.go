@@ -541,6 +541,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(output).To(ContainSubstring("/v1/chat/completions"))
 			Expect(output).To(ContainSubstring("--header \"Authorization: Bearer ${OPENAI_API_KEY}\""))
 			Expect(output).To(ContainSubstring("--header 'Content-Type: application/json'"))
+			Expect(output).To(ContainSubstring("--header 'User-Agent: chatgpt-cli'"))
 			Expect(output).To(ContainSubstring("\"model\":\"gpt-4o\""))
 			Expect(output).To(ContainSubstring("\"messages\":"))
 			Expect(output).To(ContainSubstring("Response"))

@@ -4,6 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/kardolus/chatgpt-cli/api/client"
 	"github.com/kardolus/chatgpt-cli/api/http"
 	"github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
@@ -11,10 +16,6 @@ import (
 	"github.com/spf13/pflag"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v3"
-	"io"
-	"os"
-	"strings"
-	"time"
 
 	"github.com/chzyer/readline"
 	"github.com/kardolus/chatgpt-cli/config"
@@ -96,6 +97,7 @@ var configMetadata = []ConfigMetadata{
 	{"name", "set-name", "openai", "The prefix for environment variable overrides"},
 	{"effort", "set-effort", "low", "Set the reasoning effort"},
 	{"voice", "set-voice", "nova", "Set the voice used by tts models"},
+	{"user_agent", "set-user-agent", "chatgpt-cli", "Set the User-Agent in request header"},
 }
 
 func init() {
@@ -943,6 +945,7 @@ func createConfigFromViper() config.Config {
 		Seed:                 viper.GetInt("seed"),
 		Effort:               viper.GetString("effort"),
 		Voice:                viper.GetString("voice"),
+		UserAgent:            viper.GetString("user_agent"),
 	}
 }
 

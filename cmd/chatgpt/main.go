@@ -50,6 +50,7 @@ var (
 	ServiceURL      string
 	shell           string
 	mcpTarget       string
+	modelTarget     string
 	paramsList      []string
 	paramsJSON      string
 	cfg             config.Config
@@ -118,6 +119,9 @@ func main() {
 
 	setCustomHelp(rootCmd)
 	setupFlags(rootCmd)
+
+	// Parse flags early so modelTarget gets filled from `--target`
+	_ = rootCmd.ParseFlags(os.Args[1:])
 
 	sugar := zap.S()
 
@@ -505,7 +509,13 @@ func initConfig(rootCmd *cobra.Command) (config.Config, error) {
 	if err != nil {
 		return config.Config{}, err
 	}
-	viper.SetConfigName("config")
+
+	configName := "config"
+	if modelTarget != "" {
+		configName += "." + modelTarget
+	}
+
+	viper.SetConfigName(configName)
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(configHome)
 
@@ -733,6 +743,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--output", "The output audio file for text-to-speech")
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--debug", "Print debug messages")
+		printFlagWithPadding("--target", "The specific model to target")
 		printFlagWithPadding("--mcp", "Specify the MCP plugin in the form <provider>/<plugin>@<version>")
 		printFlagWithPadding("--param", "Key-value pair as key=value. Can be specified multiple times")
 		printFlagWithPadding("--params", "Provide parameters as a raw JSON string")
@@ -787,6 +798,7 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().StringVar(&threadName, "delete-thread", "", "Delete the specified thread")
 	rootCmd.PersistentFlags().BoolVar(&showHistory, "show-history", false, "Show the human-readable conversation history")
 	rootCmd.PersistentFlags().StringVar(&shell, "set-completions", "", "Generate autocompletion script for your current shell")
+	rootCmd.PersistentFlags().StringVar(&modelTarget, "target", "", "Specify the model to target")
 	rootCmd.PersistentFlags().StringVar(&mcpTarget, "mcp", "", "Specify the MCP plugin in the form <provider>/<plugin>@<version>")
 	rootCmd.PersistentFlags().StringArrayVar(&paramsList, "param", []string{}, "Key-value pair as key=value. Can be specified multiple times")
 	rootCmd.PersistentFlags().StringVar(&paramsJSON, "params", "", "Provide parameters as a raw JSON string")
@@ -845,6 +857,7 @@ func isGeneralFlag(name string) bool {
 		"param":           true,
 		"params":          true,
 		"mcp":             true,
+		"target":          true,
 	}
 
 	return generalFlags[name]

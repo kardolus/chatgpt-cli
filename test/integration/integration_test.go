@@ -564,6 +564,52 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(output).To(Equal("http status 401: Incorrect API key provided\n"))
 		})
 
+		when("loading configuration via --target", func() {
+			var (
+				configDir    string
+				mainConfig   string
+				targetConfig string
+			)
+
+			it.Before(func() {
+				RegisterTestingT(t)
+
+				var err error
+				configDir, err = os.MkdirTemp("", "chatgpt-cli-test")
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(os.Setenv("OPENAI_CONFIG_HOME", configDir)).To(Succeed())
+
+				mainConfig = filepath.Join(configDir, "config.yaml")
+				targetConfig = filepath.Join(configDir, "config.testtarget.yaml")
+
+				Expect(os.WriteFile(mainConfig, []byte("model: gpt-4o\n"), 0644)).To(Succeed())
+				Expect(os.WriteFile(targetConfig, []byte("model: gpt-3.5-turbo-0301\n"), 0644)).To(Succeed())
+			})
+
+			it("should load config.testtarget.yaml when using --target", func() {
+				cmd := exec.Command(binaryPath, "--target", "testtarget", "--config")
+
+				session, err := gexec.Start(cmd, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(0))
+				output := string(session.Out.Contents())
+				Expect(output).To(ContainSubstring("gpt-3.5-turbo-0301"))
+			})
+
+			it("should fall back to config.yaml when --target is not used", func() {
+				cmd := exec.Command(binaryPath, "--config")
+
+				session, err := gexec.Start(cmd, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(session).Should(gexec.Exit(0))
+				output := string(session.Out.Contents())
+				Expect(output).To(ContainSubstring("gpt-4o"))
+			})
+		})
+
 		when("there is a hidden chatgpt-cli folder in the home dir", func() {
 			it.Before(func() {
 				filePath = path.Join(os.Getenv("HOME"), ".chatgpt-cli")

@@ -40,6 +40,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
     - [Custom Config and Data Directory](#custom-config-and-data-directory)
         - [Example for Custom Directories](#example-for-custom-directories)
         - [Variables for interactive mode](#variables-for-interactive-mode)
+    - [Switching Between Configurations with --target](#switching-between-configurations-with---target)
     - [Azure Configuration](#azure-configuration)
     - [Perplexity Configuration](#perplexity-configuration)
     - [302 AI Configuration](#302ai-configuration)
@@ -434,6 +435,71 @@ export OPENAI_DATA_HOME="/custom/data/path"
 
 If these environment variables are not set, the application defaults to ~/.chatgpt-cli for configuration files and ~
 /.chatgpt-cli/history for history.
+
+### Switching Between Configurations with --target
+
+You can maintain multiple configuration files side by side and switch between them using the --target flag. This is
+especially useful if you use multiple LLM providers (like OpenAI, Perplexity, Azure, etc.) or have different contexts or
+workflows that require distinct settings.
+
+How it Works
+
+When you use the --target flag, the CLI loads a config file named:
+
+```shell
+config.<target>.yaml
+```
+
+For example:
+
+```shell
+chatgpt --target perplexity --config
+```
+
+This will load:
+
+```shell
+~/.chatgpt-cli/config/config.perplexity.yaml
+```
+
+If the --target flag is not provided, the CLI falls back to:
+
+```shell
+~/.chatgpt-cli/config/config.yaml
+```
+
+Example Setup
+
+You can maintain the following structure:
+
+```shell
+~/.chatgpt-cli/
+├── config/
+│ ├── config.yaml # Default (e.g., OpenAI)
+│ ├── config.perplexity.yaml # Perplexity setup
+│ ├── config.azure.yaml # Azure-specific config
+│ └── config.llama.yaml # LLaMA setup
+```
+
+Then switch between them like so:
+
+```shell
+chatgpt --target azure --query "Explain Azure's GPT model differences"
+chatgpt --target perplexity "Summarize this article:"
+```
+
+Or just use the default:
+
+```shell
+chatgpt "What's the capital of Sweden?"
+```
+
+CLI and Environment Interaction
+
+* The value of `--target` is never persisted — it must be explicitly passed for each run.
+* The config file corresponding to the target is loaded before any environment variable overrides are applied.
+* Environment variables still follow the name: field inside the loaded config, so name: perplexity enables
+  `PERPLEXITY_API_KEY`.
 
 #### Variables for interactive mode:
 

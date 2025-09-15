@@ -743,7 +743,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--output", "The output audio file for text-to-speech")
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--debug", "Print debug messages")
-		printFlagWithPadding("--target", "The specific model to target")
+		printFlagWithPadding("--target", "Load configuration from config.<target>.yaml")
 		printFlagWithPadding("--mcp", "Specify the MCP plugin in the form <provider>/<plugin>@<version>")
 		printFlagWithPadding("--param", "Key-value pair as key=value. Can be specified multiple times")
 		printFlagWithPadding("--params", "Provide parameters as a raw JSON string")

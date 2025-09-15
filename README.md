@@ -365,6 +365,7 @@ environment variables, a config.yaml file, and default values, in that respectiv
 |--------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
 | `name`                   | The prefix for environment variable overrides.                                                                                                                                                        | 'openai'                  |
 | `thread`                 | The name of the current chat thread. Each unique thread name has its own context.                                                                                                                     | 'default'                 |
+| `target`                 | Load configuration from config._target_.yaml                                                                                                                                                          | ''                        |
 | `omit_history`           | If true, the chat history will not be used to provide context for the GPT model.                                                                                                                      | false                     |
 | `command_prompt`         | The command prompt in interactive mode. Should be single-quoted.                                                                                                                                      | '[%datetime] [Q%counter]' |
 | `output_prompt`          | The output prompt in interactive mode. Should be single-quoted.                                                                                                                                       | ''                        |
@@ -438,13 +439,13 @@ If these environment variables are not set, the application defaults to ~/.chatg
 
 ### Switching Between Configurations with --target
 
-You can maintain multiple configuration files side by side and switch between them using the --target flag. This is
+You can maintain multiple configuration files side by side and switch between them using the `--target` flag. This is
 especially useful if you use multiple LLM providers (like OpenAI, Perplexity, Azure, etc.) or have different contexts or
 workflows that require distinct settings.
 
 How it Works
 
-When you use the --target flag, the CLI loads a config file named:
+When you use the `--target` flag, the CLI loads a config file named:
 
 ```shell
 config.<target>.yaml
@@ -459,13 +460,13 @@ chatgpt --target perplexity --config
 This will load:
 
 ```shell
-~/.chatgpt-cli/config/config.perplexity.yaml
+~/.chatgpt-cli/config.perplexity.yaml
 ```
 
 If the --target flag is not provided, the CLI falls back to:
 
 ```shell
-~/.chatgpt-cli/config/config.yaml
+~/.chatgpt-cli/config.yaml
 ```
 
 Example Setup
@@ -474,18 +475,17 @@ You can maintain the following structure:
 
 ```shell
 ~/.chatgpt-cli/
-├── config/
-│ ├── config.yaml # Default (e.g., OpenAI)
-│ ├── config.perplexity.yaml # Perplexity setup
-│ ├── config.azure.yaml # Azure-specific config
-│ └── config.llama.yaml # LLaMA setup
+├── config.yaml # Default (e.g., OpenAI)
+├── config.perplexity.yaml # Perplexity setup
+├── config.azure.yaml # Azure-specific config
+└── config.llama.yaml # LLaMA setup
 ```
 
 Then switch between them like so:
 
 ```shell
-chatgpt --target azure --query "Explain Azure's GPT model differences"
-chatgpt --target perplexity "Summarize this article:"
+chatgpt --target azure "Explain Azure's GPT model differences"
+chatgpt --target perplexity "What are some good restaurants in the Red Hook area"
 ```
 
 Or just use the default:

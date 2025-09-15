@@ -408,6 +408,7 @@ environment variables, a config.yaml file, and default values, in that respectiv
 | `top_p`                  | An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. | 1.0                            |
 | `transcriptions_path`    | The API endpoint for audio transcription requests.                                                                                                     | '/v1/audio/speech'             |
 | `url`                    | The base URL for the OpenAI API.                                                                                                                       | 'https://api.openai.com'       |
+| `user_agent`             | The header used for the user agent in API requests.                                                                                                    | 'chatgpt-cli'                  |
 | `voice`                  | The voice to use when generating audio with TTS models like gpt-4o-mini-tts.                                                                           | 'nova'                         |
 
 ### Custom Config and Data Directory

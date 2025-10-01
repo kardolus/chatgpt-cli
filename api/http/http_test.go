@@ -2,10 +2,14 @@ package http_test
 
 import (
 	"bytes"
+	stdhttp "net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/kardolus/chatgpt-cli/api/http"
+	chatgpthttp "github.com/kardolus/chatgpt-cli/api/http"
+	"github.com/kardolus/chatgpt-cli/config"
 	. "github.com/onsi/gomega"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
@@ -92,3 +96,141 @@ data: {"type":"response.output_text.delta","item_id":"msg_1","output_index":0,"c
 event: response.completed
 data: {"type":"response.completed","response":{"status":"completed"}}
 `
+
+func TestUnitCustomHeaders(t *testing.T) {
+	spec.Run(t, "Testing Custom Headers", testCustomHeaders, spec.Report(report.Terminal{}))
+}
+
+func testCustomHeaders(t *testing.T, when spec.G, it spec.S) {
+	it.Before(func() {
+		RegisterTestingT(t)
+	})
+
+	when("custom headers are configured", func() {
+		it("attaches custom headers to POST requests", func() {
+			t.Parallel()
+
+			var receivedHeaders stdhttp.Header
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				receivedHeaders = r.Header
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"success": true}`))
+			}))
+			defer server.Close()
+
+			cfg := config.Config{
+				CustomHeaders: map[string]string{
+					"X-Custom-Header":  "custom-value",
+					"X-Another-Header": "another-value",
+				},
+			}
+
+			subject := chatgpthttp.New(cfg)
+			_, err := subject.Post(server.URL, []byte(`{"test": "data"}`), false)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(receivedHeaders.Get("X-Custom-Header")).To(Equal("custom-value"))
+			Expect(receivedHeaders.Get("X-Another-Header")).To(Equal("another-value"))
+		})
+
+		it("attaches custom headers to GET requests", func() {
+			t.Parallel()
+
+			var receivedHeaders stdhttp.Header
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				receivedHeaders = r.Header
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"success": true}`))
+			}))
+			defer server.Close()
+
+			cfg := config.Config{
+				CustomHeaders: map[string]string{
+					"X-API-Version": "v2",
+					"X-Client-ID":   "test-client",
+				},
+			}
+
+			subject := chatgpthttp.New(cfg)
+			_, err := subject.Get(server.URL)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(receivedHeaders.Get("X-API-Version")).To(Equal("v2"))
+			Expect(receivedHeaders.Get("X-Client-ID")).To(Equal("test-client"))
+		})
+
+		it("works with empty custom headers map", func() {
+			t.Parallel()
+
+			var receivedHeaders stdhttp.Header
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				receivedHeaders = r.Header
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"success": true}`))
+			}))
+			defer server.Close()
+
+			cfg := config.Config{
+				CustomHeaders: map[string]string{},
+			}
+
+			subject := chatgpthttp.New(cfg)
+			_, err := subject.Post(server.URL, []byte(`{"test": "data"}`), false)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(receivedHeaders).ToNot(BeNil())
+		})
+
+		it("works with nil custom headers map", func() {
+			t.Parallel()
+
+			var receivedHeaders stdhttp.Header
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				receivedHeaders = r.Header
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"success": true}`))
+			}))
+			defer server.Close()
+
+			cfg := config.Config{
+				CustomHeaders: nil,
+			}
+
+			subject := chatgpthttp.New(cfg)
+			_, err := subject.Post(server.URL, []byte(`{"test": "data"}`), false)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(receivedHeaders).ToNot(BeNil())
+		})
+
+		it("does not override standard headers with custom headers", func() {
+			t.Parallel()
+
+			var receivedHeaders stdhttp.Header
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				receivedHeaders = r.Header
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"success": true}`))
+			}))
+			defer server.Close()
+
+			cfg := config.Config{
+				APIKey:          "test-key",
+				AuthHeader:      "Authorization",
+				AuthTokenPrefix: "Bearer ",
+				UserAgent:       "TestAgent/1.0",
+				CustomHeaders: map[string]string{
+					"X-Custom-Header": "custom-value",
+				},
+			}
+
+			subject := chatgpthttp.New(cfg)
+			_, err := subject.Post(server.URL, []byte(`{"test": "data"}`), false)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(receivedHeaders.Get("Authorization")).To(Equal("Bearer test-key"))
+			Expect(receivedHeaders.Get("User-Agent")).To(Equal("TestAgent/1.0"))
+			Expect(receivedHeaders.Get("X-Custom-Header")).To(Equal("custom-value"))
+		})
+	})
+}

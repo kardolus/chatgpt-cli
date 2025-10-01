@@ -519,7 +519,18 @@ max_tokens: 4096
 ```
 
 This alters the `model` to `gpt-3.5-turbo-16k` and adjusts `max_tokens` to `4096`. All other options, such as `url`
-, `completions_path`, and `models_path`, can similarly be modified. If the user configuration file cannot be accessed or
+, `completions_path`, and `models_path`, can similarly be modified. 
+
+You can also add custom HTTP headers to all API requests. This is useful when working with proxies, API gateways, or services that require additional headers:
+
+```yaml
+custom_headers:
+  X-Custom-Header: "custom-value"
+  X-API-Version: "v2"
+  X-Client-ID: "my-client-id"
+```
+
+If the user configuration file cannot be accessed or
 is missing, the application will resort to the default configuration.
 
 Another way to adjust values without manually editing the configuration file is by using environment variables.

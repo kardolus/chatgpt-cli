@@ -7,16 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/api"
-	"github.com/kardolus/chatgpt-cli/api/http"
-	"github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
-	"github.com/kardolus/chatgpt-cli/config"
-	"github.com/kardolus/chatgpt-cli/internal"
-	"go.uber.org/zap"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"io"
 	"mime/multipart"
+	stdhttp "net/http"
 	"net/textproto"
 	"net/url"
 	"os"
@@ -26,8 +19,16 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/kardolus/chatgpt-cli/api"
+	"github.com/kardolus/chatgpt-cli/api/http"
+	"github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
+	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/history"
-	stdhttp "net/http"
+	"github.com/kardolus/chatgpt-cli/internal"
+
+	"go.uber.org/zap"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 const (
@@ -1039,6 +1040,11 @@ func (c *Client) printRequestDebugInfo(endpoint string, body []byte, headers map
 		sugar.Debugf("  --header \"%s: %s${%s_API_KEY}\" \\", c.Config.AuthHeader, c.Config.AuthTokenPrefix, strings.ToUpper(c.Config.Name))
 		sugar.Debugf("  --header '%s: %s' \\", internal.HeaderContentTypeKey, internal.HeaderContentTypeValue)
 		sugar.Debugf("  --header '%s: %s' \\", internal.HeaderUserAgentKey, c.Config.UserAgent)
+
+		// Include custom headers from config
+		for k, v := range c.Config.CustomHeaders {
+			sugar.Debugf("  --header '%s: %s' \\", k, v)
+		}
 	}
 
 	if body != nil {

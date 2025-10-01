@@ -959,6 +959,7 @@ func createConfigFromViper() config.Config {
 		Effort:               viper.GetString("effort"),
 		Voice:                viper.GetString("voice"),
 		UserAgent:            viper.GetString("user_agent"),
+		CustomHeaders:        viper.GetStringMapString("custom_headers"),
 	}
 }
 

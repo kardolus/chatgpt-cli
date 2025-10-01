@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/internal"
 	"io"
 	"net/http"
 	"os"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/config"
+	"github.com/kardolus/chatgpt-cli/internal"
 	"go.uber.org/zap"
 )
 
@@ -297,6 +297,10 @@ func (r *RestCaller) newRequest(method, url string, body []byte) (*http.Request,
 	}
 	req.Header.Set(internal.HeaderContentTypeKey, internal.HeaderContentTypeValue)
 	req.Header.Set(internal.HeaderUserAgentKey, r.config.UserAgent)
+
+	for key, value := range r.config.CustomHeaders {
+		req.Header.Set(key, value)
+	}
 
 	return req, nil
 }

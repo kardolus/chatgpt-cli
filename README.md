@@ -374,6 +374,7 @@ environment variables, a config.yaml file, and default values, in that respectiv
 | `auto_create_new_thread` | If set to `true`, a new thread with a unique identifier (e.g., `int_a1b2`) will be created for each interactive session. If `false`, the CLI will use the thread specified by the `thread` parameter. | `false`                   |
 | `track_token_usage`      | If set to true, displays the total token usage after each query in --query mode, helping you monitor API usage.                                                                                       | `false`                   |
 | `debug`                  | If set to true, prints the raw request and response data during API calls, useful for debugging.                                                                                                      | `false`                   |
+| `custom_headers`         | Add a map of custom headers to each http request                                                                                                                                                      | {}                        |
 | `skip_tls_verify`        | If set to true, skips TLS certificate verification, allowing insecure HTTPS requests.                                                                                                                 | `false`                   |
 | `multiline`              | If set to true, enables multiline input mode in interactive sessions.                                                                                                                                 | `false`                   |
 | `role_file`              | Path to a file that overrides the system role (role).                                                                                                                                                 | ''                        |
@@ -519,9 +520,10 @@ max_tokens: 4096
 ```
 
 This alters the `model` to `gpt-3.5-turbo-16k` and adjusts `max_tokens` to `4096`. All other options, such as `url`
-, `completions_path`, and `models_path`, can similarly be modified. 
+, `completions_path`, and `models_path`, can similarly be modified.
 
-You can also add custom HTTP headers to all API requests. This is useful when working with proxies, API gateways, or services that require additional headers:
+You can also add custom HTTP headers to all API requests. This is useful when working with proxies, API gateways, or
+services that require additional headers:
 
 ```yaml
 custom_headers:

@@ -390,7 +390,8 @@ environment variables, a config.yaml file, and default values, in that respectiv
 
 | Variable                 | Description                                                                                                                                            | Default                        |
 |--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------|
-| `api_key`                | Your API key.                                                                                                                                          | (none for security)            |
+| `api_key`                | Your API key.                                                                                                                                          | ''                             |
+| `api_key_file`           | Load the API key from a file instead of the environment. Takes precedence over the environment variable.                                               | ''                             |
 | `auth_header`            | The header used for authorization in API requests.                                                                                                     | 'Authorization'                |
 | `auth_token_prefix`      | The prefix to be added before the token in the `auth_header`.                                                                                          | 'Bearer '                      |
 | `completions_path`       | The API endpoint for completions.                                                                                                                      | '/v1/chat/completions'         |

@@ -309,17 +309,54 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(os.RemoveAll(homeDir))
 		})
 
-		it("throws an error when the API key is missing", func() {
-			Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
+		when("resolving the API key", func() {
+			var secretFile string
 
-			command := exec.Command(binaryPath, "some prompt")
-			session, err := gexec.Start(command, io.Discard, io.Discard)
-			Expect(err).NotTo(HaveOccurred())
+			it.Before(func() {
+				secretFile = filepath.Join(homeDir, ".chatgpt-cli", "secret.key")
+				Expect(os.MkdirAll(filepath.Dir(secretFile), 0700)).To(Succeed())
+				Expect(os.WriteFile(secretFile, []byte(expectedToken+"\n"), 0600)).To(Succeed())
+			})
 
-			Eventually(session).Should(gexec.Exit(exitFailure))
+			it.After(func() {
+				Expect(os.RemoveAll(filepath.Dir(secretFile))).To(Succeed())
+				Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
+				Expect(os.Unsetenv("OPENAI_API_KEY_FILE")).To(Succeed())
+			})
 
-			output := string(session.Err.Contents())
-			Expect(output).To(ContainSubstring("API key is required."))
+			it("prefers the API key from environment variable over the file", func() {
+				Expect(os.Setenv(apiKeyEnvVar, "env-api-key")).To(Succeed())
+				Expect(os.Setenv("OPENAI_API_KEY_FILE", secretFile)).To(Succeed())
+
+				cmd := exec.Command(binaryPath, "--config")
+				session, err := gexec.Start(cmd, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+				output := string(session.Out.Contents())
+				Expect(output).To(ContainSubstring("env-api-key"))
+			})
+
+			it("uses the file if env var is not set", func() {
+				Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
+				Expect(os.Setenv("OPENAI_API_KEY_FILE", secretFile)).To(Succeed())
+
+				cmd := exec.Command(binaryPath, "--list-models")
+				session, err := gexec.Start(cmd, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+				Eventually(session).Should(gexec.Exit(exitSuccess))
+			})
+
+			it("errors if neither env var nor file is set", func() {
+				Expect(os.Unsetenv(apiKeyEnvVar)).To(Succeed())
+				Expect(os.Unsetenv("OPENAI_API_KEY_FILE")).To(Succeed())
+
+				cmd := exec.Command(binaryPath, "--list-models")
+				session, err := gexec.Start(cmd, io.Discard, io.Discard)
+				Expect(err).NotTo(HaveOccurred())
+				Eventually(session).Should(gexec.Exit(exitFailure))
+				errOutput := string(session.Err.Contents())
+				Expect(errOutput).To(ContainSubstring("API key is required"))
+			})
 		})
 
 		it("should not require an API key for the --version flag", func() {

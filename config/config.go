@@ -3,6 +3,7 @@ package config
 type Config struct {
 	Name                 string            `yaml:"name"`
 	APIKey               string            `yaml:"api_key"`
+	APIKeyFile           string            `yaml:"api_key_file"`
 	Model                string            `yaml:"model"`
 	MaxTokens            int               `yaml:"max_tokens"`
 	ContextWindow        int               `yaml:"context_window"`

@@ -69,6 +69,7 @@ var configMetadata = []ConfigMetadata{
 	{"context_window", "set-context-window", 8192, "Set a new default context window size"},
 	{"thread", "set-thread", "default", "Set a new active thread by specifying the thread name"},
 	{"api_key", "set-api-key", "", "Set the API key for authentication"},
+	{"api_key_file", "set-api-key-file", "", "Load the API key from a file"},
 	{"apify_api_key", "set-apify-api-key", "", "Configure Apify API key for MCP"},
 	{"role", "set-role", "You are a helpful assistant.", "Set the role of the AI assistant"},
 	{"url", "set-url", "https://api.openai.com", "Set the API base URL"},
@@ -265,8 +266,16 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if viper.GetString("api_key") == "" {
-		return errors.New("API key is required. Please set it using the --set-api-key flag, with the runtime flag --api-key or via environment variables")
+	if cfg.APIKey == "" {
+		if cfg.APIKeyFile == "" {
+			return errors.New("API key is required. Provide it via --set-api-key, --set-api-key-file, env var, or config file")
+		} else {
+			content, err := os.ReadFile(cfg.APIKeyFile)
+			if err != nil {
+				return err
+			}
+			cfg.APIKey = strings.TrimSpace(string(content))
+		}
 	}
 
 	ctx := context.Background()
@@ -926,6 +935,7 @@ func createConfigFromViper() config.Config {
 	return config.Config{
 		Name:                 viper.GetString("name"),
 		APIKey:               viper.GetString("api_key"),
+		APIKeyFile:           viper.GetString("api_key_file"),
 		ApifyAPIKey:          viper.GetString("apify_api_key"),
 		Model:                viper.GetString("model"),
 		MaxTokens:            viper.GetInt("max_tokens"),

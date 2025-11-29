@@ -398,7 +398,12 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if interactiveMode {
-		sugar.Infof("Entering interactive mode. Using thread '%s'. Type 'clear' to clear the screen, 'exit' to quit, or press Ctrl+C.\n\n", hs.GetThread())
+		sugar.Infof(
+			"Entering interactive mode. Using thread '%s'. Multiline mode is %s.\n"+
+				"Commands: 'clear' (clear screen), 'multiline' (toggle multiline input), 'exit' or Ctrl+C (quit).\n\n",
+			hs.GetThread(),
+			boolToOnOff(cfg.Multiline),
+		)
 
 		var readlineCfg *readline.Config
 		if cfg.OmitHistory || cfg.AutoCreateNewThread || newThread {
@@ -441,12 +446,14 @@ func run(cmd *cobra.Command, args []string) error {
 		cmdColor, cmdReset := utils.ColorToAnsi(c.Config.CommandPromptColor)
 		outputColor, outPutReset := utils.ColorToAnsi(c.Config.OutputPromptColor)
 
+		multiline := cfg.Multiline
+
 		qNum, usage := 1, 0
 		for {
 			rl.SetPrompt(commandPrompt(qNum, usage))
 
 			fmt.Print(cmdColor)
-			input, err := readInput(rl, cfg.Multiline)
+			input, err := readInput(rl, &multiline)
 			fmt.Print(cmdReset)
 
 			if err == io.EOF {
@@ -509,6 +516,13 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func boolToOnOff(b bool) string {
+	if b {
+		return "ON"
+	}
+	return "OFF"
+}
+
 func initConfig(rootCmd *cobra.Command) (config.Config, error) {
 	// Set default name for environment variables if no config is loaded yet.
 	viper.SetDefault("name", "openai")
@@ -565,18 +579,18 @@ func readConfigWithComments(configPath string) (*yaml.Node, error) {
 	return &rootNode, nil
 }
 
-func readInput(rl *readline.Instance, multiline bool) (string, error) {
+func readInput(rl *readline.Instance, multiline *bool) (string, error) {
 	var lines []string
 
 	sugar := zap.S()
-	if multiline {
+	if *multiline {
 		sugar.Infoln("Multiline mode enabled. Type 'EOF' on a new line to submit your query.")
 	}
 
 	// Custom keybinding to handle backspace in multiline mode
 	rl.Config.SetListener(func(line []rune, pos int, key rune) ([]rune, int, bool) {
 		// Check if backspace is pressed and if multiline mode is enabled
-		if multiline && key == readline.CharBackspace && pos == 0 && len(lines) > 0 {
+		if *multiline && key == readline.CharBackspace && pos == 0 && len(lines) > 0 {
 			fmt.Print("\033[A") // Move cursor up one line
 
 			// Print the last line without clearing
@@ -602,11 +616,19 @@ func readInput(rl *readline.Instance, multiline bool) (string, error) {
 		case "clear":
 			fmt.Print("\033[H\033[2J") // ANSI escape code to clear the screen
 			continue
+		case "multiline":
+			if *multiline {
+				sugar.Infoln("Multiline mode disabled.")
+			} else {
+				sugar.Infoln("Multiline mode enabled. Type 'EOF' on a new line to submit your query.")
+			}
+			*multiline = !*multiline
+			continue
 		case "exit", "/q":
 			return "", io.EOF
 		}
 
-		if multiline {
+		if *multiline {
 			if line == "EOF" {
 				break
 			}

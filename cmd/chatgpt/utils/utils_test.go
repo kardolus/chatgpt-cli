@@ -3,6 +3,7 @@ package utils_test
 import (
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
+	"github.com/kardolus/chatgpt-cli/config"
 	"testing"
 	"time"
 
@@ -393,6 +394,58 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			Expect(result.Provider).To(Equal(utils.ApifyProvider))
 			Expect(result.Function).To(Equal(function))
 			Expect(result.Version).To(Equal(version))
+		})
+	})
+
+	when("GenerateThreadName()", func() {
+		const (
+			doNotCreateNewThread    = false
+			doNotUseInteractiveMode = false
+			useInteractiveMode      = true
+			createNewThread         = true
+			threadName              = "threadName"
+		)
+		var cfg config.Config
+
+		it.Before(func() {
+			cfg = config.Config{Thread: threadName}
+		})
+
+		it("returns the configured thread name when new-thread and auto-new-thread are disabled (regardless of interactive mode)", func() {
+			result, updateConfig := utils.GenerateThreadName(cfg, doNotUseInteractiveMode, doNotCreateNewThread)
+			Expect(result).To(Equal(threadName))
+			Expect(updateConfig).To(BeFalse())
+
+			result, updateConfig = utils.GenerateThreadName(cfg, useInteractiveMode, doNotCreateNewThread)
+			Expect(result).To(Equal(threadName))
+			Expect(updateConfig).To(BeFalse())
+		})
+
+		it("prioritizes --new-thread over auto-create-new-thread when interactive mode is enabled", func() {
+			result, updateConfig := utils.GenerateThreadName(cfg, useInteractiveMode, createNewThread)
+			Expect(result).To(HavePrefix(utils.CommandPrefix))
+			Expect(updateConfig).To(BeTrue())
+		})
+
+		it("generates an interactive prefix slug when auto-create-new-thread is enabled", func() {
+			cfg.AutoCreateNewThread = createNewThread
+			result, updateConfig := utils.GenerateThreadName(cfg, useInteractiveMode, doNotCreateNewThread)
+			Expect(result).To(HavePrefix(utils.InteractivePrefix))
+			Expect(updateConfig).To(BeFalse())
+		})
+
+		it("does not generate a prefix in interactive mode when auto-create-new-thread is disabled", func() {
+			cfg.AutoCreateNewThread = doNotCreateNewThread
+			result, updateConfig := utils.GenerateThreadName(cfg, useInteractiveMode, doNotCreateNewThread)
+			Expect(result).To(Equal(threadName))
+			Expect(updateConfig).To(BeFalse())
+		})
+
+		it("should return the configured thread when in command mode when auto-create-new-thread is enabled", func() {
+			cfg.AutoCreateNewThread = createNewThread
+			result, updateConfig := utils.GenerateThreadName(cfg, doNotUseInteractiveMode, doNotCreateNewThread)
+			Expect(result).To(Equal(threadName))
+			Expect(updateConfig).To(BeFalse())
 		})
 	})
 

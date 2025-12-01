@@ -29,6 +29,7 @@ type Config struct {
 	OutputPrompt         string            `yaml:"output_prompt"`
 	OutputPromptColor    string            `yaml:"output_prompt_color"`
 	AutoCreateNewThread  bool              `yaml:"auto_create_new_thread"`
+	AutoShellTitle       bool              `yaml:"auto_shell_title"`
 	TrackTokenUsage      bool              `yaml:"track_token_usage"`
 	SkipTLSVerify        bool              `yaml:"skip_tls_verify"`
 	Multiline            bool              `yaml:"multiline"`

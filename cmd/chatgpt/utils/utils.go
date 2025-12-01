@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/api"
+	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/internal"
 	"os"
 	"path/filepath"
@@ -27,6 +28,8 @@ const (
 	InvalidParams          = "params need to be pairs or a JSON object"
 	InvalidApifyFunction   = "apify functions need to be of the form user~actor"
 	InteractiveHistoryFile = "interactive_history.txt"
+	InteractivePrefix      = "int_"
+	CommandPrefix          = "cmd_"
 )
 
 func ColorToAnsi(color string) (string, string) {
@@ -101,6 +104,22 @@ func FormatPrompt(str string, counter, usage int, now time.Time) string {
 	str = strings.ReplaceAll(str, "\\n", "\n")
 
 	return str
+}
+
+func GenerateThreadName(cfg config.Config, interactive, newThread bool) (result string, updateConfig bool) {
+	if !cfg.AutoCreateNewThread && !newThread {
+		return cfg.Thread, false
+	}
+
+	if newThread {
+		return internal.GenerateUniqueSlug(CommandPrefix), true
+	}
+
+	if interactive && cfg.AutoCreateNewThread {
+		return internal.GenerateUniqueSlug(InteractivePrefix), false
+	}
+
+	return cfg.Thread, false
 }
 
 func IsBinary(data []byte) bool {

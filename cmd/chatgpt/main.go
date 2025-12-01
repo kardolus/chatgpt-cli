@@ -92,6 +92,7 @@ var configMetadata = []ConfigMetadata{
 	{"presence_penalty", "set-presence-penalty", 0.0, "Set the presence penalty"},
 	{"omit_history", "set-omit-history", false, "Omit history in the conversation"},
 	{"auto_create_new_thread", "set-auto-create-new-thread", true, "Create a new thread for each interactive session"},
+	{"auto_shell_title", "set-auto-shell-title", false, "Set the title of the shell to the name of the current thread"},
 	{"track_token_usage", "set-track-token-usage", true, "Track token usage"},
 	{"skip_tls_verify", "set-skip-tls-verify", false, "Skip TLS certificate verification"},
 	{"multiline", "set-multiline", false, "Enables multiline mode while in interactive mode"},
@@ -281,20 +282,29 @@ func run(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
 	hs, _ := history.New() // do not error out
+
+	if hs != nil {
+		slug, writeConfig := utils.GenerateThreadName(cfg, interactiveMode, newThread)
+
+		hs.SetThread(slug)
+
+		if writeConfig {
+			if err := saveConfig(map[string]interface{}{"thread": slug}); err != nil {
+				return fmt.Errorf("failed to save new thread to config: %w", err)
+			}
+		}
+
+		if cfg.AutoShellTitle {
+			if err := setShellTitle(slug); err != nil {
+				return err
+			}
+		}
+	}
+
 	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, &client.RealFileReader{}, &client.RealFileWriter{}, cfg, interactiveMode)
 
 	if ServiceURL != "" {
 		c = c.WithServiceURL(ServiceURL)
-	}
-
-	if hs != nil && newThread {
-		slug := internal.GenerateUniqueSlug("cmd_")
-
-		hs.SetThread(slug)
-
-		if err := saveConfig(map[string]interface{}{"thread": slug}); err != nil {
-			return fmt.Errorf("failed to save new thread to config: %w", err)
-		}
 	}
 
 	if cmd.Flag("prompt").Changed {
@@ -642,6 +652,31 @@ func readInput(rl *readline.Instance, multiline *bool) (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
+func isTerminal(f *os.File) bool {
+	stat, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return (stat.Mode() & os.ModeCharDevice) != 0
+}
+
+func setShellTitle(title string) error {
+	f := os.Stdout
+
+	if !isTerminal(f) {
+		// Not a TTY: silently skip
+		return nil
+	}
+
+	// ANSI: ESC ] 0 ; <title> BEL
+	_, err := fmt.Fprintf(f, "\033]0;%s\007", title)
+	if err != nil {
+		return fmt.Errorf("failed to write shell title: %w", err)
+	}
+
+	return nil
+}
+
 func updateConfig(node *yaml.Node, changes map[string]interface{}) error {
 	// If the node is not a document or has no content, create an empty mapping node.
 	if node.Kind != yaml.DocumentNode || len(node.Content) == 0 {
@@ -984,6 +1019,7 @@ func createConfigFromViper() config.Config {
 		OutputPrompt:         viper.GetString("output_prompt"),
 		OutputPromptColor:    viper.GetString("output_prompt_color"),
 		AutoCreateNewThread:  viper.GetBool("auto_create_new_thread"),
+		AutoShellTitle:       viper.GetBool("auto_shell_title"),
 		TrackTokenUsage:      viper.GetBool("track_token_usage"),
 		SkipTLSVerify:        viper.GetBool("skip_tls_verify"),
 		Multiline:            viper.GetBool("multiline"),

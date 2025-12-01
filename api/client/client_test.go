@@ -79,42 +79,6 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		mockCtrl.Finish()
 	})
 
-	when("New()", func() {
-		it("should set a unique thread slug in interactive mode when AutoCreateNewThread is true", func() {
-			var capturedThread string
-			mockHistoryStore.EXPECT().SetThread(gomock.Any()).DoAndReturn(func(thread string) {
-				capturedThread = thread
-			}).Times(1)
-
-			client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, mockWriter, MockConfig(), interactiveMode)
-
-			Expect(capturedThread).To(HavePrefix(client.InteractiveThreadPrefix))
-			Expect(len(capturedThread)).To(Equal(8)) // "int_" (4 chars) + 4 random characters
-		})
-		it("should not overwrite the thread in interactive mode when AutoCreateNewThread is false", func() {
-			var capturedThread string
-			mockHistoryStore.EXPECT().SetThread(gomock.Any()).DoAndReturn(func(thread string) {
-				capturedThread = thread
-			}).Times(1)
-
-			cfg := MockConfig()
-			cfg.AutoCreateNewThread = false
-
-			client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, mockWriter, cfg, interactiveMode)
-
-			Expect(capturedThread).To(Equal(config.Thread))
-		})
-		it("should never overwrite the thread in non-interactive mode", func() {
-			var capturedThread string
-			mockHistoryStore.EXPECT().SetThread(config.Thread).DoAndReturn(func(thread string) {
-				capturedThread = thread
-			}).Times(1)
-
-			client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, mockWriter, MockConfig(), commandLineMode)
-
-			Expect(capturedThread).To(Equal(config.Thread))
-		})
-	})
 	when("Query()", func() {
 		var (
 			body     []byte
@@ -308,8 +272,6 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 				testValidHTTPResponse(subject, body, false)
 			})
 			it("ignores history when configured to do so", func() {
-				mockHistoryStore.EXPECT().SetThread(config.Thread).Times(1)
-
 				config := MockConfig()
 				config.OmitHistory = true
 
@@ -1668,8 +1630,6 @@ func newClientFactory(mhs *MockStore) *clientFactory {
 }
 
 func (f *clientFactory) buildClientWithoutConfig() *client.Client {
-	f.mockHistoryStore.EXPECT().SetThread(config.Thread).Times(1)
-
 	c := client.New(mockCallerFactory, f.mockHistoryStore, mockTimer, mockReader, mockWriter, MockConfig(), commandLineMode)
 
 	return c.WithContextWindow(config.ContextWindow)

@@ -123,12 +123,6 @@ type Client struct {
 func New(callerFactory http.CallerFactory, hs history.Store, t Timer, r FileReader, w FileWriter, cfg config.Config, interactiveMode bool) *Client {
 	caller := callerFactory(cfg)
 
-	if interactiveMode && cfg.AutoCreateNewThread {
-		hs.SetThread(internal.GenerateUniqueSlug(InteractiveThreadPrefix))
-	} else {
-		hs.SetThread(cfg.Thread)
-	}
-
 	return &Client{
 		Config:       cfg,
 		caller:       caller,

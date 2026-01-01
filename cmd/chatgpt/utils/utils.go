@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/internal"
 	"os"
@@ -196,46 +195,24 @@ func ValidateFlags(model string, flags map[string]bool) error {
 	return nil
 }
 
-// ParseMCPPlugin expects input for the apify provider of the form [provider]/[user]~[actor]@[version]
-func ParseMCPPlugin(input string) (api.MCPRequest, error) {
-	var result api.MCPRequest
-
-	fields := strings.Split(input, "/")
-	if len(fields) != 2 || fields[0] == "" || fields[1] == "" {
-		return api.MCPRequest{}, errors.New(InvalidMCPPatter)
-	}
-
-	validProviders := map[string]bool{
-		ApifyProvider: true,
-	}
-
-	if validProviders[strings.ToLower(fields[0])] {
-		result.Provider = fields[0]
-	} else {
-		return api.MCPRequest{}, errors.New(UnsupportedProvider)
-	}
-
-	function := strings.Split(fields[1], "@")
-
-	result.Function = function[0]
-
-	if result.Provider == ApifyProvider {
-		parts := strings.Split(result.Function, "~")
-		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-			return api.MCPRequest{}, errors.New(InvalidApifyFunction)
+func ParseMCPHeaders(in []string) (map[string]string, error) {
+	out := map[string]string{}
+	for _, h := range in {
+		parts := strings.SplitN(h, ":", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid --mcp-header %q (expected 'Key: Value')", h)
 		}
+		k := strings.TrimSpace(parts[0])
+		v := strings.TrimSpace(parts[1])
+		if k == "" {
+			return nil, fmt.Errorf("invalid --mcp-header %q (empty key)", h)
+		}
+		out[k] = v
 	}
-
-	if len(function) == 1 {
-		result.Version = LatestVersion
-	} else if len(function) == 2 {
-		result.Version = function[1]
-	}
-
-	return result, nil
+	return out, nil
 }
 
-func ParseParams(params ...string) (map[string]interface{}, error) {
+func ParseMCPParams(params ...string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 
 	if len(params) == 1 {

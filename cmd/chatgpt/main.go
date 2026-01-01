@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kardolus/chatgpt-cli/api"
 	"io"
 	"os"
 	"strings"
@@ -49,7 +50,9 @@ var (
 	threadName      string
 	ServiceURL      string
 	shell           string
-	mcpTarget       string
+	mcpEndpoint     string
+	mcpTool         string
+	mcpHeaders      []string
 	modelTarget     string
 	paramsList      []string
 	paramsJSON      string
@@ -70,7 +73,6 @@ var configMetadata = []ConfigMetadata{
 	{"thread", "set-thread", "default", "Set a new active thread by specifying the thread name"},
 	{"api_key", "set-api-key", "", "Set the API key for authentication"},
 	{"api_key_file", "set-api-key-file", "", "Load the API key from a file"},
-	{"apify_api_key", "set-apify-api-key", "", "Configure Apify API key for MCP"},
 	{"role", "set-role", "You are a helpful assistant.", "Set the role of the AI assistant"},
 	{"url", "set-url", "https://api.openai.com", "Set the API base URL"},
 	{"completions_path", "set-completions-path", "/v1/chat/completions", "Set the completions API endpoint"},
@@ -301,7 +303,7 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, &client.RealFileReader{}, &client.RealFileWriter{}, cfg, interactiveMode)
+	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, &client.RealFileReader{}, &client.RealFileWriter{}, cfg)
 
 	if ServiceURL != "" {
 		c = c.WithServiceURL(ServiceURL)
@@ -376,33 +378,56 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.Flag("mcp").Changed {
-		mcp, err := utils.ParseMCPPlugin(mcpTarget)
+		if mcpEndpoint == "" {
+			return errors.New("--mcp is required")
+		}
+		if mcpTool == "" {
+			return errors.New("--mcp-tool is required when using --mcp")
+		}
+
+		headers, err := utils.ParseMCPHeaders(mcpHeaders)
 		if err != nil {
 			return err
 		}
+
+		mcp := api.MCPRequest{
+			Endpoint: mcpEndpoint,
+			Headers:  headers,
+			Tool:     mcpTool,
+			Params:   map[string]interface{}{},
+		}
+
 		if cmd.Flag("params").Changed {
-			mcp.Params, err = utils.ParseParams([]string{paramsJSON}...)
+			mcp.Params, err = utils.ParseMCPParams([]string{paramsJSON}...)
 			if err != nil {
 				return err
 			}
 		}
+
 		if cmd.Flag("param").Changed {
-			newParams, err := utils.ParseParams(paramsList...)
+			newParams, err := utils.ParseMCPParams(paramsList...)
 			if err != nil {
 				return err
 			}
-
 			if len(mcp.Params) > 0 {
 				mergeMaps(mcp.Params, newParams)
 			} else {
 				mcp.Params = newParams
 			}
 		}
+
+		transport, err := client.NewMCPTransport(mcp.Endpoint, c.Caller, mcp.Headers)
+		if err != nil {
+			return err
+		}
+		c = c.WithTransport(transport)
+
 		if err := c.InjectMCPContext(mcp); err != nil {
 			return err
 		}
+
 		if len(args) == 0 && !hasPipe && !interactiveMode {
-			sugar.Infof("[MCP: %s] Context injected. No query submitted.", mcp.Function)
+			sugar.Infof("[MCP: %s] Context injected. No query submitted.", mcp.Tool)
 			return nil
 		}
 	}
@@ -564,9 +589,6 @@ func initConfig(rootCmd *cobra.Command) (config.Config, error) {
 	envPrefix := viper.GetString("name")
 	viper.SetEnvPrefix(envPrefix)
 	viper.AutomaticEnv()
-
-	// Bind variables without prefix manually
-	_ = viper.BindEnv("apify_api_key", "APIFY_API_KEY")
 
 	// Now, set up the flags using the fully loaded configuration metadata.
 	for _, meta := range configMetadata {
@@ -810,7 +832,9 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--debug", "Print debug messages")
 		printFlagWithPadding("--target", "Load configuration from config.<target>.yaml")
-		printFlagWithPadding("--mcp", "Specify the MCP plugin in the form <provider>/<plugin>@<version>")
+		printFlagWithPadding("--mcp", "MCP endpoint URL (e.g. http://localhost:3333)")
+		printFlagWithPadding("--mcp-tool", "Tool name to call on the MCP server")
+		printFlagWithPadding("--mcp-header", "HTTP header for MCP call (repeatable, 'Key: Value')")
 		printFlagWithPadding("--param", "Key-value pair as key=value. Can be specified multiple times")
 		printFlagWithPadding("--params", "Provide parameters as a raw JSON string")
 		printFlagWithPadding("--set-completions", "Generate autocompletion script for your current shell")
@@ -865,7 +889,9 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().BoolVar(&showHistory, "show-history", false, "Show the human-readable conversation history")
 	rootCmd.PersistentFlags().StringVar(&shell, "set-completions", "", "Generate autocompletion script for your current shell")
 	rootCmd.PersistentFlags().StringVar(&modelTarget, "target", "", "Specify the model to target")
-	rootCmd.PersistentFlags().StringVar(&mcpTarget, "mcp", "", "Specify the MCP plugin in the form <provider>/<plugin>@<version>")
+	rootCmd.PersistentFlags().StringVar(&mcpEndpoint, "mcp", "", "MCP endpoint URL (e.g. http://localhost:3333)")
+	rootCmd.PersistentFlags().StringVar(&mcpTool, "mcp-tool", "", "MCP tool name to call")
+	rootCmd.PersistentFlags().StringArrayVar(&mcpHeaders, "mcp-header", []string{}, "MCP header in the form 'Key: Value' (repeatable)")
 	rootCmd.PersistentFlags().StringArrayVar(&paramsList, "param", []string{}, "Key-value pair as key=value. Can be specified multiple times")
 	rootCmd.PersistentFlags().StringVar(&paramsJSON, "params", "", "Provide parameters as a raw JSON string")
 }
@@ -923,6 +949,8 @@ func isGeneralFlag(name string) bool {
 		"param":           true,
 		"params":          true,
 		"mcp":             true,
+		"mcp-tool":        true,
+		"mcp-header":      true,
 		"target":          true,
 	}
 
@@ -993,7 +1021,6 @@ func createConfigFromViper() config.Config {
 		Name:                 viper.GetString("name"),
 		APIKey:               viper.GetString("api_key"),
 		APIKeyFile:           viper.GetString("api_key_file"),
-		ApifyAPIKey:          viper.GetString("apify_api_key"),
 		Model:                viper.GetString("model"),
 		MaxTokens:            viper.GetInt("max_tokens"),
 		ContextWindow:        viper.GetInt("context_window"),

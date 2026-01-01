@@ -19,9 +19,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
     - [MCP Support](#mcp-support)
         - [Overview](#overview)
         - [Examples](#examples)
-        - [Default Version Behavior](#default-version-behavior)
-        - [Handling MCP Replies](#handling-mcp-replies)
-        - [Config](#config)
+        - [Headers and Authentication](#headers-and-authentication)
+        - [How MCP Results Are Used](#how-mcp-results-are-used)
 - [Installation](#installation)
     - [Using Homebrew (macOS)](#using-homebrew-macos)
     - [Direct Download](#direct-download)
@@ -133,84 +132,78 @@ Here’s the updated README section for MCP Support, placed after the ### Prompt
 
 ### MCP Support
 
-We’re excited to introduce Model Context Protocol (MCP) support in version 1.8.3+, allowing you to enrich your chat
-sessions with structured, live data. For now, this feature is limited to Apify integrations.
+ChatGPT CLI supports the **Model Context Protocol (MCP)** via **HTTP(S)**. This allows the CLI to call an MCP tool,
+inject the tool’s result into the current thread as context, and then run your normal prompt — all in one command.
+
+This integration is **provider-agnostic**: the CLI does not hardcode Apify (or any other vendor). You provide:
+
+- an MCP endpoint URL (`--mcp`)
+- a tool name (`--mcp-tool`)
+- optional HTTP headers (`--mcp-header`)
+- tool arguments (`--param` or `--params`)
 
 #### Overview
 
-MCP enables the CLI to call external plugins — like Apify actors — and inject their responses into the chat context
-before your actual query is sent. This is useful for fetching weather, scraping Google Maps, or summarizing PDFs.
+When `--mcp` is set, the CLI will:
 
-You can use either `--param` (for individual key=value pairs) or `--params` (for raw JSON).
+1. POST a JSON-RPC `tools/call` request to your MCP server
+2. Extract the tool output
+3. Store it as an **assistant** message in the active thread (prefixed with `[MCP: <tool>]`)
+4. Submit your query to the model (if you provided one)
 
 #### Examples
 
-Using `--param` flags:
+**Apify MCP example (known working):**
+
+```sh
+chatgpt \
+  --mcp "https://mcp.apify.com/?tools=epctex/weather-scraper" \
+  --mcp-tool "epctex-slash-weather-scraper" \
+  --mcp-header "Authorization: Bearer $APIFY_API_KEY" \
+  --mcp-header "mcp-session-id: $MCP_SESSION_ID" \
+  --param locations='["Brooklyn, NY"]' \
+  --param timeFrame=today \
+  --param units=imperial \
+  --param proxyConfiguration='{"useApifyProxy":true}' \
+  --param maxItems=1 \
+  "what should I wear today"
+ ```
+
+Using --params (raw JSON) instead of multiple --param:
 
 ```shell
-chatgpt --mcp apify/epctex~weather-scraper \
-    --param locations='["Brooklyn"]' \
-    --param language=en \
-    --param forecasts=true \
-    "what should I wear today"
+chatgpt \
+  --mcp "https://your-mcp-server.example.com" \
+  --mcp-tool "some-tool-name" \
+  --params '{"locations":["Brooklyn, NY"],"timeFrame":"today"}' \
+  "what should I wear today"
 ```
 
-Using a single `--params` flag:
+#### Headers and Authentication
+
+MCP does not mandate a specific auth mechanism. Some servers use Bearer tokens, others use API keys, cookies, or no
+auth at all. Use --mcp-header to pass whatever your MCP server requires:
 
 ```shell
-chatgpt --mcp apify/epctex~weather-scraper \
-    --params '{"locations": ["Brooklyn"], "language": "en", "forecasts": true}' \
-    "what should I wear today"
+--mcp-header "Authorization: Bearer $TOKEN"
+--mcp-header "X-Api-Key: $API_KEY"
 ```
 
-#### Default Version Behavior
+Some MCP servers also use a session header (for example mcp-session-id). The CLI does not manage sessions yet — you can
+pass session-related headers yourself as shown above.
 
-If no version is specified, `@latest` is assumed:
+#### How MCP Results Are Used
+Tool results are injected into the conversation thread as context before your query runs. The injected message is
+stored as an assistant message and prefixed like this:
 
 ```shell
-chatgpt --mcp apify/user~weather
+[MCP: <tool-name>]
+...
 ```
 
-is equivalent to:
-
+If you run MCP without providing a query, the CLI will inject the context and exit:
 ```shell
-chatgpt --mcp apify/user~weather@latest
-```
-
-#### Handling MCP Replies
-
-Responses from MCP plugins are automatically injected into the conversation thread as context. You can use MCP in two
-different modes:
-
-1. MCP-only mode (Context Injection Only)
-
-    ```shell
-    chatgpt --mcp apify/epctex~weather-scraper --param location=Brooklyn
-    ```
-
-    * Fetches live data
-    * Injects it into the current thread
-    * Does not trigger a GPT completion
-    * CLI prints a confirmation
-
-2. MCP + Query mode (Context + Completion)
-
-    ```shell
-    chatgpt --mcp apify/epctex~weather-scraper --param location=Brooklyn "What should I wear today?"
-    ```
-
-    * Fetches and injects MCP data
-    * Immediately sends your query to GPT
-    * Returns the assistant’s response
-
-#### Config
-
-You’ll need to set the `APIFY_API_KEY` as an environment variable or config value
-
-Example:
-
-```shell
-export APIFY_API_KEY=your-api-key
+chatgpt --mcp "https://your-mcp-server.example.com" --mcp-tool "some-tool-name" --params '{"foo":"bar"}'
 ```
 
 ## Installation

@@ -36,5 +36,62 @@ response:
 For certain actors you can add a version --> `[username]~[actor-name]@[version]`. The keyword `latest` is not valid for 
 the version though. Leaving out the version will default to the latest version. 
 
+## MCP API
+
+Initialize a session
+```shell
+curl -sS -D- \
+  -H "Authorization: Bearer $APIFY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  "https://mcp.apify.com/?tools=epctex/weather-scraper" \
+  --data '{
+    "jsonrpc":"2.0",
+    "id":"init",
+    "method":"initialize",
+    "params":{
+      "protocolVersion":"2024-11-05",
+      "clientInfo":{"name":"curl","version":"0.1"},
+      "capabilities":{}
+    }
+  }'
+```
+
+List tools
+```shell
+curl -sS -D- \
+  -H "Authorization: Bearer $APIFY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "mcp-session-id: $MCP_SESSION_ID" \
+  "https://mcp.apify.com/?tools=epctex/weather-scraper" \
+  --data '{"jsonrpc":"2.0","id":"1","method":"tools/list","params":{}}'
+```
+
+Call a tool
+```shell
+curl -sS -D- \
+  -H "Authorization: Bearer $APIFY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "mcp-session-id: $MCP_SESSION_ID" \
+  "https://mcp.apify.com/?tools=epctex/weather-scraper" \
+  --data '{
+    "jsonrpc":"2.0",
+    "id":"2",
+    "method":"tools/call",
+    "params":{
+      "name":"epctex-slash-weather-scraper",
+      "arguments":{
+        "locations":["Brooklyn, NY"],
+        "timeFrame":"today",
+        "units":"imperial",
+        "proxyConfiguration":{"useApifyProxy":true},
+        "maxItems":1
+      }
+    }
+  }'
+```
+
 ## Links
 * [API Documentation](https://docs.apify.com/api/v2)

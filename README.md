@@ -153,7 +153,7 @@ When `--mcp` is set, the CLI will:
 
 #### Examples
 
-**Apify MCP example (known working):**
+Apify MCP example (known working):
 
 ```sh
 chatgpt \

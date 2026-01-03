@@ -26,3 +26,8 @@ logs/
 *.prof
 coverage.out
 
+# Python virtual environments
+.venv/
+venv/
+env/
+

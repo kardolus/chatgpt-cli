@@ -153,9 +153,20 @@ When `--mcp` is set, the CLI will:
 
 #### Examples
 
-Apify MCP example (known working):
+Local FastMCP echo server (minimal MCP HTTP example):
 
-```sh
+```shell
+chatgpt \
+  --mcp "http://127.0.0.1:8000/mcp" \
+  --mcp-tool echo \
+  --mcp-header "Mcp-Session-Id: $SID" \
+  --param 'payload={"foo":"bar","count":3,"enabled":true}' \
+  "What did the MCP server receive?"
+```
+
+Apify MCP example (production MCP server):
+
+```shell
 chatgpt \
   --mcp "https://mcp.apify.com/?tools=epctex/weather-scraper" \
   --mcp-tool "epctex-slash-weather-scraper" \
@@ -193,6 +204,7 @@ Some MCP servers also use a session header (for example mcp-session-id). The CLI
 pass session-related headers yourself as shown above.
 
 #### How MCP Results Are Used
+
 Tool results are injected into the conversation thread as context before your query runs. The injected message is
 stored as an assistant message and prefixed like this:
 
@@ -202,6 +214,7 @@ stored as an assistant message and prefixed like this:
 ```
 
 If you run MCP without providing a query, the CLI will inject the context and exit:
+
 ```shell
 chatgpt --mcp "https://your-mcp-server.example.com" --mcp-tool "some-tool-name" --params '{"foo":"bar"}'
 ```

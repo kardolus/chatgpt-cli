@@ -46,6 +46,12 @@ Run the server:
 python server.py
 ```
 
+Or alternatively, the SSE server: 
+
+```shell
+python server_sse.py
+```
+
 Grab the session ID (optional)
 
 ```shell

@@ -140,7 +140,7 @@ This integration is **provider-agnostic**: the CLI does not hardcode Apify (or a
 - an MCP endpoint URL (`--mcp`)
 - a tool name (`--mcp-tool`)
 - optional HTTP headers (`--mcp-header`)
-- tool arguments (`--param` or `--params`)
+- tool arguments (`--mcp-param` or `--mcp-params`)
 
 #### Overview
 
@@ -160,7 +160,7 @@ chatgpt \
   --mcp "http://127.0.0.1:8000/mcp" \
   --mcp-tool echo \
   --mcp-header "Mcp-Session-Id: $SID" \
-  --param 'payload={"foo":"bar","count":3,"enabled":true}' \
+  --mcp-param 'payload={"foo":"bar","count":3,"enabled":true}' \
   "What did the MCP server receive?"
 ```
 
@@ -172,21 +172,21 @@ chatgpt \
   --mcp-tool "epctex-slash-weather-scraper" \
   --mcp-header "Authorization: Bearer $APIFY_API_KEY" \
   --mcp-header "mcp-session-id: $MCP_SESSION_ID" \
-  --param locations='["Brooklyn, NY"]' \
-  --param timeFrame=today \
-  --param units=imperial \
-  --param proxyConfiguration='{"useApifyProxy":true}' \
-  --param maxItems=1 \
+  --mcp-param locations='["Brooklyn, NY"]' \
+  --mcp-param timeFrame=today \
+  --mcp-param units=imperial \
+  --mcp-param proxyConfiguration='{"useApifyProxy":true}' \
+  --mcp-param maxItems=1 \
   "what should I wear today"
  ```
 
-Using --params (raw JSON) instead of multiple --param:
+Using --mcp-params (raw JSON) instead of multiple --mcp-param:
 
 ```shell
 chatgpt \
   --mcp "https://your-mcp-server.example.com" \
   --mcp-tool "some-tool-name" \
-  --params '{"locations":["Brooklyn, NY"],"timeFrame":"today"}' \
+  --mcp-params '{"locations":["Brooklyn, NY"],"timeFrame":"today"}' \
   "what should I wear today"
 ```
 
@@ -216,7 +216,7 @@ stored as an assistant message and prefixed like this:
 If you run MCP without providing a query, the CLI will inject the context and exit:
 
 ```shell
-chatgpt --mcp "https://your-mcp-server.example.com" --mcp-tool "some-tool-name" --params '{"foo":"bar"}'
+chatgpt --mcp "https://your-mcp-server.example.com" --mcp-tool "some-tool-name" --mcp-params '{"foo":"bar"}'
 ```
 
 ## Installation

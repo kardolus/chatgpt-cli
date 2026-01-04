@@ -103,7 +103,7 @@ you can invoke it from chatgpt-cli like this:
   --mcp "http://127.0.0.1:8000/mcp" \
   --mcp-tool echo \
   --mcp-header "Mcp-Session-Id: $SID" \
-  --param 'payload={"foo":"bar","count":3,"enabled":true}' \
+  --mcp-param 'payload={"foo":"bar","count":3,"enabled":true}' \
   "What did the MCP server receive?"
 ```
 

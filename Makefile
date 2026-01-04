@@ -1,7 +1,7 @@
 # Default goal when running `make`
 .DEFAULT_GOAL := help
 
-.PHONY: help all-tests binaries commit contract coverage install integration reinstall shipit unit updatedeps
+.PHONY: help all-tests binaries commit contract coverage install integration mcp-http mcp-sse reinstall shipit unit updatedeps
 
 # Help command to list all available targets
 help:  ## Show this help message
@@ -27,6 +27,16 @@ install: ## Build the binaries for the specified OS (default: darwin)
 
 integration: ## Run integration tests
 	./scripts/integration.sh
+
+mcp-http: ## Run local FastMCP HTTP server (JSON response)
+	@pushd test/mcp/http > /dev/null && \
+	  python3 server.py && \
+	  popd > /dev/null
+
+mcp-sse: ## Run local FastMCP SSE server (text/event-stream)
+	@pushd test/mcp/http > /dev/null && \
+	  python3 server_sse.py && \
+	  popd > /dev/null
 
 reinstall: ## Reinstall binaries (default target OS: darwin)
 	./scripts/reinstall.sh $(TARGET_OS)

@@ -397,14 +397,14 @@ func run(cmd *cobra.Command, args []string) error {
 			Params:   map[string]interface{}{},
 		}
 
-		if cmd.Flag("params").Changed {
+		if cmd.Flag("mcp-params").Changed {
 			mcp.Params, err = utils.ParseMCPParams([]string{paramsJSON}...)
 			if err != nil {
 				return err
 			}
 		}
 
-		if cmd.Flag("param").Changed {
+		if cmd.Flag("mcp-param").Changed {
 			newParams, err := utils.ParseMCPParams(paramsList...)
 			if err != nil {
 				return err
@@ -835,8 +835,8 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--mcp", "MCP endpoint URL (e.g. http://localhost:3333)")
 		printFlagWithPadding("--mcp-tool", "Tool name to call on the MCP server")
 		printFlagWithPadding("--mcp-header", "HTTP header for MCP call (repeatable, 'Key: Value')")
-		printFlagWithPadding("--param", "Key-value pair as key=value. Can be specified multiple times")
-		printFlagWithPadding("--params", "Provide parameters as a raw JSON string")
+		printFlagWithPadding("--mcp-param", "Key-value pair as key=value. Can be specified multiple times")
+		printFlagWithPadding("--mcp-params", "Provide parameters as a raw JSON string")
 		printFlagWithPadding("--set-completions", "Generate autocompletion script for your current shell")
 		sugar.Infoln()
 
@@ -892,8 +892,8 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().StringVar(&mcpEndpoint, "mcp", "", "MCP endpoint URL (e.g. http://localhost:3333)")
 	rootCmd.PersistentFlags().StringVar(&mcpTool, "mcp-tool", "", "MCP tool name to call")
 	rootCmd.PersistentFlags().StringArrayVar(&mcpHeaders, "mcp-header", []string{}, "MCP header in the form 'Key: Value' (repeatable)")
-	rootCmd.PersistentFlags().StringArrayVar(&paramsList, "param", []string{}, "Key-value pair as key=value. Can be specified multiple times")
-	rootCmd.PersistentFlags().StringVar(&paramsJSON, "params", "", "Provide parameters as a raw JSON string")
+	rootCmd.PersistentFlags().StringArrayVar(&paramsList, "mcp-param", []string{}, "Key-value pair as key=value. Can be specified multiple times")
+	rootCmd.PersistentFlags().StringVar(&paramsJSON, "mcp-params", "", "Provide parameters as a raw JSON string")
 }
 
 func setupConfigFlags(rootCmd *cobra.Command, meta ConfigMetadata) {
@@ -946,11 +946,11 @@ func isGeneralFlag(name string) bool {
 		"draw":            true,
 		"output":          true,
 		"transcribe":      true,
-		"param":           true,
-		"params":          true,
 		"mcp":             true,
-		"mcp-tool":        true,
 		"mcp-header":      true,
+		"mcp-param":       true,
+		"mcp-params":      true,
+		"mcp-tool":        true,
 		"target":          true,
 	}
 

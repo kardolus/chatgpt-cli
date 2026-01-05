@@ -9,8 +9,10 @@ import (
 const (
 	ConfigHomeEnv     = "OPENAI_CONFIG_HOME"
 	DataHomeEnv       = "OPENAI_DATA_HOME"
+	CacheHomeEnv      = "OPENAI_CACHE_HOME"
 	DefaultConfigDir  = ".chatgpt-cli"
 	DefaultDataDir    = "history"
+	DefaultCacheDir   = "cache"
 	SlugPostfixLength = 4
 )
 
@@ -47,6 +49,23 @@ func GetDataHome() (string, error) {
 	result = filepath.Join(configHome, DefaultDataDir)
 
 	if tmp := os.Getenv(DataHomeEnv); tmp != "" {
+		result = tmp
+	}
+
+	return result, nil
+}
+
+func GetCacheHome() (string, error) {
+	var result string
+
+	configHome, err := GetConfigHome()
+	if err != nil {
+		return "", err
+	}
+
+	result = filepath.Join(configHome, DefaultCacheDir)
+
+	if tmp := os.Getenv(CacheHomeEnv); tmp != "" {
 		result = tmp
 	}
 

@@ -5,14 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"net/url"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/api/http"
 	"github.com/kardolus/chatgpt-cli/history"
 )
+
+/* =========================
+   Client entrypoint
+   ========================= */
 
 func (c *Client) InjectMCPContext(mcp api.MCPRequest) error {
 	if c.Config.OmitHistory {
@@ -34,16 +39,16 @@ func (c *Client) InjectMCPContext(mcp api.MCPRequest) error {
 		c.printRequestDebugInfo(mcp.Endpoint, rawReq, buildMCPHeaders(mcp.Headers))
 	}
 
-	resp, err := c.transport.Call(mcp.Endpoint, req)
+	resp, err := c.transport.Call(mcp.Endpoint, req, mcp.Headers)
 	if err != nil {
 		return err
 	}
 
-	if rawResp, err := json.Marshal(resp); err == nil {
+	if rawResp, err := json.Marshal(resp.Message); err == nil {
 		c.printResponseDebugInfo(rawResp)
 	}
 
-	formatted := formatMCPResponse(resp.Result, mcp.Tool)
+	formatted := formatMCPResponse(resp.Message.Result, mcp.Tool)
 
 	c.initHistory()
 	c.History = append(c.History, history.History{
@@ -58,18 +63,19 @@ func (c *Client) InjectMCPContext(mcp api.MCPRequest) error {
 	return c.historyStore.Write(c.History)
 }
 
+/* =========================
+   MCP message building
+   ========================= */
+
 func (c *Client) buildMCPMessage(mcp api.MCPRequest) (api.MCPMessage, error) {
-	paramsObj := map[string]any{
+	rawParams, err := json.Marshal(map[string]any{
 		"name":      mcp.Tool,
 		"arguments": mcp.Params,
-	}
-
-	rawParams, err := json.Marshal(paramsObj)
+	})
 	if err != nil {
 		return api.MCPMessage{}, fmt.Errorf("failed to marshal mcp params: %w", err)
 	}
 
-	// JSON-RPC MCP request
 	return api.MCPMessage{
 		JSONRPC: "2.0",
 		ID:      uuid.NewString(),
@@ -78,18 +84,258 @@ func (c *Client) buildMCPMessage(mcp api.MCPRequest) (api.MCPMessage, error) {
 	}, nil
 }
 
-// formatMCPResponse is MCP-shape aware and provider-agnostic.
-// Many MCP servers return tool results as:
-//
-//	resp.Result = {"content":[{"type":"text","text":"..."} ...]}
-//
-// We prefer extracting text blocks; if that fails, we fall back to raw JSON.
+/* =========================
+   Transport interfaces
+   ========================= */
+
+type MCPTransport interface {
+	Call(endpoint string, req api.MCPMessage, headers map[string]string) (api.MCPResponse, error)
+}
+
+type SessionStore interface {
+	GetSessionID(endpoint string) (string, error)
+	SetSessionID(endpoint, sessionID string) error
+	DeleteSessionID(endpoint string) error
+}
+
+/* =========================
+   Session transport
+   ========================= */
+
+type SessionTransport struct {
+	inner MCPTransport
+	store SessionStore
+}
+
+func NewSessionTransport(inner MCPTransport, store SessionStore) *SessionTransport {
+	return &SessionTransport{inner: inner, store: store}
+}
+
+func (t *SessionTransport) Call(endpoint string, req api.MCPMessage, headers map[string]string) (api.MCPResponse, error) {
+	// Explicit session header → passthrough
+	if _, ok := headerGet(headers, "mcp-session-id"); ok {
+		return t.inner.Call(endpoint, req, headers)
+	}
+
+	// Try cached session
+	if sid, err := t.store.GetSessionID(endpoint); err == nil && strings.TrimSpace(sid) != "" {
+		h := cloneHeaders(headers)
+		h["Mcp-Session-Id"] = sid
+
+		resp, err := t.inner.Call(endpoint, req, h)
+		if err == nil {
+			t.maybeStoreSession(endpoint, resp)
+			return resp, nil
+		}
+
+		// If the server rejected the session, clear and proceed to init.
+		if looksLikeInvalidSession(err) {
+			_ = t.store.DeleteSessionID(endpoint)
+		} else {
+			return resp, err
+		}
+	}
+
+	// Initialize session
+	sid, err := t.initialize(endpoint, headers)
+	if err != nil {
+		return api.MCPResponse{}, err
+	}
+
+	h := cloneHeaders(headers)
+	h["Mcp-Session-Id"] = sid
+
+	resp, err := t.inner.Call(endpoint, req, h)
+	if err == nil {
+		t.maybeStoreSession(endpoint, resp)
+	}
+	return resp, err
+}
+
+func (t *SessionTransport) initialize(endpoint string, headers map[string]string) (string, error) {
+	raw, err := json.Marshal(map[string]any{
+		"protocolVersion": "2024-11-05",
+		"capabilities":    map[string]any{},
+		"clientInfo": map[string]any{
+			"name":    "chatgpt-cli",
+			"version": "dev",
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := t.inner.Call(endpoint, api.MCPMessage{
+		JSONRPC: "2.0",
+		ID:      uuid.NewString(),
+		Method:  "initialize",
+		Params:  raw,
+	}, headers)
+	if err != nil {
+		return "", err
+	}
+
+	sid, ok := headerGet(resp.Headers, "mcp-session-id")
+	if !ok || strings.TrimSpace(sid) == "" {
+		return "", fmt.Errorf("mcp initialize did not return session id")
+	}
+
+	_ = t.store.SetSessionID(endpoint, sid)
+	return sid, nil
+}
+
+func (t *SessionTransport) maybeStoreSession(endpoint string, resp api.MCPResponse) {
+	if sid, ok := headerGet(resp.Headers, "mcp-session-id"); ok && strings.TrimSpace(sid) != "" {
+		_ = t.store.SetSessionID(endpoint, sid)
+	}
+}
+
+/* =========================
+   HTTP transport
+   ========================= */
+
+type MCPHTTPTransport struct {
+	caller  http.Caller
+	headers map[string]string
+}
+
+func NewMCPTransport(endpoint string, caller http.Caller, headers map[string]string) (*MCPHTTPTransport, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported mcp transport: %s", u.Scheme)
+	}
+	return &MCPHTTPTransport{caller: caller, headers: headers}, nil
+}
+
+func (t *MCPHTTPTransport) Call(endpoint string, req api.MCPMessage, extra map[string]string) (api.MCPResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return api.MCPResponse{}, fmt.Errorf("failed to marshal mcp request: %w", err)
+	}
+
+	merged := map[string]string{}
+	for k, v := range t.headers {
+		merged[k] = v
+	}
+	for k, v := range extra {
+		merged[k] = v
+	}
+
+	httpResp, postErr := t.caller.PostWithHeadersResponse(endpoint, body, buildMCPHeaders(merged))
+
+	out := api.MCPResponse{
+		Headers: httpResp.Headers,
+		Status:  httpResp.Status,
+	}
+
+	// Even on non-2xx, parse body if possible so SessionTransport can reason about it.
+	if len(httpResp.Body) > 0 {
+		var msg api.MCPMessage
+		if err := json.Unmarshal(httpResp.Body, &msg); err == nil {
+			out.Message = msg
+		} else if dataJSON, ok := extractFirstSSEDataJSON(httpResp.Body); ok {
+			if err := json.Unmarshal(dataJSON, &msg); err == nil {
+				out.Message = msg
+			}
+		}
+	}
+
+	// Prefer JSON-RPC error if present.
+	if out.Message.Error != nil {
+		return out, out.Message.Error
+	}
+
+	// Otherwise propagate HTTP-layer error.
+	if postErr != nil {
+		return out, postErr
+	}
+
+	return out, nil
+}
+
+/* =========================
+   Helpers
+   ========================= */
+
+func looksLikeInvalidSession(err error) bool {
+	msg := strings.ToLower(err.Error())
+	if !strings.Contains(msg, "session") {
+		return false
+	}
+
+	return strings.Contains(msg, "missing") ||
+		strings.Contains(msg, "invalid") ||
+		strings.Contains(msg, "no valid") ||
+		strings.Contains(msg, "expired") ||
+		strings.Contains(msg, "unknown")
+}
+
+func cloneHeaders(in map[string]string) map[string]string {
+	out := map[string]string{}
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func headerGet(h map[string]string, key string) (string, bool) {
+	for k, v := range h {
+		if strings.EqualFold(k, key) {
+			return v, true
+		}
+	}
+	return "", false
+}
+
+func headerDelCI(h map[string]string, key string) {
+	for k := range h {
+		if strings.EqualFold(k, key) {
+			delete(h, k)
+		}
+	}
+}
+
+func buildMCPHeaders(in map[string]string) map[string]string {
+	h := cloneHeaders(in)
+
+	if _, ok := headerGet(h, "Content-Type"); !ok {
+		h["Content-Type"] = "application/json"
+	}
+	if _, ok := headerGet(h, "Accept"); !ok {
+		h["Accept"] = "application/json, text/event-stream"
+	}
+
+	// Canonicalize mcp-session-id → Mcp-Session-Id
+	if v, ok := headerGet(h, "mcp-session-id"); ok {
+		headerDelCI(h, "mcp-session-id")
+		h["Mcp-Session-Id"] = v
+	}
+
+	return h
+}
+
+func extractFirstSSEDataJSON(raw []byte) ([]byte, bool) {
+	lines := strings.Split(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n")
+	var data []string
+	for _, l := range lines {
+		if strings.HasPrefix(l, "data:") {
+			data = append(data, strings.TrimSpace(strings.TrimPrefix(l, "data:")))
+		}
+	}
+	if len(data) == 0 {
+		return nil, false
+	}
+	return []byte(strings.Join(data, "\n")), true
+}
+
 func formatMCPResponse(raw json.RawMessage, tool string) string {
 	if len(raw) == 0 {
 		return fmt.Sprintf("[MCP: %s] (empty result)", tool)
 	}
 
-	// Common MCP result shape.
 	type contentBlock struct {
 		Type string `json:"type"`
 		Text string `json:"text,omitempty"`
@@ -111,7 +357,6 @@ func formatMCPResponse(raw json.RawMessage, tool string) string {
 		}
 	}
 
-	// Fallback: pretty print JSON if possible, otherwise raw.
 	return fmt.Sprintf("[MCP: %s]\n%s", tool, prettyJSONOrRaw(raw))
 }
 
@@ -123,8 +368,7 @@ func normalizeMaybeJSON(s string) string {
 
 	var v any
 	if json.Unmarshal([]byte(txt), &v) == nil {
-		b, err := json.MarshalIndent(v, "", "  ")
-		if err == nil {
+		if b, err := json.MarshalIndent(v, "", "  "); err == nil {
 			return string(b)
 		}
 	}
@@ -136,160 +380,8 @@ func prettyJSONOrRaw(raw []byte) string {
 	if err := json.Unmarshal(raw, &v); err != nil {
 		return string(raw)
 	}
-	b, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return string(raw)
+	if b, err := json.MarshalIndent(v, "", "  "); err == nil {
+		return string(bytes.TrimSpace(b))
 	}
-	// Avoid trailing newline surprises; history messages look nicer without it.
-	return string(bytes.TrimSpace(b))
-}
-
-type MCPTransport interface {
-	Call(endpoint string, req api.MCPMessage) (api.MCPMessage, error)
-}
-
-type MCPHTTPTransport struct {
-	caller  http.Caller
-	headers map[string]string
-}
-
-func NewMCPTransport(endpoint string, caller http.Caller, headers map[string]string) (*MCPHTTPTransport, error) {
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	switch u.Scheme {
-	case "http", "https":
-		return &MCPHTTPTransport{caller: caller, headers: headers}, nil
-	default:
-		return nil, fmt.Errorf("unsupported mcp transport: %s", u.Scheme)
-	}
-}
-
-func (t *MCPHTTPTransport) Call(endpoint string, req api.MCPMessage) (api.MCPMessage, error) {
-	body, err := json.Marshal(req)
-	if err != nil {
-		return api.MCPMessage{}, fmt.Errorf("failed to marshal mcp request: %w", err)
-	}
-
-	raw, err := t.caller.PostWithHeaders(endpoint, body, buildMCPHeaders(t.headers))
-	if err != nil {
-		return api.MCPMessage{}, err
-	}
-
-	// 1) Try direct JSON first (some servers may reply application/json)
-	var resp api.MCPMessage
-	if err := json.Unmarshal(raw, &resp); err == nil {
-		if resp.Error != nil {
-			return api.MCPMessage{}, &api.MCPError{Code: resp.Error.Code, Message: resp.Error.Message, Data: resp.Error.Data}
-		}
-		return resp, nil
-	}
-
-	// 2) If that fails, try SSE (text/event-stream). Extract the first "data:" JSON payload.
-	dataJSON, ok := extractFirstSSEDataJSON(raw)
-	if !ok {
-		return api.MCPMessage{}, fmt.Errorf("invalid mcp response: expected JSON or SSE data frame")
-	}
-
-	if err := json.Unmarshal(dataJSON, &resp); err != nil {
-		return api.MCPMessage{}, fmt.Errorf("invalid mcp SSE json: %w", err)
-	}
-
-	if resp.Error != nil {
-		return api.MCPMessage{}, &api.MCPError{Code: resp.Error.Code, Message: resp.Error.Message, Data: resp.Error.Data}
-	}
-
-	return resp, nil
-}
-
-func extractFirstSSEDataJSON(raw []byte) ([]byte, bool) {
-	// Normalize CRLF
-	s := strings.ReplaceAll(string(raw), "\r\n", "\n")
-	lines := strings.Split(s, "\n")
-
-	var dataLines []string
-	inEvent := false
-
-	for _, line := range lines {
-		// blank line terminates an event
-		if strings.TrimSpace(line) == "" {
-			if inEvent && len(dataLines) > 0 {
-				payload := strings.Join(dataLines, "\n")
-				payload = strings.TrimSpace(payload)
-				if payload != "" {
-					return []byte(payload), true
-				}
-			}
-			// reset for next event
-			inEvent = false
-			dataLines = nil
-			continue
-		}
-
-		// once we see *any* field, we’re in an event
-		inEvent = true
-
-		if strings.HasPrefix(line, "data:") {
-			payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-			if payload != "" {
-				dataLines = append(dataLines, payload)
-			}
-		}
-	}
-
-	// Handle case where stream ended without trailing blank line
-	if inEvent && len(dataLines) > 0 {
-		payload := strings.TrimSpace(strings.Join(dataLines, "\n"))
-		if payload != "" {
-			return []byte(payload), true
-		}
-	}
-
-	return nil, false
-}
-
-func buildMCPHeaders(in map[string]string) map[string]string {
-	h := map[string]string{}
-
-	// Copy input headers (do not mutate Caller map)
-	for k, v := range in {
-		h[k] = v
-	}
-
-	// Content-Type default
-	if _, ok := headerGet(h, "Content-Type"); !ok {
-		h["Content-Type"] = "application/json"
-	}
-
-	// MCP Streamable HTTP requires both for POST
-	if _, ok := headerGet(h, "Accept"); !ok {
-		h["Accept"] = "application/json, text/event-stream"
-	}
-
-	// Canonicalize session header spelling (optional)
-	if v, ok := headerGet(h, "mcp-session-id"); ok {
-		headerDel(h, "mcp-session-id")
-		h["Mcp-Session-Id"] = v
-	}
-
-	return h
-}
-
-func headerGet(h map[string]string, key string) (string, bool) {
-	for k, v := range h {
-		if strings.EqualFold(k, key) {
-			return v, true
-		}
-	}
-	return "", false
-}
-
-func headerDel(h map[string]string, key string) {
-	for k := range h {
-		if strings.EqualFold(k, key) {
-			delete(h, k)
-		}
-	}
+	return string(raw)
 }

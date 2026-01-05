@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/api"
+	"github.com/kardolus/chatgpt-cli/cache"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -416,10 +418,23 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		transport, err := client.NewMCPTransport(mcp.Endpoint, c.Caller, mcp.Headers)
+		base, err := client.NewMCPTransport(mcp.Endpoint, c.Caller, mcp.Headers)
 		if err != nil {
 			return err
 		}
+
+		cacheHome, err := internal.GetCacheHome()
+		if err != nil {
+			return err
+		}
+
+		sessionsDir := filepath.Join(cacheHome, "mcp", "sessions")
+
+		store := cache.NewFileStore(sessionsDir)
+		sessionStore := cache.New(store)
+
+		transport := client.NewSessionTransport(base, sessionStore)
+
 		c = c.WithTransport(transport)
 
 		if err := c.InjectMCPContext(mcp); err != nil {

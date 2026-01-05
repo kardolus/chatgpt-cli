@@ -159,7 +159,6 @@ Local FastMCP echo server (minimal MCP HTTP example):
 chatgpt \
   --mcp "http://127.0.0.1:8000/mcp" \
   --mcp-tool echo \
-  --mcp-header "Mcp-Session-Id: $SID" \
   --mcp-param 'payload={"foo":"bar","count":3,"enabled":true}' \
   "What did the MCP server receive?"
 ```
@@ -171,7 +170,6 @@ chatgpt \
   --mcp "https://mcp.apify.com/?tools=epctex/weather-scraper" \
   --mcp-tool "epctex-slash-weather-scraper" \
   --mcp-header "Authorization: Bearer $APIFY_API_KEY" \
-  --mcp-header "mcp-session-id: $MCP_SESSION_ID" \
   --mcp-param locations='["Brooklyn, NY"]' \
   --mcp-param timeFrame=today \
   --mcp-param units=imperial \
@@ -422,17 +420,17 @@ environment variables, a config.yaml file, and default values, in that respectiv
 | `user_agent`             | The header used for the user agent in API requests.                                                                                                    | 'chatgpt-cli'                  |
 | `voice`                  | The voice to use when generating audio with TTS models like gpt-4o-mini-tts.                                                                           | 'nova'                         |
 
-### Custom Config and Data Directory
+### Custom Config, Cache and Data Directory
 
 By default, ChatGPT CLI stores configuration and history files in the `~/.chatgpt-cli` directory. However, you can
-easily
-override these locations by setting environment variables, allowing you to store configuration and history in custom
-directories.
+easily override these locations by setting environment variables, allowing you to store configuration and history in
+custom directories.
 
 | Environment Variable | Description                                  | Default Location         |
 |----------------------|----------------------------------------------|--------------------------|
 | `OPENAI_CONFIG_HOME` | Overrides the default config directory path. | `~/.chatgpt-cli`         |
 | `OPENAI_DATA_HOME`   | Overrides the default data directory path.   | `~/.chatgpt-cli/history` |
+| `OPENAI_CACHE_HOME`  | Overrides the default cache directory path.  | `~/.chatgpt-cli/cache`   |
 
 #### Example for Custom Directories
 
@@ -441,6 +439,7 @@ To change the default configuration or data directories, set the appropriate env
 ```
 export OPENAI_CONFIG_HOME="/custom/config/path"
 export OPENAI_DATA_HOME="/custom/data/path"
+export OPENAI_CACHE_HOME="/custom/cache/path"
 ```
 
 If these environment variables are not set, the application defaults to ~/.chatgpt-cli for configuration files and ~

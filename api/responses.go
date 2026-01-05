@@ -1,5 +1,11 @@
 package api
 
+type HTTPResponse struct {
+	Status  int
+	Headers map[string]string
+	Body    []byte
+}
+
 type ResponsesRequest struct {
 	Model           string    `json:"model"`
 	Input           []Message `json:"input"`

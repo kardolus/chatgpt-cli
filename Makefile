@@ -46,8 +46,8 @@ reinstall: ## Reinstall binaries (default target OS: darwin)
 shipit: ## Run the release script, create binaries, and generate release notes
 	./scripts/shipit.sh $(version) "$(message)"
 
-unit: ## Run unit tests
-	./scripts/unit.sh
+unit: ## Run unit tests (optionally pass ARGS=...)
+	./scripts/unit.sh $(ARGS)
 
 updatedeps: ## Update dependencies and vendor them
 	./scripts/updatedeps.sh

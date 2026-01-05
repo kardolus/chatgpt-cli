@@ -8,6 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	api "github.com/kardolus/chatgpt-cli/api"
 )
 
 // MockCaller is a mock of Caller interface.
@@ -76,4 +77,19 @@ func (m *MockCaller) PostWithHeaders(arg0 string, arg1 []byte, arg2 map[string]s
 func (mr *MockCallerMockRecorder) PostWithHeaders(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostWithHeaders", reflect.TypeOf((*MockCaller)(nil).PostWithHeaders), arg0, arg1, arg2)
+}
+
+// PostWithHeadersResponse mocks base method.
+func (m *MockCaller) PostWithHeadersResponse(arg0 string, arg1 []byte, arg2 map[string]string) (api.HTTPResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PostWithHeadersResponse", arg0, arg1, arg2)
+	ret0, _ := ret[0].(api.HTTPResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostWithHeadersResponse indicates an expected call of PostWithHeadersResponse.
+func (mr *MockCallerMockRecorder) PostWithHeadersResponse(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostWithHeadersResponse", reflect.TypeOf((*MockCaller)(nil).PostWithHeadersResponse), arg0, arg1, arg2)
 }

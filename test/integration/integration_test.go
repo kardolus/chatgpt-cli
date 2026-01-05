@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/kardolus/chatgpt-cli/api"
+	"github.com/kardolus/chatgpt-cli/cache"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/history"
 	"github.com/kardolus/chatgpt-cli/internal"
@@ -109,6 +110,72 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			readEntries, err := fileIO.Read()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(readEntries).To(Equal(historyEntries))
+		})
+	})
+
+	when("Read, Write and Delete Cache", func() {
+		var (
+			tmpDir   string
+			storeDir string
+			err      error
+		)
+
+		const endpoint = "http://127.0.0.1:8000/mcp"
+
+		it.Before(func() {
+			tmpDir, err = os.MkdirTemp("", "chatgpt-cli-cache-test")
+			Expect(err).NotTo(HaveOccurred())
+
+			// Simulate what will likely become ~/.chatgpt-cli/cache/mcp/sessions
+			storeDir = filepath.Join(tmpDir, "cache", "mcp", "sessions")
+		})
+
+		it.After(func() {
+			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		})
+
+		it("writes, reads, and deletes a session id", func() {
+			fs := cache.NewFileStore(storeDir)
+			c := cache.New(fs)
+
+			Expect(c.SetSessionID(endpoint, "sid-1")).To(Succeed())
+
+			got, err := c.GetSessionID(endpoint)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(got).To(Equal("sid-1"))
+
+			Expect(c.DeleteSessionID(endpoint)).To(Succeed())
+
+			// After delete, Get should error (os.ErrNotExist bubbling up)
+			_, err = c.GetSessionID(endpoint)
+			Expect(err).To(HaveOccurred())
+		})
+
+		it("persists across cache instances (simulates separate CLI invocations)", func() {
+			fs1 := cache.NewFileStore(storeDir)
+			c1 := cache.New(fs1)
+
+			Expect(c1.SetSessionID(endpoint, "sid-abc")).To(Succeed())
+
+			// New instances, same underlying directory
+			fs2 := cache.NewFileStore(storeDir)
+			c2 := cache.New(fs2)
+
+			got, err := c2.GetSessionID(endpoint)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(got).To(Equal("sid-abc"))
+		})
+
+		it("overwrites an existing session id (rotation)", func() {
+			fs := cache.NewFileStore(storeDir)
+			c := cache.New(fs)
+
+			Expect(c.SetSessionID(endpoint, "sid-old")).To(Succeed())
+			Expect(c.SetSessionID(endpoint, "sid-new")).To(Succeed())
+
+			got, err := c.GetSessionID(endpoint)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(got).To(Equal("sid-new"))
 		})
 	})
 

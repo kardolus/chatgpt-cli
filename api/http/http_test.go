@@ -2,6 +2,7 @@ package http_test
 
 import (
 	"bytes"
+	"io"
 	stdhttp "net/http"
 	"net/http/httptest"
 	"strings"
@@ -55,6 +56,145 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 			subject.ProcessResponse(strings.NewReader(input), &buf, "/v1/chat/completions")
 			output := buf.String()
 			Expect(output).To(Equal(expectedOutput))
+		})
+	})
+
+	when("Get()", func() {
+		it("returns the response body on success", func() {
+			t.Parallel()
+
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				Expect(r.Method).To(Equal(stdhttp.MethodGet))
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			defer server.Close()
+
+			subject := chatgpthttp.New(config.Config{})
+
+			body, err := subject.Get(server.URL)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(body)).To(Equal(`{"ok":true}`))
+		})
+	})
+
+	when("Post()", func() {
+		it("POSTs the body and returns the response body on success", func() {
+			t.Parallel()
+
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				Expect(r.Method).To(Equal(stdhttp.MethodPost))
+
+				b, err := io.ReadAll(r.Body)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(b)).To(Equal(`{"hello":"world"}`))
+
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			defer server.Close()
+
+			subject := chatgpthttp.New(config.Config{})
+
+			out, err := subject.Post(server.URL, []byte(`{"hello":"world"}`), false)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(out)).To(Equal(`{"ok":true}`))
+		})
+	})
+
+	when("PostWithHeaders()", func() {
+		it("attaches headers and returns the response body on success", func() {
+			t.Parallel()
+
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				Expect(r.Method).To(Equal(stdhttp.MethodPost))
+				Expect(r.Header.Get("X-Test")).To(Equal("abc"))
+
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			defer server.Close()
+
+			subject := chatgpthttp.New(config.Config{})
+
+			out, err := subject.PostWithHeaders(server.URL, []byte(`{}`), map[string]string{
+				"X-Test": "abc",
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(out)).To(Equal(`{"ok":true}`))
+		})
+
+		it("returns body + error on non-2xx with OpenAI-style error json", func() {
+			t.Parallel()
+
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				w.WriteHeader(stdhttp.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":{"message":"nope"}}`))
+			}))
+			defer server.Close()
+
+			subject := chatgpthttp.New(config.Config{})
+
+			out, err := subject.PostWithHeaders(server.URL, []byte(`{}`), nil)
+			Expect(err).To(HaveOccurred())
+			Expect(string(out)).To(ContainSubstring(`"nope"`))
+		})
+	})
+
+	when("PostWithHeadersResponse()", func() {
+		it("returns status, headers, and body on success", func() {
+			t.Parallel()
+
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				Expect(r.Method).To(Equal(stdhttp.MethodPost))
+				Expect(r.Header.Get("X-Test")).To(Equal("abc"))
+
+				w.Header().Set("mcp-session-id", "sid-123")
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			defer server.Close()
+
+			rc := http.RestCaller{} // ✅ no NewRestCaller
+
+			resp, err := rc.PostWithHeadersResponse(server.URL, []byte(`{"hello":"world"}`), map[string]string{
+				"X-Test": "abc",
+			})
+
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(resp.Status).To(Equal(stdhttp.StatusOK))
+			Expect(resp.Headers).NotTo(BeNil())
+			Expect(string(resp.Body)).To(Equal(`{"ok":true}`))
+
+			v, ok := headerGetCI(resp.Headers, "mcp-session-id")
+			Expect(ok).To(BeTrue())
+			Expect(v).To(Equal("sid-123"))
+		})
+
+		it("returns response + error on non-2xx with OpenAI-style error json", func() {
+			t.Parallel()
+
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				w.Header().Set("mcp-session-id", "sid-rotated")
+				w.WriteHeader(stdhttp.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":{"message":"nope"}}`))
+			}))
+			defer server.Close()
+
+			rc := http.RestCaller{}
+
+			resp, err := rc.PostWithHeadersResponse(server.URL, []byte(`{}`), nil)
+
+			Expect(err).To(HaveOccurred())
+
+			Expect(resp.Status).To(Equal(stdhttp.StatusUnauthorized))
+			Expect(resp.Headers).NotTo(BeNil())
+			Expect(resp.Body).NotTo(BeEmpty())
+
+			v, ok := headerGetCI(resp.Headers, "mcp-session-id")
+			Expect(ok).To(BeTrue())
+			Expect(v).To(Equal("sid-rotated"))
 		})
 	})
 }
@@ -233,4 +373,13 @@ func testCustomHeaders(t *testing.T, when spec.G, it spec.S) {
 			Expect(receivedHeaders.Get("X-Custom-Header")).To(Equal("custom-value"))
 		})
 	})
+}
+
+func headerGetCI(h map[string]string, key string) (string, bool) {
+	for k, v := range h {
+		if strings.EqualFold(k, key) {
+			return v, true
+		}
+	}
+	return "", false
 }

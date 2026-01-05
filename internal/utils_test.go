@@ -18,6 +18,7 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 		RegisterTestingT(t)
 		Expect(os.Unsetenv(internal.ConfigHomeEnv)).To(Succeed())
 		Expect(os.Unsetenv(internal.DataHomeEnv)).To(Succeed())
+		Expect(os.Unsetenv(internal.CacheHomeEnv)).To(Succeed())
 	})
 
 	when("GetConfigHome()", func() {
@@ -55,6 +56,25 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(dataHome).To(Equal(customDataHome))
+		})
+	})
+
+	when("GetCacheHome()", func() {
+		it("Uses the default value if OPENAI_CACHE_HOME is not set", func() {
+			cacheHome, err := internal.GetCacheHome()
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cacheHome).To(ContainSubstring(".chatgpt-cli/cache")) // Assuming default location is ~/.local/share/chatgpt-cli
+		})
+
+		it("Overwrites the default when OPENAI_CACHE_HOME is set", func() {
+			cacheDataHome := "/custom/cache/path"
+			Expect(os.Setenv("OPENAI_CACHE_HOME", cacheDataHome)).To(Succeed())
+
+			cacheHome, err := internal.GetCacheHome()
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cacheHome).To(Equal(cacheDataHome))
 		})
 	})
 

@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type MCPError struct {
@@ -67,6 +68,21 @@ type MCPMessage struct {
 	// JSON-RPC response fields
 	Result json.RawMessage `json:"result,omitempty"`
 	Error  *MCPError       `json:"error,omitempty"`
+}
+
+type MCPResponse struct {
+	Message MCPMessage        `json:"-"`
+	Headers map[string]string `json:"-"`
+	Status  int               `json:"-"`
+}
+
+func (r MCPResponse) Header(key string) (string, bool) {
+	for k, v := range r.Headers {
+		if strings.EqualFold(k, key) {
+			return v, true
+		}
+	}
+	return "", false
 }
 
 type MCPRequest struct {

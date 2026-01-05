@@ -29,6 +29,7 @@ type Caller interface {
 	Post(url string, body []byte, stream bool) ([]byte, error)
 	PostWithHeaders(url string, body []byte, headers map[string]string) ([]byte, error)
 	Get(url string) ([]byte, error)
+	PostWithHeadersResponse(url string, body []byte, headers map[string]string) (api.HTTPResponse, error)
 }
 
 type RestCaller struct {
@@ -104,6 +105,64 @@ func (r *RestCaller) PostWithHeaders(url string, body []byte, headers map[string
 	}
 
 	return io.ReadAll(resp.Body)
+}
+
+func (r *RestCaller) PostWithHeadersResponse(url string, body []byte, headers map[string]string) (api.HTTPResponse, error) {
+	// tests construct RestCaller{} (nil client) — avoid panic
+	if r.client == nil {
+		r.client = http.DefaultClient
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
+	if err != nil {
+		return api.HTTPResponse{}, fmt.Errorf(errFailedToCreateRequest, err)
+	}
+
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return api.HTTPResponse{}, fmt.Errorf(errFailedToMakeRequest, err)
+	}
+	defer resp.Body.Close()
+
+	respBody, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return api.HTTPResponse{}, readErr
+	}
+
+	outHeaders := map[string]string{}
+	for k, vals := range resp.Header {
+		if len(vals) == 0 {
+			continue
+		}
+		outHeaders[k] = strings.Join(vals, ", ")
+	}
+
+	out := api.HTTPResponse{
+		Status:  resp.StatusCode,
+		Headers: outHeaders,
+		Body:    respBody,
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// Try OpenAI error shape first
+		var errorData api.ErrorResponse
+		if err := json.Unmarshal(respBody, &errorData); err == nil && errorData.Error.Message != "" {
+			return out, fmt.Errorf(errHTTP, resp.StatusCode, errorData.Error.Message)
+		}
+
+		// Otherwise include raw body so you can debug MCP server errors
+		msg := strings.TrimSpace(string(respBody))
+		if msg == "" {
+			return out, fmt.Errorf(errHTTPStatus, resp.StatusCode)
+		}
+		return out, fmt.Errorf("http status %d: %s", resp.StatusCode, msg)
+	}
+
+	return out, nil
 }
 
 func (r *RestCaller) ProcessResponse(reader io.Reader, writer io.Writer, endpoint string) []byte {
@@ -248,6 +307,7 @@ func (r *RestCaller) processResponsesSSE(reader io.Reader, writer io.Writer) []b
 	}
 	return result
 }
+
 func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]byte, error) {
 	req, err := r.newRequest(method, url, body)
 	if err != nil {

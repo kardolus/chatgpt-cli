@@ -20,6 +20,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
         - [Overview](#overview)
         - [Examples](#examples)
         - [Headers and Authentication](#headers-and-authentication)
+        - [MCP Session Management](#mcp-session-management)
         - [How MCP Results Are Used](#how-mcp-results-are-used)
 - [Installation](#installation)
     - [Using Homebrew (macOS)](#using-homebrew-macos)
@@ -69,6 +70,10 @@ Azure, featuring streaming capabilities and extensive configuration options.
 * **Custom context from any source**: You can provide the GPT model with a custom context during conversation. This
   context can be piped in from any source, such as local files, standard input, or even another program. This
   flexibility allows the model to adapt to a wide range of conversational scenarios.
+* **MCP (Model Context Protocol) support**: Call external MCP tools via HTTP(S), inject their results into the
+  conversation context, and continue the prompt seamlessly.
+    * **MCP session management**: Built-in support for stateful MCP servers. The CLI automatically initializes
+      sessions, attaches session identifiers, and renews them when they become invalid.
 * **Support for images**: Upload an image or provide an image URL using the `--image` flag. Note that image support may
   not be available for all models. You can also pipe an image directly: `pngpaste - | chatgpt "What is this photo?"`
 * **Generate images**: Use the `--draw` and `--output` flags to generate an image from a prompt (requires image-capable
@@ -132,30 +137,32 @@ Here’s the updated README section for MCP Support, placed after the ### Prompt
 
 ### MCP Support
 
-ChatGPT CLI supports the **Model Context Protocol (MCP)** via **HTTP(S)**. This allows the CLI to call an MCP tool,
-inject the tool’s result into the current thread as context, and then run your normal prompt — all in one command.
+ChatGPT CLI supports the Model Context Protocol (MCP) over HTTP(S). This allows the CLI to call an MCP tool, inject the
+tool’s result into the current thread as context, and then run your prompt — all in one command. The integration is
+provider-agnostic.
 
-This integration is **provider-agnostic**: the CLI does not hardcode Apify (or any other vendor). You provide:
+You provide:
 
-- an MCP endpoint URL (`--mcp`)
-- a tool name (`--mcp-tool`)
-- optional HTTP headers (`--mcp-header`)
-- tool arguments (`--mcp-param` or `--mcp-params`)
+- MCP endpoint URL (`--mcp`)
+- Tool name (`--mcp-tool`)
+- Optional HTTP headers (`--mcp-header`)
+- Tool arguments (`--mcp-param` or `--mcp-params`)
 
 #### Overview
 
 When `--mcp` is set, the CLI will:
 
 1. POST a JSON-RPC `tools/call` request to your MCP server
-2. Extract the tool output
-3. Store it as an **assistant** message in the active thread (prefixed with `[MCP: <tool>]`)
-4. Submit your query to the model (if you provided one)
+2. Automatically initialize and manage an MCP session if required
+3. Extract the tool output
+4. Store it as an assistant message in the active thread (prefixed with `[MCP: <tool>]`)
+5. Submit your query to the model (if you provided one)
 
 #### Examples
 
 Local FastMCP echo server (minimal MCP HTTP example):
 
-```shell
+```bash
 chatgpt \
   --mcp "http://127.0.0.1:8000/mcp" \
   --mcp-tool echo \
@@ -176,9 +183,9 @@ chatgpt \
   --mcp-param proxyConfiguration='{"useApifyProxy":true}' \
   --mcp-param maxItems=1 \
   "what should I wear today"
- ```
+```
 
-Using --mcp-params (raw JSON) instead of multiple --mcp-param:
+Using `--mcp-params` (raw JSON) instead of multiple `--mcp-param` flags:
 
 ```shell
 chatgpt \
@@ -190,31 +197,43 @@ chatgpt \
 
 #### Headers and Authentication
 
-MCP does not mandate a specific auth mechanism. Some servers use Bearer tokens, others use API keys, cookies, or no
-auth at all. Use --mcp-header to pass whatever your MCP server requires:
+MCP does not mandate a specific authentication mechanism. Some servers use Bearer tokens, others use API keys, cookies,
+or no auth at all. Use `--mcp-header` to pass whatever your MCP server requires:
 
 ```shell
 --mcp-header "Authorization: Bearer $TOKEN"
 --mcp-header "X-Api-Key: $API_KEY"
 ```
 
-Some MCP servers also use a session header (for example mcp-session-id). The CLI does not manage sessions yet — you can
-pass session-related headers yourself as shown above.
+#### MCP Session Management
+
+Some MCP servers require a session identifier (commonly `mcp-session-id`) to be established before tool calls are
+accepted. The ChatGPT CLI automatically manages MCP sessions for HTTP(S) servers that require them:
+
+- Initializes a session when needed
+- Caches the session identifier per endpoint
+- Attaches it to subsequent requests
+- Automatically re-initializes the session if the server invalidates it
+
+You can explicitly pass a session header yourself using `--mcp-header`. If you do, the CLI will respect it and skip
+automatic session handling.
 
 #### How MCP Results Are Used
 
-Tool results are injected into the conversation thread as context before your query runs. The injected message is
-stored as an assistant message and prefixed like this:
+Tool results are injected into the conversation thread as context before your query runs. The injected message is stored
+as an assistant message and prefixed like this:
 
-```shell
-[MCP: <tool-name>]
-...
+```text
+[MCP: <tool-name>] ...
 ```
 
 If you run MCP without providing a query, the CLI will inject the context and exit:
 
 ```shell
-chatgpt --mcp "https://your-mcp-server.example.com" --mcp-tool "some-tool-name" --mcp-params '{"foo":"bar"}'
+chatgpt \
+  --mcp "https://your-mcp-server.example.com" \
+  --mcp-tool "some-tool-name" \
+  --mcp-params '{"foo":"bar"}'
 ```
 
 ## Installation

@@ -318,13 +318,13 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			Expect(utils.ValidateFlags(defaultModel+utils.O1ProPattern, flags)).To(Succeed())
 			Expect(utils.ValidateFlags(defaultModel+utils.GPT5Pattern, flags)).To(Succeed())
 		})
-		it("should return an error when the --param flag is used without --mcp", func() {
-			flags["param"] = true
+		it("should return an error when the --mcp-param flag is used without --mcp", func() {
+			flags["mcp-param"] = true
 			err := utils.ValidateFlags(defaultModel, flags)
 			Expect(err).To(HaveOccurred())
 		})
-		it("should return an error when the --params flag is used without --mcp", func() {
-			flags["params"] = true
+		it("should return an error when the --mcp-params flag is used without --mcp", func() {
+			flags["mcp-params"] = true
 			err := utils.ValidateFlags(defaultModel, flags)
 			Expect(err).To(HaveOccurred())
 		})

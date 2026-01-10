@@ -162,11 +162,11 @@ func ValidateFlags(model string, flags map[string]bool) error {
 	if !flags["speak"] && !flags["draw"] && flags["output"] {
 		return errors.New("the --output flag cannot be used without the --speak or --draw flag")
 	}
-	if !flags["mcp"] && flags["param"] {
-		return errors.New("the --param flag cannot be used without the --mcp flag")
+	if !flags["mcp"] && flags["mcp-param"] {
+		return errors.New("the --mcp-param flag cannot be used without the --mcp flag")
 	}
-	if !flags["mcp"] && flags["params"] {
-		return errors.New("the --params flag cannot be used without the --mcp flag")
+	if !flags["mcp"] && flags["mcp-params"] {
+		return errors.New("the --mcp-params flag cannot be used without the --mcp flag")
 	}
 	if flags["audio"] && !strings.Contains(model, AudioPattern) {
 		return errors.New("the --audio flag cannot be used without a compatible model, ie gpt-4o-audio-preview (see --list-models)")

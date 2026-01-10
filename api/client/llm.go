@@ -13,11 +13,13 @@ import (
 
 const (
 	ErrEmptyResponse   = "empty response"
+	ErrRealTime        = "model %q requires the Realtime API (WebSocket/WebRTC) and is not supported yet"
 	SearchModelPattern = "-search"
 	gptPrefix          = "gpt"
 	o1Prefix           = "o1"
 	o1ProPattern       = "o1-pro"
 	gpt5Pattern        = "gpt-5"
+	realTimePattern    = "realtime"
 	messageType        = "message"
 	outputTextType     = "output_text"
 )
@@ -203,6 +205,10 @@ func (c *Client) addQuery(query string) {
 func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
 	caps := GetCapabilities(c.Config.Model)
 
+	if caps.IsRealtime {
+		return nil, fmt.Errorf(ErrRealTime, c.Config.Model)
+	}
+
 	if caps.UsesResponsesAPI {
 		req, err := c.createResponsesRequest(ctx, stream)
 		if err != nil {
@@ -329,6 +335,7 @@ type ModelCapabilities struct {
 	SupportsStreaming   bool
 	UsesResponsesAPI    bool
 	OmitFirstSystemMsg  bool
+	IsRealtime          bool
 }
 
 func GetCapabilities(model string) ModelCapabilities {
@@ -344,5 +351,6 @@ func GetCapabilities(model string) ModelCapabilities {
 		SupportsStreaming:   !strings.Contains(model, o1ProPattern),
 		UsesResponsesAPI:    strings.Contains(model, o1ProPattern) || isGpt5,
 		OmitFirstSystemMsg:  strings.HasPrefix(model, o1Prefix) && !strings.Contains(model, o1ProPattern),
+		IsRealtime:          strings.Contains(model, realTimePattern),
 	}
 }

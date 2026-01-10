@@ -129,6 +129,26 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 				})
 			}
 
+			it("errors when the model is realtime (no HTTP call is made)", func() {
+				factory.withoutHistory()
+				subject := factory.buildClientWithoutConfig()
+
+				realtimeModel := "gpt-realtime"
+				subject.Config.Model = realtimeModel
+				config.Model = realtimeModel
+
+				mockCaller.EXPECT().
+					Post(gomock.Any(), gomock.Any(), gomock.Any()).
+					Times(0)
+
+				mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
+
+				_, _, err := subject.Query(context.Background(), query)
+				Expect(err).To(HaveOccurred())
+
+				Expect(err.Error()).To(ContainSubstring("realtime"))
+			})
+
 			when("a valid http response is received", func() {
 				testValidHTTPResponse := func(subject *client.Client, expectedBody []byte, omitHistory bool) {
 					const (
@@ -540,6 +560,25 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 				Expect(err.Error()).To(Equal(errorMsg))
 			})
 
+			it("errors when the model is realtime (no HTTP call is made)", func() {
+				factory.withoutHistory()
+				subject := factory.buildClientWithoutConfig()
+
+				realtimeModel := "gpt-4o-realtime-preview"
+				subject.Config.Model = realtimeModel
+				config.Model = realtimeModel
+
+				mockCaller.EXPECT().
+					Post(gomock.Any(), gomock.Any(), gomock.Any()).
+					Times(0)
+
+				mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
+
+				err := subject.Stream(context.Background(), query)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("realtime"))
+			})
+
 			when("a valid http response is received", func() {
 				const answer = "answer"
 
@@ -669,6 +708,7 @@ func testCapabilities(t *testing.T, when spec.G, it spec.S) {
 			usesResponses     bool
 			omitFirstSystem   bool
 			supportsStreaming bool
+			isRealtime        bool
 		}
 
 		tests := []tc{
@@ -687,6 +727,10 @@ func testCapabilities(t *testing.T, when spec.G, it spec.S) {
 				usesResponses:     false, // still completions path
 				omitFirstSystem:   false,
 				supportsStreaming: true,
+			},
+			{
+				model:      "gpt-realtime",
+				isRealtime: true,
 			},
 
 			// gpt-5 family uses Responses API
@@ -749,11 +793,16 @@ func testCapabilities(t *testing.T, when spec.G, it spec.S) {
 
 				c := client.GetCapabilities(tt.model)
 
-				Expect(c.SupportsTemperature).To(Equal(tt.supportsTemp))
-				Expect(c.SupportsTopP).To(Equal(tt.supportsTopP))
-				Expect(c.UsesResponsesAPI).To(Equal(tt.usesResponses))
-				Expect(c.OmitFirstSystemMsg).To(Equal(tt.omitFirstSystem))
-				Expect(c.SupportsStreaming).To(Equal(tt.supportsStreaming))
+				Expect(c.IsRealtime).To(Equal(tt.isRealtime))
+
+				// Only assert these for non-realtime models.
+				if !tt.isRealtime {
+					Expect(c.SupportsTemperature).To(Equal(tt.supportsTemp))
+					Expect(c.SupportsTopP).To(Equal(tt.supportsTopP))
+					Expect(c.UsesResponsesAPI).To(Equal(tt.usesResponses))
+					Expect(c.OmitFirstSystemMsg).To(Equal(tt.omitFirstSystem))
+					Expect(c.SupportsStreaming).To(Equal(tt.supportsStreaming))
+				}
 			})
 		}
 	})

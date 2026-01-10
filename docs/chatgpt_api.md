@@ -930,6 +930,25 @@ event: response.completed
 data: {"type":"response.completed","sequence_number":31,"response":{"id":"resp_689a2fd015448191a804ad63fdb613f60e5696160b26e781","object":"response","created_at":1754935248,"status":"completed","background":false,"error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":4096,"max_tool_calls":null,"model":"gpt-5-2025-08-07","output":[{"id":"rs_689a2fd0b7b08191823b9d3993c07fc70e5696160b26e781","type":"reasoning","summary":[]},{"id":"msg_689a2fd133d081919b2ff584122ab87a0e5696160b26e781","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"logprobs":[],"text":"Amsterdam is the constitutional capital of the Netherlands. The seat of government and the royal residence are in The Hague."}],"role":"assistant"}],"parallel_tool_calls":true,"previous_response_id":null,"prompt_cache_key":null,"reasoning":{"effort":"low","summary":null},"safety_identifier":null,"service_tier":"auto","store":true,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tools":[],"top_logprobs":0,"top_p":1.0,"truncation":"disabled","usage":{"input_tokens":24,"input_tokens_details":{"cached_tokens":0},"output_tokens":28,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":52},"user":null,"metadata":{}}}
 ```
 
+### Web Search
+
+Request: 
+```shell
+curl "https://api.openai.com/v1/responses" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d '{
+    "model": "gpt-4.1",
+    "tools": [
+      {
+        "type": "web_search",
+        "search_context_size": "low"
+      }
+    ],
+    "input": "What is the weather like in Red Hook, Brooklyn"
+  }'
+```
+
 ## Azure
 
 Request:

@@ -30,12 +30,14 @@ integration: ## Run integration tests
 
 mcp-http: ## Run local FastMCP HTTP server (JSON response)
 	@pushd test/mcp/http > /dev/null && \
-	  python3 server.py && \
+	  . .venv/bin/activate && \
+	  python server.py && \
 	  popd > /dev/null
 
 mcp-sse: ## Run local FastMCP SSE server (text/event-stream)
 	@pushd test/mcp/http > /dev/null && \
-	  python3 server_sse.py && \
+	  . .venv/bin/activate && \
+	  python server_sse.py && \
 	  popd > /dev/null
 
 reinstall: ## Reinstall binaries (default target OS: darwin)

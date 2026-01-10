@@ -1,12 +1,17 @@
 package client
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
+	"os/exec"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -112,6 +117,13 @@ func NewSessionTransport(inner MCPTransport, store SessionStore) *SessionTranspo
 }
 
 func (t *SessionTransport) Call(endpoint string, req api.MCPMessage, headers map[string]string) (api.MCPResponse, error) {
+	// Session headers are HTTP-only; stdio (and other non-http schemes) have no headers.
+	if u, err := url.Parse(endpoint); err == nil {
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return t.inner.Call(endpoint, req, headers)
+		}
+	}
+
 	// Explicit session header → passthrough
 	if _, ok := headerGet(headers, "mcp-session-id"); ok {
 		return t.inner.Call(endpoint, req, headers)
@@ -190,6 +202,22 @@ func (t *SessionTransport) maybeStoreSession(endpoint string, resp api.MCPRespon
 	}
 }
 
+func NewMCPTransport(endpoint string, caller http.Caller, headers map[string]string) (MCPTransport, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	switch u.Scheme {
+	case "http", "https":
+		return NewMCPHTTPTransport(endpoint, caller, headers)
+	case "stdio":
+		return NewMCPStdioTransport(endpoint)
+	default:
+		return nil, fmt.Errorf("unsupported mcp transport: %s", u.Scheme)
+	}
+}
+
 /* =========================
    HTTP transport
    ========================= */
@@ -199,15 +227,29 @@ type MCPHTTPTransport struct {
 	headers map[string]string
 }
 
-func NewMCPTransport(endpoint string, caller http.Caller, headers map[string]string) (*MCPHTTPTransport, error) {
+func NewMCPHTTPTransport(endpoint string, caller http.Caller, headers map[string]string) (*MCPHTTPTransport, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, err
 	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("unsupported mcp transport: %s", u.Scheme)
+
+	switch u.Scheme {
+	case "http", "https":
+		// ok
+	default:
+		return nil, fmt.Errorf("unsupported mcp http transport: %s", u.Scheme)
 	}
-	return &MCPHTTPTransport{caller: caller, headers: headers}, nil
+
+	// Defensive copy so callers can reuse/modify their input map safely.
+	h := map[string]string{}
+	for k, v := range headers {
+		h[k] = v
+	}
+
+	return &MCPHTTPTransport{
+		caller:  caller,
+		headers: h,
+	}, nil
 }
 
 func (t *MCPHTTPTransport) Call(endpoint string, req api.MCPMessage, extra map[string]string) (api.MCPResponse, error) {
@@ -253,6 +295,312 @@ func (t *MCPHTTPTransport) Call(endpoint string, req api.MCPMessage, extra map[s
 		return out, postErr
 	}
 
+	return out, nil
+}
+
+/* =========================
+   STDIO transport
+   ========================= */
+
+type MCPStdioTransport struct {
+	// Endpoint is "stdio:<cmdline...>"
+	endpoint string
+
+	mu     sync.Mutex
+	cmd    *exec.Cmd
+	stdin  io.WriteCloser
+	stdout io.ReadCloser
+	stderr io.ReadCloser
+
+	initialized bool
+
+	// response routing
+	pending map[string]chan api.MCPMessage
+	done    chan struct{}
+}
+
+func NewMCPStdioTransport(endpoint string) (*MCPStdioTransport, error) {
+	if !strings.HasPrefix(endpoint, "stdio:") {
+		return nil, fmt.Errorf("invalid stdio endpoint: %s", endpoint)
+	}
+	return &MCPStdioTransport{endpoint: endpoint}, nil
+}
+
+func (t *MCPStdioTransport) Call(endpoint string, req api.MCPMessage, headers map[string]string) (api.MCPResponse, error) {
+	// headers are ignored for stdio
+	if endpoint != t.endpoint {
+		return api.MCPResponse{}, fmt.Errorf("stdio transport called with unexpected endpoint")
+	}
+
+	if err := t.ensureStarted(); err != nil {
+		return api.MCPResponse{}, err
+	}
+	if err := t.ensureInitialized(); err != nil {
+		return api.MCPResponse{}, err
+	}
+
+	if strings.TrimSpace(req.ID) == "" {
+		req.ID = uuid.NewString()
+	}
+
+	msg, err := t.roundTrip(req, 30*time.Second)
+	out := api.MCPResponse{
+		Message: msg,
+		Status:  0,
+		Headers: nil,
+	}
+	return out, err
+}
+
+func (t *MCPStdioTransport) ensureStarted() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.cmd != nil {
+		return nil
+	}
+
+	cmdline := strings.TrimSpace(strings.TrimPrefix(t.endpoint, "stdio:"))
+	if cmdline == "" {
+		return fmt.Errorf("stdio endpoint missing command: %s", t.endpoint)
+	}
+
+	argv, err := splitCommandLine(cmdline)
+	if err != nil {
+		return err
+	}
+	if len(argv) == 0 {
+		return fmt.Errorf("stdio endpoint missing command: %s", t.endpoint)
+	}
+
+	cmd := exec.Command(argv[0], argv[1:]...) // #nosec G204
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start mcp stdio server: %w", err)
+	}
+
+	t.cmd = cmd
+	t.stdin = stdin
+	t.stdout = stdout
+	t.stderr = stderr
+	t.pending = map[string]chan api.MCPMessage{}
+	t.done = make(chan struct{})
+
+	go t.readLoop()
+	go t.drainStderr()
+
+	return nil
+}
+
+func (t *MCPStdioTransport) ensureInitialized() error {
+	t.mu.Lock()
+	if t.initialized {
+		t.mu.Unlock()
+		return nil
+	}
+	t.mu.Unlock()
+
+	initParams, _ := json.Marshal(map[string]any{
+		"protocolVersion": "2024-11-05",
+		"capabilities":    map[string]any{},
+		"clientInfo": map[string]any{
+			"name":    "chatgpt-cli",
+			"version": "dev",
+		},
+	})
+
+	initReq := api.MCPMessage{
+		JSONRPC: "2.0",
+		ID:      uuid.NewString(),
+		Method:  "initialize",
+		Params:  initParams,
+	}
+
+	if _, err := t.roundTrip(initReq, 10*time.Second); err != nil {
+		return err
+	}
+
+	// notifications/initialized (no response expected)
+	notif := api.MCPMessage{
+		JSONRPC: "2.0",
+		Method:  "notifications/initialized",
+	}
+	if err := t.sendOneWay(notif); err != nil {
+		return err
+	}
+
+	t.mu.Lock()
+	t.initialized = true
+	t.mu.Unlock()
+	return nil
+}
+
+func (t *MCPStdioTransport) sendOneWay(msg api.MCPMessage) error {
+	b, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	_, err = t.stdin.Write(append(b, '\n'))
+	return err
+}
+
+func (t *MCPStdioTransport) roundTrip(req api.MCPMessage, timeout time.Duration) (api.MCPMessage, error) {
+	ch := make(chan api.MCPMessage, 1)
+
+	t.mu.Lock()
+	t.pending[req.ID] = ch
+
+	b, err := json.Marshal(req)
+	if err == nil {
+		_, err = t.stdin.Write(append(b, '\n'))
+	}
+	t.mu.Unlock()
+
+	if err != nil {
+		t.mu.Lock()
+		delete(t.pending, req.ID)
+		t.mu.Unlock()
+		return api.MCPMessage{}, fmt.Errorf("failed to write to mcp stdio: %w", err)
+	}
+
+	select {
+	case msg, ok := <-ch:
+		if !ok {
+			return api.MCPMessage{}, fmt.Errorf("mcp stdio server closed")
+		}
+		if msg.Error != nil {
+			return msg, msg.Error
+		}
+		return msg, nil
+	case <-time.After(timeout):
+		t.mu.Lock()
+		delete(t.pending, req.ID)
+		t.mu.Unlock()
+		return api.MCPMessage{}, fmt.Errorf("mcp stdio call timed out")
+	}
+}
+
+func (t *MCPStdioTransport) readLoop() {
+	defer close(t.done)
+
+	scanner := bufio.NewScanner(t.stdout)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 5*1024*1024)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		var msg api.MCPMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			continue
+		}
+
+		// ignore notifications (no id)
+		if strings.TrimSpace(msg.ID) == "" {
+			continue
+		}
+
+		t.mu.Lock()
+		ch := t.pending[msg.ID]
+		if ch != nil {
+			delete(t.pending, msg.ID)
+		}
+		t.mu.Unlock()
+
+		if ch != nil {
+			ch <- msg
+			close(ch)
+		}
+	}
+
+	// server exited: unblock all waiters
+	t.mu.Lock()
+	for id, ch := range t.pending {
+		delete(t.pending, id)
+		close(ch)
+	}
+	t.mu.Unlock()
+}
+
+func (t *MCPStdioTransport) drainStderr() {
+	r := bufio.NewReader(t.stderr)
+	for {
+		_, err := r.ReadString('\n')
+		if err != nil {
+			return
+		}
+		// optionally log when debug
+	}
+}
+
+// Minimal shell-ish arg splitting supporting:
+// - spaces
+// - single quotes '...'
+// - double quotes "..."
+// No escapes yet (good enough for v1).
+func splitCommandLine(s string) ([]string, error) {
+	var out []string
+	var cur strings.Builder
+
+	inSingle := false
+	inDouble := false
+
+	flush := func() {
+		if cur.Len() > 0 {
+			out = append(out, cur.String())
+			cur.Reset()
+		}
+	}
+
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+
+		switch ch {
+		case '\'':
+			if !inDouble {
+				inSingle = !inSingle
+				continue
+			}
+			cur.WriteByte(ch)
+		case '"':
+			if !inSingle {
+				inDouble = !inDouble
+				continue
+			}
+			cur.WriteByte(ch)
+		case ' ', '\t', '\n':
+			if inSingle || inDouble {
+				cur.WriteByte(ch)
+				continue
+			}
+			flush()
+		default:
+			cur.WriteByte(ch)
+		}
+	}
+
+	if inSingle || inDouble {
+		return nil, fmt.Errorf("unterminated quote in stdio command")
+	}
+
+	flush()
 	return out, nil
 }
 

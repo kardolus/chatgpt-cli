@@ -70,7 +70,7 @@ Azure, featuring streaming capabilities and extensive configuration options.
 * **Custom context from any source**: You can provide the GPT model with a custom context during conversation. This
   context can be piped in from any source, such as local files, standard input, or even another program. This
   flexibility allows the model to adapt to a wide range of conversational scenarios.
-* **MCP (Model Context Protocol) support**: Call external MCP tools via HTTP(S), inject their results into the
+* **MCP (Model Context Protocol) support**: Call external MCP tools via HTTP(S) or STDIO, inject their results into the
   conversation context, and continue the prompt seamlessly.
     * **MCP session management**: Built-in support for stateful MCP servers. The CLI automatically initializes
       sessions, attaches session identifiers, and renews them when they become invalid.
@@ -193,6 +193,16 @@ chatgpt \
   --mcp-tool "some-tool-name" \
   --mcp-params '{"locations":["Brooklyn, NY"],"timeFrame":"today"}' \
   "what should I wear today"
+```
+
+Local MCP server over stdio (no HTTP, runs as a subprocess):
+
+```shell
+chatgpt \
+  --mcp "stdio:python test/mcp/stdio/mcp_stdio_server.py" \
+  --mcp-tool echo \
+  --mcp-param 'payload={"foo":"bar","count":3}' \
+  "What did the MCP server receive?"
 ```
 
 #### Headers and Authentication

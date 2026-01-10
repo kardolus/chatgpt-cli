@@ -65,6 +65,8 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 
 	testMCP(t, when, it)
 	testSessionTransport(t, when, it)
+	testSessionTransportNonHTTP(t, when, it)
+	testNewMCPTransport(t, when, it)
 	testHistory(t, when, it)
 	testMedia(t, when, it)
 	testLLM(t, when, it)

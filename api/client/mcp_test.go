@@ -2,6 +2,7 @@ package client_test
 
 import (
 	"errors"
+	"github.com/kardolus/chatgpt-cli/api/http"
 	"strings"
 	"testing"
 	"time"
@@ -384,6 +385,89 @@ func testSessionTransport(t *testing.T, when spec.G, it spec.S) {
 			_, err := subject.Call(endpoint, req, headers)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("did not return"))
+		})
+	})
+}
+
+func testSessionTransportNonHTTP(t *testing.T, when spec.G, it spec.S) {
+	when("SessionTransport.Call() with non-http scheme", func() {
+		var (
+			endpoint string
+			store    *fakeSessionStore
+			inner    *fakeMCPTransport
+			subject  *client.SessionTransport
+		)
+
+		it.Before(func() {
+			RegisterTestingT(t)
+
+			endpoint = "stdio:python test/mcp/stdio/mcp_stdio_server.py"
+			store = newFakeSessionStore()
+			inner = &fakeMCPTransport{}
+			subject = client.NewSessionTransport(inner, store)
+		})
+
+		it("bypasses session logic and does not touch the session store", func() {
+			req := api.MCPMessage{JSONRPC: "2.0", ID: "1", Method: "tools/call", Params: []byte(`{}`)}
+			headers := map[string]string{}
+
+			inner.handler = func(ep string, r api.MCPMessage, h map[string]string) (api.MCPResponse, error) {
+				Expect(ep).To(Equal(endpoint))
+				Expect(r.Method).To(Equal("tools/call"))
+				// No session header should be injected for non-http transports.
+				_, ok := headerGetCIok(h, "mcp-session-id")
+				Expect(ok).To(BeFalse())
+
+				return api.MCPResponse{
+					Status:  0,
+					Headers: nil,
+					Message: api.MCPMessage{JSONRPC: "2.0", ID: r.ID, Result: []byte(`{}`)},
+				}, nil
+			}
+
+			_, err := subject.Call(endpoint, req, headers)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(store.getCalls).To(Equal(0))
+			Expect(store.setCalls).To(Equal(0))
+			Expect(store.delCalls).To(Equal(0))
+		})
+	})
+}
+
+func testNewMCPTransport(t *testing.T, when spec.G, it spec.S) {
+	when("NewMCPTransport()", func() {
+		it.Before(func() {
+			RegisterTestingT(t)
+		})
+
+		it("returns MCPHTTPTransport for http/https endpoints", func() {
+			// We don't need to actually call it; we just want to route correctly.
+			var caller http.Caller = nil
+
+			tr, err := client.NewMCPTransport("https://example.com/mcp", caller, map[string]string{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tr).To(BeAssignableToTypeOf(&client.MCPHTTPTransport{}))
+
+			tr, err = client.NewMCPTransport("http://example.com/mcp", caller, map[string]string{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tr).To(BeAssignableToTypeOf(&client.MCPHTTPTransport{}))
+		})
+
+		it("returns MCPStdioTransport for stdio endpoints", func() {
+			var caller http.Caller = nil
+
+			tr, err := client.NewMCPTransport("stdio:python test/mcp/stdio/mcp_stdio_server.py", caller, map[string]string{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tr).To(BeAssignableToTypeOf(&client.MCPStdioTransport{}))
+		})
+
+		it("errors for unsupported schemes", func() {
+			var caller http.Caller = nil
+
+			_, err := client.NewMCPTransport("ftp://example.com/mcp", caller, map[string]string{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("unsupported mcp transport"))
 		})
 	})
 }

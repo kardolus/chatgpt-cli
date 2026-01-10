@@ -378,27 +378,58 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 							factory.withoutHistory()
 						})
 
+						assertResponsesRequest := func(body []byte) {
+							var req map[string]any
+							Expect(json.Unmarshal(body, &req)).To(Succeed())
+
+							Expect(req).To(HaveKeyWithValue("model", m))
+							Expect(req).To(HaveKey("input"))
+							Expect(req).To(HaveKey("max_output_tokens"))
+							Expect(req).To(HaveKey("reasoning"))
+							Expect(req).To(HaveKeyWithValue("stream", false))
+
+							// Validate reasoning.effort
+							reasoning, ok := req["reasoning"].(map[string]any)
+							Expect(ok).To(BeTrue())
+							Expect(reasoning).To(HaveKeyWithValue("effort", "low"))
+
+							// Validate input messages
+							input, ok := req["input"].([]any)
+							Expect(ok).To(BeTrue())
+							Expect(input).To(HaveLen(2))
+
+							msg0, ok := input[0].(map[string]any)
+							Expect(ok).To(BeTrue())
+							Expect(msg0).To(HaveKeyWithValue("role", client.SystemRole))
+							Expect(msg0).To(HaveKeyWithValue("content", systemRole))
+
+							msg1, ok := input[1].(map[string]any)
+							Expect(ok).To(BeTrue())
+							Expect(msg1).To(HaveKeyWithValue("role", client.UserRole))
+							Expect(msg1).To(HaveKeyWithValue("content", query))
+
+							// Temperature / top_p assertions are capability-driven now
+							caps := client.GetCapabilities(m)
+
+							if caps.SupportsTemperature {
+								Expect(req).To(HaveKeyWithValue("temperature", BeNumerically("==", config.Temperature)))
+							} else {
+								Expect(req).NotTo(HaveKey("temperature"))
+							}
+
+							if caps.SupportsTopP {
+								Expect(req).To(HaveKeyWithValue("top_p", BeNumerically("==", config.TopP)))
+							} else {
+								Expect(req).NotTo(HaveKey("top_p"))
+							}
+						}
+
 						it("returns the output_text when present", func() {
 							subject := factory.buildClientWithoutConfig()
 							subject.Config.Model = m
 							subject.Config.Role = systemRole
 
 							answer := "yes, it does"
-							messages := []api.Message{
-								{Role: client.SystemRole, Content: systemRole},
-								{Role: client.UserRole, Content: query},
-							}
-
-							body, err := json.Marshal(api.ResponsesRequest{
-								Model:           subject.Config.Model,
-								Input:           messages,
-								MaxOutputTokens: subject.Config.MaxTokens,
-								Reasoning:       api.Reasoning{Effort: "low"},
-								Stream:          false,
-								Temperature:     subject.Config.Temperature,
-								TopP:            subject.Config.TopP,
-							})
-							Expect(err).NotTo(HaveOccurred())
 
 							mockTimer.EXPECT().Now().Times(3)
 							mockHistoryStore.EXPECT().Write(gomock.Any())
@@ -413,8 +444,11 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 							raw, _ := json.Marshal(response)
 
 							mockCaller.EXPECT().
-								Post(subject.Config.URL+"/v1/responses", body, false).
-								Return(raw, nil)
+								Post(subject.Config.URL+"/v1/responses", gomock.Any(), false).
+								DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+									assertResponsesRequest(body)
+									return raw, nil
+								})
 
 							text, tokens, err := subject.Query(context.Background(), query)
 							Expect(err).NotTo(HaveOccurred())
@@ -427,21 +461,6 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 							subject.Config.Model = m
 							subject.Config.Role = systemRole
 
-							messages := []api.Message{
-								{Role: client.SystemRole, Content: systemRole},
-								{Role: client.UserRole, Content: query},
-							}
-
-							body, _ := json.Marshal(api.ResponsesRequest{
-								Model:           subject.Config.Model,
-								Input:           messages,
-								MaxOutputTokens: subject.Config.MaxTokens,
-								Reasoning:       api.Reasoning{Effort: "low"},
-								Stream:          false,
-								Temperature:     subject.Config.Temperature,
-								TopP:            subject.Config.TopP,
-							})
-
 							mockTimer.EXPECT().Now().Times(2)
 
 							response := api.ResponsesResponse{
@@ -451,8 +470,11 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 							raw, _ := json.Marshal(response)
 
 							mockCaller.EXPECT().
-								Post(subject.Config.URL+"/v1/responses", body, false).
-								Return(raw, nil)
+								Post(subject.Config.URL+"/v1/responses", gomock.Any(), false).
+								DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+									assertResponsesRequest(body)
+									return raw, nil
+								})
 
 							_, _, err := subject.Query(context.Background(), query)
 							Expect(err).To(HaveOccurred())
@@ -463,21 +485,6 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 							subject := factory.buildClientWithoutConfig()
 							subject.Config.Model = m
 							subject.Config.Role = systemRole
-
-							messages := []api.Message{
-								{Role: client.SystemRole, Content: systemRole},
-								{Role: client.UserRole, Content: query},
-							}
-
-							body, _ := json.Marshal(api.ResponsesRequest{
-								Model:           subject.Config.Model,
-								Input:           messages,
-								MaxOutputTokens: subject.Config.MaxTokens,
-								Reasoning:       api.Reasoning{Effort: "low"},
-								Stream:          false,
-								Temperature:     subject.Config.Temperature,
-								TopP:            subject.Config.TopP,
-							})
 
 							mockTimer.EXPECT().Now().Times(2)
 
@@ -491,8 +498,11 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 							raw, _ := json.Marshal(response)
 
 							mockCaller.EXPECT().
-								Post(subject.Config.URL+"/v1/responses", body, false).
-								Return(raw, nil)
+								Post(subject.Config.URL+"/v1/responses", gomock.Any(), false).
+								DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+									assertResponsesRequest(body)
+									return raw, nil
+								})
 
 							_, _, err := subject.Query(context.Background(), query)
 							Expect(err).To(HaveOccurred())
@@ -646,6 +656,106 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 				Expect(result[4]).To(Equal("- o1-mini"))
 			})
 		})
+	})
+}
+
+func testCapabilities(t *testing.T, when spec.G, it spec.S) {
+	when("GetCapabilities()", func() {
+		type tc struct {
+			model string
+
+			supportsTemp      bool
+			supportsTopP      bool
+			usesResponses     bool
+			omitFirstSystem   bool
+			supportsStreaming bool
+		}
+
+		tests := []tc{
+			{
+				model:             "gpt-4o",
+				supportsTemp:      true,
+				supportsTopP:      true,
+				usesResponses:     false,
+				omitFirstSystem:   false,
+				supportsStreaming: true,
+			},
+			{
+				model:             "gpt-4o-search-preview",
+				supportsTemp:      false,
+				supportsTopP:      false,
+				usesResponses:     false, // still completions path
+				omitFirstSystem:   false,
+				supportsStreaming: true,
+			},
+
+			// gpt-5 family uses Responses API
+			{
+				model:             "gpt-5",
+				supportsTemp:      true,
+				supportsTopP:      false, // key: drop top_p for gpt-5+
+				usesResponses:     true,
+				omitFirstSystem:   false,
+				supportsStreaming: true,
+			},
+			{
+				model:             "gpt-5.2",
+				supportsTemp:      true,
+				supportsTopP:      false,
+				usesResponses:     true,
+				omitFirstSystem:   false,
+				supportsStreaming: true,
+			},
+			{
+				model:             "gpt-5.2-pro",
+				supportsTemp:      true,
+				supportsTopP:      false,
+				usesResponses:     true,
+				omitFirstSystem:   false,
+				supportsStreaming: true,
+			},
+			{
+				model:             "gpt-5-search",
+				supportsTemp:      false,
+				supportsTopP:      false,
+				usesResponses:     true, // because gpt-5*
+				omitFirstSystem:   false,
+				supportsStreaming: true,
+			},
+
+			// o1
+			{
+				model:             "o1-mini",
+				supportsTemp:      true, // unless you treat -search specially
+				supportsTopP:      true,
+				usesResponses:     false,
+				omitFirstSystem:   true, // key behavior
+				supportsStreaming: true,
+			},
+			{
+				model:             "o1-pro",
+				supportsTemp:      true,
+				supportsTopP:      true, // if you keep old behavior
+				usesResponses:     true,
+				omitFirstSystem:   false,
+				supportsStreaming: false, // your code: !strings.Contains(o1ProPattern)
+			},
+		}
+
+		for _, tt := range tests {
+			tt := tt
+			it(tt.model, func() {
+				RegisterTestingT(t)
+
+				c := client.GetCapabilities(tt.model)
+
+				Expect(c.SupportsTemperature).To(Equal(tt.supportsTemp))
+				Expect(c.SupportsTopP).To(Equal(tt.supportsTopP))
+				Expect(c.UsesResponsesAPI).To(Equal(tt.usesResponses))
+				Expect(c.OmitFirstSystemMsg).To(Equal(tt.omitFirstSystem))
+				Expect(c.SupportsStreaming).To(Equal(tt.supportsStreaming))
+			})
+		}
 	})
 }
 

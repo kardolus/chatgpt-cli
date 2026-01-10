@@ -246,6 +246,8 @@ func (c *Client) createCompletionsRequest(ctx context.Context, stream bool) (*ap
 
 	if caps.SupportsTemperature {
 		req.Temperature = c.Config.Temperature
+	}
+	if caps.SupportsTopP {
 		req.TopP = c.Config.TopP
 	}
 
@@ -275,9 +277,14 @@ func (c *Client) createResponsesRequest(ctx context.Context, stream bool) (*api.
 		Reasoning: api.Reasoning{
 			Effort: c.Config.Effort,
 		},
-		Stream:      stream,
-		Temperature: c.Config.Temperature,
-		TopP:        c.Config.TopP,
+		Stream: stream,
+	}
+
+	if caps.SupportsTemperature {
+		req.Temperature = c.Config.Temperature
+	}
+	if caps.SupportsTopP {
+		req.TopP = c.Config.TopP
 	}
 
 	return req, nil
@@ -318,16 +325,24 @@ func (c *Client) processResponse(raw []byte, v interface{}) error {
 
 type ModelCapabilities struct {
 	SupportsTemperature bool
+	SupportsTopP        bool
 	SupportsStreaming   bool
 	UsesResponsesAPI    bool
 	OmitFirstSystemMsg  bool
 }
 
 func GetCapabilities(model string) ModelCapabilities {
+	isSearch := strings.Contains(model, SearchModelPattern)
+	isGpt5 := strings.Contains(model, gpt5Pattern)
+
+	supportsTemp := !isSearch
+	supportsTopP := !isSearch && !isGpt5
+
 	return ModelCapabilities{
-		SupportsTemperature: !strings.Contains(model, SearchModelPattern),
+		SupportsTemperature: supportsTemp,
+		SupportsTopP:        supportsTopP,
 		SupportsStreaming:   !strings.Contains(model, o1ProPattern),
-		UsesResponsesAPI:    strings.Contains(model, o1ProPattern) || strings.Contains(model, gpt5Pattern),
+		UsesResponsesAPI:    strings.Contains(model, o1ProPattern) || isGpt5,
 		OmitFirstSystemMsg:  strings.HasPrefix(model, o1Prefix) && !strings.Contains(model, o1ProPattern),
 	}
 }

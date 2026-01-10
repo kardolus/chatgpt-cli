@@ -70,6 +70,7 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 	testHistory(t, when, it)
 	testMedia(t, when, it)
 	testLLM(t, when, it)
+	testCapabilities(t, when, it)
 }
 
 func newClientFactory(mhs *MockStore) *clientFactory {

@@ -21,6 +21,7 @@ CHATGPT_BIN="${CHATGPT_BIN:-chatgpt}"
 SMOKE_WEB="${SMOKE_WEB:-false}"
 WEB_CONTEXT_SIZE="${WEB_CONTEXT_SIZE:-low}"
 MAX_TOKENS="${MAX_TOKENS:-256}"
+MAX_TOKENS_PRO="${MAX_TOKENS_PRO:-2048}"
 TIMEOUT_SECS="${TIMEOUT_SECS:-30}"
 
 require() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: missing dependency: $1"; exit 2; }; }
@@ -163,49 +164,52 @@ run_query() {
   local model="$2"
   shift 2
 
-  local out status
-  set +e
   local effort
   effort="$(effort_for_model "$model")"
 
+  local max_tokens="$MAX_TOKENS"
   if [[ -n "$effort" ]]; then
-    out="$(run_with_timeout "$CHATGPT_BIN" \
-        --new-thread \
-        --temperature 0 \
-        --effort "$effort" \
-        --model "$model" \
-        --max-tokens "$MAX_TOKENS" \
-        "$@" \
-        --query "$PROMPT" 2>&1)"
-  else
-    out="$(run_with_timeout "$CHATGPT_BIN" \
-        --new-thread \
-        --temperature 0 \
-        --model "$model" \
-        --max-tokens "$MAX_TOKENS" \
-        "$@" \
-        --query "$PROMPT" 2>&1)"
+    max_tokens="$MAX_TOKENS_PRO"
   fi
+
+  # Build args ONCE so the debug rerun is identical (+ --debug).
+  local args=(
+    --new-thread
+    --temperature 0
+    --model "$model"
+    --max-tokens "$max_tokens"
+  )
+
+  if [[ -n "$effort" ]]; then
+    args+=(--effort "$effort")
+  fi
+
+  # Allow extra args like: --web true --web-context-size low
+  if [[ $# -gt 0 ]]; then
+    args+=("$@")
+  fi
+
+  # Always set the query last.
+  args+=(--query "$PROMPT")
+
+  local out="" status=0
+  set +e
+  out="$(run_with_timeout "$CHATGPT_BIN" "${args[@]}" 2>&1)"
   status=$?
   set -e
 
   _dump_failure() {
     local why="$1"
     fail "$name (model=$model) $why (exit=$status)"
+    echo "meta: effort='${effort:-}' max_tokens=${max_tokens}" >&2
     echo "----- RAW OUTPUT -----" >&2
     printf "%s\n" "$out" >&2
     echo "----------------------" >&2
 
     echo "----- DEBUG RERUN -----" >&2
-    local dbg dbg_status
+    local dbg="" dbg_status=0
     set +e
-    dbg="$(run_with_timeout "$CHATGPT_BIN" \
-        --new-thread \
-        --model "$model" \
-        --max-tokens "$MAX_TOKENS" \
-        "$@" \
-        --debug \
-        --query "$PROMPT" 2>&1)"
+    dbg="$(run_with_timeout "$CHATGPT_BIN" "${args[@]}" --debug 2>&1)"
     dbg_status=$?
     set -e
     echo "(debug exit=$dbg_status)" >&2
@@ -254,11 +258,15 @@ main() {
   count_realtime="$(printf '%s\n' "${models[@]}" | grep -c 'realtime' || true)"
   count_search="$(printf '%s\n' "${models[@]}" | grep -c -- '-search' || true)"
   count_gpt5="$(printf '%s\n' "${models[@]}" | grep -c '^gpt-5' || true)"
+  count_gpt4="$(printf '%s\n' "${models[@]}" | grep -c '^gpt-4' || true)"
+  count_gpt3="$(printf '%s\n' "${models[@]}" | grep -c '^gpt-3' || true)"
   count_o1="$(printf '%s\n' "${models[@]}" | grep -c '^o1' || true)"
 
   echo "Discovered ${#models[@]} model(s)"
   echo "  realtime:      $count_realtime"
   echo "  search:        $count_search"
+  echo "  gpt-3*:        $count_gpt3"
+  echo "  gpt-4*:        $count_gpt4"
   echo "  gpt-5*:        $count_gpt5"
   echo "  o1*:           $count_o1"
   echo

@@ -33,6 +33,8 @@ type Config struct {
 	TrackTokenUsage      bool              `yaml:"track_token_usage"`
 	SkipTLSVerify        bool              `yaml:"skip_tls_verify"`
 	Multiline            bool              `yaml:"multiline"`
+	Web                  bool              `yaml:"web"`
+	WebContextSize       string            `yaml:"web_context_size"`
 	Seed                 int               `yaml:"seed"`
 	Effort               string            `yaml:"effort"`
 	Voice                string            `yaml:"voice"`

@@ -14,6 +14,7 @@ import (
 const (
 	ErrEmptyResponse   = "empty response"
 	ErrRealTime        = "model %q requires the Realtime API (WebSocket/WebRTC) and is not supported yet"
+	ErrWebSearch       = "model %q is not compatible with the web search feature"
 	SearchModelPattern = "-search"
 	gptPrefix          = "gpt"
 	o1Prefix           = "o1"
@@ -209,7 +210,11 @@ func (c *Client) createBody(ctx context.Context, stream bool) ([]byte, error) {
 		return nil, fmt.Errorf(ErrRealTime, c.Config.Model)
 	}
 
-	if caps.UsesResponsesAPI {
+	if c.Config.Web && !caps.SupportsWebSearch {
+		return nil, fmt.Errorf(ErrWebSearch, c.Config.Model)
+	}
+
+	if caps.UsesResponsesAPI || c.Config.Web {
 		req, err := c.createResponsesRequest(ctx, stream)
 		if err != nil {
 			return nil, err
@@ -293,6 +298,13 @@ func (c *Client) createResponsesRequest(ctx context.Context, stream bool) (*api.
 		req.TopP = c.Config.TopP
 	}
 
+	if c.Config.Web {
+		req.Tools = append(req.Tools, api.Tool{
+			Type:              "web_search",
+			SearchContextSize: c.Config.WebContextSize,
+		})
+	}
+
 	return req, nil
 }
 
@@ -333,6 +345,7 @@ type ModelCapabilities struct {
 	SupportsTemperature bool
 	SupportsTopP        bool
 	SupportsStreaming   bool
+	SupportsWebSearch   bool
 	UsesResponsesAPI    bool
 	OmitFirstSystemMsg  bool
 	IsRealtime          bool
@@ -352,5 +365,6 @@ func GetCapabilities(model string) ModelCapabilities {
 		UsesResponsesAPI:    strings.Contains(model, o1ProPattern) || isGpt5,
 		OmitFirstSystemMsg:  strings.HasPrefix(model, o1Prefix) && !strings.Contains(model, o1ProPattern),
 		IsRealtime:          strings.Contains(model, realTimePattern),
+		SupportsWebSearch:   isGpt5 && !isSearch,
 	}
 }

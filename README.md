@@ -70,6 +70,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
 * **Custom context from any source**: You can provide the GPT model with a custom context during conversation. This
   context can be piped in from any source, such as local files, standard input, or even another program. This
   flexibility allows the model to adapt to a wide range of conversational scenarios.
+* **Web search**: Allow compatible models (e.g. `gpt-5+`) to fetch live web data during a query. Enable with the `web`
+  setting and tune results using `web_context_size`.
 * **MCP (Model Context Protocol) support**: Call external MCP tools via HTTP(S) or STDIO, inject their results into the
   conversation context, and continue the prompt seamlessly.
     * **MCP session management**: Built-in support for stateful MCP servers. The CLI automatically initializes
@@ -419,6 +421,8 @@ environment variables, a config.yaml file, and default values, in that respectiv
 | `transcribe`             | Enables transcription mode. This flags takes the path of an audio file.                                                                                                                               | `false`                   |
 | `speak`                  | If true, enables text-to-speech synthesis for the input query.                                                                                                                                        | `false`                   |
 | `draw`                   | If true, generates an image from a prompt and saves it to the path specified by `output`. Requires image-capable models.                                                                              | `false`                   |
+| `web`                    | Enable web search for supported models (e.g. gpt-5+).                                                                                                                                                 | `false`                   |
+| `web_context_size`       | Controls how much context is retrieved during web search (`low`, `medium`, `high`).                                                                                                                   | `low`                     |
 
 ### LLM-Specific Configuration
 
@@ -441,10 +445,10 @@ environment variables, a config.yaml file, and default values, in that respectiv
 | `responses_path`         | The API endpoint for responses. Used by o1-pro models.                                                                                                 | '/v1/responses'                |
 | `role`                   | The system role                                                                                                                                        | 'You are a helpful assistant.' |
 | `seed`                   | Sets the seed for deterministic sampling (Beta). Repeated requests with the same seed and parameters aim to return the same result.                    | 0                              |
-| `speech_path`            | The API endpoint for text-to-speech synthesis.                                                                                                         | '/v1/audio/transcriptions'     |
+| `speech_path`            | The API endpoint for text-to-speech synthesis.                                                                                                         | '/v1/audio/speech'             |
 | `temperature`            | What sampling temperature to use, between 0 and 2. Higher values make the output more random; lower values make it more focused and deterministic.     | 1.0                            |
 | `top_p`                  | An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. | 1.0                            |
-| `transcriptions_path`    | The API endpoint for audio transcription requests.                                                                                                     | '/v1/audio/speech'             |
+| `transcriptions_path`    | The API endpoint for audio transcription requests.                                                                                                     | '/v1/audio/transcriptions'     |
 | `url`                    | The base URL for the OpenAI API.                                                                                                                       | 'https://api.openai.com'       |
 | `user_agent`             | The header used for the user agent in API requests.                                                                                                    | 'chatgpt-cli'                  |
 | `voice`                  | The voice to use when generating audio with TTS models like gpt-4o-mini-tts.                                                                           | 'nova'                         |

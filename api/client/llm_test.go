@@ -1,4 +1,3 @@
-// llm_test.go
 package client_test
 
 import (
@@ -147,6 +146,42 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 				Expect(err).To(HaveOccurred())
 
 				Expect(err.Error()).To(ContainSubstring("realtime"))
+			})
+
+			it("errors when web is enabled for a non-gpt5 model", func() {
+				factory.withoutHistory()
+				subject := factory.buildClientWithoutConfig()
+
+				subject.Config.Model = "gpt-4o"
+				subject.Config.Web = true
+
+				mockCaller.EXPECT().
+					Post(gomock.Any(), gomock.Any(), gomock.Any()).
+					Times(0)
+
+				mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
+
+				_, _, err := subject.Query(context.Background(), query)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("web search"))
+			})
+
+			it("errors when web is enabled for gpt-5-search", func() {
+				factory.withoutHistory()
+				subject := factory.buildClientWithoutConfig()
+
+				subject.Config.Model = "gpt-5-search"
+				subject.Config.Web = true
+
+				mockCaller.EXPECT().
+					Post(gomock.Any(), gomock.Any(), gomock.Any()).
+					Times(0)
+
+				mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
+
+				_, _, err := subject.Query(context.Background(), query)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("web search"))
 			})
 
 			when("a valid http response is received", func() {
@@ -377,6 +412,79 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 						})
 
 					_, _, _ = subject.Query(context.Background(), "test query")
+				})
+
+				it("forces Responses API when web is enabled", func() {
+					factory.withoutHistory()
+					subject := factory.buildClientWithoutConfig()
+
+					subject.Config.Model = "gpt-5"
+					subject.Config.Web = true
+					subject.Config.WebContextSize = "low"
+
+					mockTimer.EXPECT().Now().Times(3)
+					mockHistoryStore.EXPECT().Write(gomock.Any())
+
+					response := api.ResponsesResponse{
+						Output: []api.Output{{
+							Type:    "message",
+							Content: []api.Content{{Type: "output_text", Text: "hi"}},
+						}},
+						Usage: api.TokenUsage{TotalTokens: 1},
+					}
+					raw, _ := json.Marshal(response)
+
+					mockCaller.EXPECT().
+						Post(subject.Config.URL+"/v1/responses", gomock.Any(), false).
+						DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+							var req map[string]any
+							Expect(json.Unmarshal(body, &req)).To(Succeed())
+							Expect(req).To(HaveKey("tools"))
+							return raw, nil
+						})
+
+					_, _, err := subject.Query(context.Background(), query)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				it("adds web_search tool when web is enabled", func() {
+					factory.withoutHistory()
+					subject := factory.buildClientWithoutConfig()
+
+					subject.Config.Model = "gpt-5"
+					subject.Config.Web = true
+					subject.Config.WebContextSize = "low"
+
+					mockTimer.EXPECT().Now().Times(3)
+					mockHistoryStore.EXPECT().Write(gomock.Any())
+
+					response := api.ResponsesResponse{
+						Output: []api.Output{{
+							Type:    "message",
+							Content: []api.Content{{Type: "output_text", Text: "ok"}},
+						}},
+						Usage: api.TokenUsage{TotalTokens: 1},
+					}
+					raw, _ := json.Marshal(response)
+
+					mockCaller.EXPECT().
+						Post(subject.Config.URL+"/v1/responses", gomock.Any(), false).
+						DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+							var req map[string]any
+							Expect(json.Unmarshal(body, &req)).To(Succeed())
+
+							tools := req["tools"].([]any)
+							Expect(tools).To(HaveLen(1))
+
+							tool := tools[0].(map[string]any)
+							Expect(tool).To(HaveKeyWithValue("type", "web_search"))
+							Expect(tool).To(HaveKeyWithValue("search_context_size", "low"))
+
+							return raw, nil
+						})
+
+					_, _, err := subject.Query(context.Background(), query)
+					Expect(err).NotTo(HaveOccurred())
 				})
 			})
 
@@ -709,6 +817,7 @@ func testCapabilities(t *testing.T, when spec.G, it spec.S) {
 			omitFirstSystem   bool
 			supportsStreaming bool
 			isRealtime        bool
+			supportsWebSearch bool
 		}
 
 		tests := []tc{
@@ -719,6 +828,8 @@ func testCapabilities(t *testing.T, when spec.G, it spec.S) {
 				usesResponses:     false,
 				omitFirstSystem:   false,
 				supportsStreaming: true,
+				isRealtime:        false,
+				supportsWebSearch: false,
 			},
 			{
 				model:             "gpt-4o-search-preview",
@@ -727,20 +838,32 @@ func testCapabilities(t *testing.T, when spec.G, it spec.S) {
 				usesResponses:     false, // still completions path
 				omitFirstSystem:   false,
 				supportsStreaming: true,
+				isRealtime:        false,
+				supportsWebSearch: false,
 			},
 			{
 				model:      "gpt-realtime",
 				isRealtime: true,
 			},
-
-			// gpt-5 family uses Responses API
 			{
 				model:             "gpt-5",
 				supportsTemp:      true,
-				supportsTopP:      false, // key: drop top_p for gpt-5+
+				supportsTopP:      false,
 				usesResponses:     true,
 				omitFirstSystem:   false,
 				supportsStreaming: true,
+				isRealtime:        false,
+				supportsWebSearch: true,
+			},
+			{
+				model:             "gpt-5-search",
+				supportsTemp:      false,
+				supportsTopP:      false,
+				usesResponses:     true,
+				omitFirstSystem:   false,
+				supportsStreaming: true,
+				isRealtime:        false,
+				supportsWebSearch: false,
 			},
 			{
 				model:             "gpt-5.2",
@@ -749,6 +872,8 @@ func testCapabilities(t *testing.T, when spec.G, it spec.S) {
 				usesResponses:     true,
 				omitFirstSystem:   false,
 				supportsStreaming: true,
+				isRealtime:        false,
+				supportsWebSearch: true,
 			},
 			{
 				model:             "gpt-5.2-pro",
@@ -757,32 +882,28 @@ func testCapabilities(t *testing.T, when spec.G, it spec.S) {
 				usesResponses:     true,
 				omitFirstSystem:   false,
 				supportsStreaming: true,
+				isRealtime:        false,
+				supportsWebSearch: true,
 			},
-			{
-				model:             "gpt-5-search",
-				supportsTemp:      false,
-				supportsTopP:      false,
-				usesResponses:     true, // because gpt-5*
-				omitFirstSystem:   false,
-				supportsStreaming: true,
-			},
-
-			// o1
 			{
 				model:             "o1-mini",
-				supportsTemp:      true, // unless you treat -search specially
+				supportsTemp:      true,
 				supportsTopP:      true,
 				usesResponses:     false,
-				omitFirstSystem:   true, // key behavior
+				omitFirstSystem:   true,
 				supportsStreaming: true,
+				isRealtime:        false,
+				supportsWebSearch: false,
 			},
 			{
 				model:             "o1-pro",
 				supportsTemp:      true,
-				supportsTopP:      true, // if you keep old behavior
+				supportsTopP:      true,
 				usesResponses:     true,
 				omitFirstSystem:   false,
-				supportsStreaming: false, // your code: !strings.Contains(o1ProPattern)
+				supportsStreaming: false,
+				isRealtime:        false,
+				supportsWebSearch: false,
 			},
 		}
 
@@ -802,6 +923,7 @@ func testCapabilities(t *testing.T, when spec.G, it spec.S) {
 					Expect(c.UsesResponsesAPI).To(Equal(tt.usesResponses))
 					Expect(c.OmitFirstSystemMsg).To(Equal(tt.omitFirstSystem))
 					Expect(c.SupportsStreaming).To(Equal(tt.supportsStreaming))
+					Expect(c.SupportsWebSearch).To(Equal(tt.supportsWebSearch))
 				}
 			})
 		}

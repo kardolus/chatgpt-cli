@@ -103,6 +103,8 @@ var configMetadata = []ConfigMetadata{
 	{"seed", "set-seed", 0, "Sets the seed for deterministic sampling (Beta)"},
 	{"name", "set-name", "openai", "The prefix for environment variable overrides"},
 	{"effort", "set-effort", "low", "Set the reasoning effort"},
+	{"web", "set-web", false, "Enable web search"},
+	{"web_context_size", "set-web-context-size", "low", "Set the context size for web search"},
 	{"voice", "set-voice", "nova", "Set the voice used by tts models"},
 	{"user_agent", "set-user-agent", "chatgpt-cli", "Set the User-Agent in request header"},
 }
@@ -1067,6 +1069,8 @@ func createConfigFromViper() config.Config {
 		Multiline:            viper.GetBool("multiline"),
 		Seed:                 viper.GetInt("seed"),
 		Effort:               viper.GetString("effort"),
+		Web:                  viper.GetBool("web"),
+		WebContextSize:       viper.GetString("web_context_size"),
 		Voice:                viper.GetString("voice"),
 		UserAgent:            viper.GetString("user_agent"),
 		CustomHeaders:        viper.GetStringMapString("custom_headers"),

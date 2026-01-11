@@ -14,6 +14,12 @@ type ResponsesRequest struct {
 	Stream          bool      `json:"stream"`
 	Temperature     float64   `json:"temperature,omitempty"`
 	TopP            float64   `json:"top_p,omitempty"`
+	Tools           []Tool    `json:"tools,omitempty"`
+}
+
+type Tool struct {
+	Type              string `json:"type"`
+	SearchContextSize string `json:"search_context_size"`
 }
 
 type Reasoning struct {

@@ -1,7 +1,7 @@
 # Default goal when running `make`
 .DEFAULT_GOAL := help
 
-.PHONY: help all-tests binaries commit contract coverage install integration mcp-http mcp-sse reinstall shipit unit updatedeps
+.PHONY: help all-tests binaries commit contract coverage install integration mcp-http mcp-sse reinstall shipit smoke unit updatedeps
 
 # Help command to list all available targets
 help:  ## Show this help message
@@ -47,6 +47,9 @@ reinstall: ## Reinstall binaries (default target OS: darwin)
 
 shipit: ## Run the release script, create binaries, and generate release notes
 	./scripts/shipit.sh $(version) "$(message)"
+
+smoke: ## Run smoke tests
+	./scripts/smoke.sh
 
 unit: ## Run unit tests (optionally pass ARGS=...)
 	./scripts/unit.sh $(ARGS)

@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kardolus/chatgpt-cli/agent"
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/cache"
+	"github.com/kardolus/chatgpt-cli/internal/fsio"
 	"io"
 	"os"
 	"path/filepath"
@@ -44,6 +46,7 @@ var (
 	hasPipe         bool
 	useSpeak        bool
 	useDraw         bool
+	useAgent        bool
 	promptFile      string
 	roleFile        string
 	imageFile       string
@@ -307,7 +310,7 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, &client.RealFileReader{}, &client.RealFileWriter{}, cfg)
+	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, fsio.NewRealReader(fsio.DefaultBufferSize), &fsio.RealWriter{}, cfg)
 
 	if ServiceURL != "" {
 		c = c.WithServiceURL(ServiceURL)
@@ -443,10 +446,86 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		if len(args) == 0 && !hasPipe && !interactiveMode {
+		if len(args) == 0 && !hasPipe && !interactiveMode && !useAgent {
 			sugar.Infof("[MCP: %s] Context injected. No query submitted.", mcp.Tool)
 			return nil
 		}
+	}
+
+	if useAgent {
+		var parts []string
+
+		if strings.TrimSpace(chatContext) != "" {
+			parts = append(parts, chatContext)
+		}
+		if len(args) > 0 {
+			parts = append(parts, strings.Join(args, " "))
+		}
+
+		goal := strings.TrimSpace(strings.Join(parts, "\n"))
+		if goal == "" {
+			return errors.New("missing agent goal (provide args or pipe)")
+		}
+
+		clk := agent.NewRealClock()
+
+		budget := agent.NewDefaultBudget(agent.BudgetLimits{
+			MaxSteps:      10, // counts runner steps; planner doesn't call AllowStep
+			MaxWallTime:   0,  // unlimited for now
+			MaxShellCalls: 0,  // unlimited for now
+			MaxLLMCalls:   0,  // unlimited for now (planner + runner both consume)
+			MaxFileOps:    0,  // unlimited for now
+			MaxLLMTokens:  0,  // unlimited for now
+		})
+
+		sh := agent.NewExecShellRunner()
+		llm := agent.NewClientLLM(c)
+
+		r := fsio.NewRealReader(fsio.DefaultBufferSize)
+		w := &fsio.RealWriter{}
+		files := agent.NewFSIOFileOps(r, w)
+
+		tools := agent.Tools{
+			Shell: sh,
+			LLM:   llm,
+			Files: files,
+		}
+
+		policy := agent.NewDefaultPolicy(agent.PolicyLimits{
+			AllowedTools:           []agent.ToolKind{agent.ToolShell, agent.ToolLLM, agent.ToolFiles},
+			DeniedShellCommands:    []string{"rm", "sudo", "dd", "mkfs", "shutdown", "reboot"},
+			AllowedFileOps:         []string{"read", "write"},
+			RestrictFilesToWorkDir: true,
+		})
+
+		run := agent.NewDefaultRunner(tools, clk, budget, policy)
+
+		logs, err := agent.NewLogs()
+		if err != nil {
+			return err
+		}
+		defer logs.Close()
+
+		base := agent.NewDefaultPlanner(
+			llm,
+			budget,
+			clk,
+			agent.WithPlannerRawSink(func(raw string) {
+				_ = os.WriteFile(filepath.Join(logs.Dir, "plan.json"), []byte(strings.TrimSpace(raw)), 0o644)
+			}),
+		)
+
+		pl := agent.NewLoggingPlanner(base, logs)
+
+		a := agent.NewAgent(
+			clk,
+			pl,
+			run,
+			agent.WithHumanLogger(zap.S()),
+			agent.WithDebugLogger(logs.DebugLogger),
+		)
+
+		return a.RunAgentGoal(ctx, goal)
 	}
 
 	if interactiveMode {
@@ -848,6 +927,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--output", "The output audio file for text-to-speech")
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--debug", "Print debug messages")
+		printFlagWithPadding("--agent", "Run agent (experimental)")
 		printFlagWithPadding("--target", "Load configuration from config.<target>.yaml")
 		printFlagWithPadding("--mcp", "MCP endpoint URL (e.g. http://localhost:3333)")
 		printFlagWithPadding("--mcp-tool", "Tool name to call on the MCP server")
@@ -911,6 +991,7 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().StringArrayVar(&mcpHeaders, "mcp-header", []string{}, "MCP header in the form 'Key: Value' (repeatable)")
 	rootCmd.PersistentFlags().StringArrayVar(&paramsList, "mcp-param", []string{}, "Key-value pair as key=value. Can be specified multiple times")
 	rootCmd.PersistentFlags().StringVar(&paramsJSON, "mcp-params", "", "Provide parameters as a raw JSON string")
+	rootCmd.PersistentFlags().BoolVar(&useAgent, "agent", false, "Run agent (experimental)")
 }
 
 func setupConfigFlags(rootCmd *cobra.Command, meta ConfigMetadata) {
@@ -954,6 +1035,7 @@ func isGeneralFlag(name string) bool {
 		"delete-thread":   true,
 		"show-history":    true,
 		"prompt":          true,
+		"agent":           true,
 		"set-completions": true,
 		"help":            true,
 		"role-file":       true,

@@ -18,8 +18,8 @@ import (
 //go:generate mockgen -destination=callermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/http Caller
 //go:generate mockgen -destination=historymocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/history Store
 //go:generate mockgen -destination=timermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client Timer
-//go:generate mockgen -destination=readermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client FileReader
-//go:generate mockgen -destination=writermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client FileWriter
+//go:generate mockgen -destination=readermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/internal/fsio Reader
+//go:generate mockgen -destination=writermocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/internal/fsio Writer
 //go:generate mockgen -destination=transportmocks_test.go -package=client_test github.com/kardolus/chatgpt-cli/api/client MCPTransport
 
 const (
@@ -31,8 +31,8 @@ var (
 	mockCaller       *MockCaller
 	mockHistoryStore *MockStore
 	mockTimer        *MockTimer
-	mockReader       *MockFileReader
-	mockWriter       *MockFileWriter
+	mockReader       *MockReader
+	mockWriter       *MockWriter
 	factory          *clientFactory
 	apiKeyEnvVar     string
 	config           config2.Config
@@ -49,8 +49,8 @@ func testClient(t *testing.T, when spec.G, it spec.S) {
 		mockCaller = NewMockCaller(mockCtrl)
 		mockHistoryStore = NewMockStore(mockCtrl)
 		mockTimer = NewMockTimer(mockCtrl)
-		mockReader = NewMockFileReader(mockCtrl)
-		mockWriter = NewMockFileWriter(mockCtrl)
+		mockReader = NewMockReader(mockCtrl)
+		mockWriter = NewMockWriter(mockCtrl)
 		config = MockConfig()
 
 		factory = newClientFactory(mockHistoryStore)

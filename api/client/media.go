@@ -14,7 +14,6 @@ import (
 	stdhttp "net/http"
 	"net/textproto"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -26,45 +25,6 @@ const (
 	httpScheme   = "http"
 	httpsScheme  = "https"
 )
-
-type FileReader interface {
-	ReadFile(name string) ([]byte, error)
-	ReadBufferFromFile(file *os.File) ([]byte, error)
-	Open(name string) (*os.File, error)
-}
-
-type RealFileReader struct{}
-
-func (r *RealFileReader) Open(name string) (*os.File, error) {
-	return os.Open(name)
-}
-
-func (r *RealFileReader) ReadFile(name string) ([]byte, error) {
-	return os.ReadFile(name)
-}
-
-func (r *RealFileReader) ReadBufferFromFile(file *os.File) ([]byte, error) {
-	buffer := make([]byte, bufferSize)
-	_, err := file.Read(buffer)
-
-	return buffer, err
-}
-
-type FileWriter interface {
-	Write(file *os.File, buf []byte) error
-	Create(name string) (*os.File, error)
-}
-
-type RealFileWriter struct{}
-
-func (r *RealFileWriter) Create(name string) (*os.File, error) {
-	return os.Create(name)
-}
-
-func (r *RealFileWriter) Write(file *os.File, buf []byte) error {
-	_, err := file.Write(buf)
-	return err
-}
 
 // EditImage edits an input image using a text prompt and writes the modified image to the specified output path.
 //

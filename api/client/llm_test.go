@@ -266,16 +266,57 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 					cfg := MockConfig()
 					cfg.OmitHistory = true
 
-					subject := client.New(mockCallerFactory, mockHistoryStore, mockTimer, mockReader, mockWriter, cfg)
+					subject := client.New(
+						mockCallerFactory,
+						mockHistoryStore,
+						mockTimer,
+						mockReader,
+						mockWriter,
+						cfg,
+					)
 
+					// History should never be read or written
 					mockHistoryStore.EXPECT().Read().Times(0)
 					mockHistoryStore.EXPECT().Write(gomock.Any()).Times(0)
 
-					messages = createMessages(nil, query)
-					body, err = createBody(messages, false)
+					var capturedBody []byte
+
+					validHTTPResponseBytes := []byte(`{
+					  "id": "chatcmpl_test",
+					  "object": "chat.completion",
+					  "created": 0,
+					  "model": "gpt-4o",
+					  "choices": [
+						{
+						  "index": 0,
+						  "message": { "role": "assistant", "content": "ok" },
+						  "finish_reason": "stop"
+						}
+					  ],
+					  "usage": { "prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2 }
+					}`)
+
+					mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
+
+					mockCaller.EXPECT().
+						Post(gomock.Any(), gomock.Any(), gomock.Any()).
+						DoAndReturn(func(endpoint string, body []byte, stream bool) ([]byte, error) {
+							capturedBody = body
+							return validHTTPResponseBytes, nil
+						})
+
+					_, _, err := subject.Query(context.Background(), query)
 					Expect(err).NotTo(HaveOccurred())
 
-					testValidHTTPResponse(subject, body, true)
+					Expect(capturedBody).NotTo(BeNil())
+
+					var req api.CompletionsRequest
+					err = json.Unmarshal(capturedBody, &req)
+					Expect(err).NotTo(HaveOccurred())
+
+					Expect(req.Messages).To(HaveLen(1))
+					Expect(req.Messages[0].Role).To(Equal("user"))
+					Expect(req.Messages[0].Content).To(Equal(query))
 				})
 
 				it("truncates the history as expected", func() {

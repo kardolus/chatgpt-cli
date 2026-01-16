@@ -10,17 +10,19 @@ type Budget interface {
 	Start(now time.Time)
 	AllowStep(step Step, now time.Time) error
 	AllowTool(kind ToolKind, now time.Time) error
+	AllowIteration(now time.Time) error // NEW
 	ChargeLLMTokens(tokens int, now time.Time)
 	Snapshot(now time.Time) BudgetSnapshot
 }
 
 const (
-	BudgetKindSteps     = "steps"
-	BudgetKindShell     = "shell"
-	BudgetKindLLM       = "llm"
-	BudgetKindFiles     = "files"
-	BudgetKindLLMTokens = "llm_tokens"
-	BudgetKindWallTime  = "wall_time"
+	BudgetKindSteps      = "steps"
+	BudgetKindShell      = "shell"
+	BudgetKindLLM        = "llm"
+	BudgetKindFiles      = "files"
+	BudgetKindLLMTokens  = "llm_tokens"
+	BudgetKindWallTime   = "wall_time"
+	BudgetKindIterations = "iterations"
 )
 
 type BudgetLimits struct {
@@ -30,17 +32,19 @@ type BudgetLimits struct {
 	MaxShellCalls int
 	MaxLLMCalls   int
 	MaxFileOps    int
+	MaxIterations int
 }
 
 type BudgetSnapshot struct {
-	StartedAt     time.Time
-	Elapsed       time.Duration
-	Limits        BudgetLimits
-	StepsUsed     int
-	ShellUsed     int
-	LLMUsed       int
-	FileOpsUsed   int
-	LLMTokensUsed int
+	StartedAt      time.Time
+	Elapsed        time.Duration
+	Limits         BudgetLimits
+	StepsUsed      int
+	ShellUsed      int
+	LLMUsed        int
+	FileOpsUsed    int
+	LLMTokensUsed  int
+	IterationsUsed int
 }
 
 type DefaultBudget struct {
@@ -49,11 +53,12 @@ type DefaultBudget struct {
 	started   bool
 	startedAt time.Time
 
-	stepsUsed     int
-	shellUsed     int
-	llmUsed       int
-	fileOpsUsed   int
-	llmTokensUsed int
+	stepsUsed      int
+	shellUsed      int
+	llmUsed        int
+	fileOpsUsed    int
+	llmTokensUsed  int
+	iterationsUsed int
 }
 
 func NewDefaultBudget(limits BudgetLimits) *DefaultBudget {
@@ -68,14 +73,7 @@ func (b *DefaultBudget) Start(now time.Time) {
 	b.llmUsed = 0
 	b.fileOpsUsed = 0
 	b.llmTokensUsed = 0
-}
-
-func (b *DefaultBudget) ChargeLLMTokens(tokens int, now time.Time) {
-	b.ensureStarted(now)
-	if tokens <= 0 {
-		return
-	}
-	b.llmTokensUsed += tokens
+	b.iterationsUsed = 0
 }
 
 func (b *DefaultBudget) Snapshot(now time.Time) BudgetSnapshot {
@@ -87,15 +85,44 @@ func (b *DefaultBudget) Snapshot(now time.Time) BudgetSnapshot {
 	}
 
 	return BudgetSnapshot{
-		StartedAt:     b.startedAt,
-		Elapsed:       elapsed,
-		Limits:        b.limits,
-		StepsUsed:     b.stepsUsed,
-		ShellUsed:     b.shellUsed,
-		LLMUsed:       b.llmUsed,
-		FileOpsUsed:   b.fileOpsUsed,
-		LLMTokensUsed: b.llmTokensUsed,
+		StartedAt:      b.startedAt,
+		Elapsed:        elapsed,
+		Limits:         b.limits,
+		StepsUsed:      b.stepsUsed,
+		ShellUsed:      b.shellUsed,
+		LLMUsed:        b.llmUsed,
+		FileOpsUsed:    b.fileOpsUsed,
+		LLMTokensUsed:  b.llmTokensUsed,
+		IterationsUsed: b.iterationsUsed,
 	}
+}
+
+func (b *DefaultBudget) ChargeLLMTokens(tokens int, now time.Time) {
+	b.ensureStarted(now)
+	if tokens <= 0 {
+		return
+	}
+	b.llmTokensUsed += tokens
+}
+
+func (b *DefaultBudget) AllowIteration(now time.Time) error {
+	b.ensureStarted(now)
+
+	if err := b.checkWall(now); err != nil {
+		return err
+	}
+
+	if b.limits.MaxIterations > 0 && b.iterationsUsed+1 > b.limits.MaxIterations {
+		return BudgetExceededError{
+			Kind:    BudgetKindIterations,
+			Limit:   b.limits.MaxIterations,
+			Used:    b.iterationsUsed,
+			Message: "iteration budget exceeded",
+		}
+	}
+
+	b.iterationsUsed++
+	return nil
 }
 
 func (b *DefaultBudget) AllowStep(step Step, now time.Time) error {

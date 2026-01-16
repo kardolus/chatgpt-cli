@@ -35,6 +35,20 @@ func (m *MockBudget) EXPECT() *MockBudgetMockRecorder {
 	return m.recorder
 }
 
+// AllowIteration mocks base method.
+func (m *MockBudget) AllowIteration(arg0 time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AllowIteration", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AllowIteration indicates an expected call of AllowIteration.
+func (mr *MockBudgetMockRecorder) AllowIteration(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AllowIteration", reflect.TypeOf((*MockBudget)(nil).AllowIteration), arg0)
+}
+
 // AllowStep mocks base method.
 func (m *MockBudget) AllowStep(arg0 agent.Step, arg1 time.Time) error {
 	m.ctrl.T.Helper()

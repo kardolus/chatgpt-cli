@@ -168,6 +168,9 @@ func ValidateFlags(model string, flags map[string]bool) error {
 	if !flags["mcp"] && flags["mcp-params"] {
 		return errors.New("the --mcp-params flag cannot be used without the --mcp flag")
 	}
+	if !flags["agent"] && flags["agent-mode"] {
+		return errors.New("the --agent-mode flag cannot be used without the --agent flag")
+	}
 	if flags["audio"] && !strings.Contains(model, AudioPattern) {
 		return errors.New("the --audio flag cannot be used without a compatible model, ie gpt-4o-audio-preview (see --list-models)")
 	}

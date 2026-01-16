@@ -17,8 +17,10 @@ type ClientLLM struct {
 func NewClientLLM(c *apiclient.Client) *ClientLLM { return &ClientLLM{c: c} }
 
 func (l *ClientLLM) Complete(ctx context.Context, prompt string) (string, int, error) {
+	// we should let the planner set the configuration
 	l.c.Config.OmitHistory = true
-	//l.c.Config.Temperature = 0
+	l.c.Config.Temperature = 0
+
 	out, tokens, err := l.c.Query(ctx, prompt)
 	if err != nil {
 		return "", 0, err

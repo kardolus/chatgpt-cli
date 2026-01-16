@@ -14,10 +14,10 @@ import (
 )
 
 func TestUnitAgent(t *testing.T) {
-	spec.Run(t, "Testing the agent orchestration", testAgent, spec.Report(report.Terminal{}))
+	spec.Run(t, "Testing the plan-execute agent", testPlanExecuteAgent, spec.Report(report.Terminal{}))
 }
 
-func testAgent(t *testing.T, when spec.G, it spec.S) {
+func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 	var (
 		mockCtrl    *gomock.Controller
 		mockClock   *MockClock
@@ -59,7 +59,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 				RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
 				Times(0)
 
-			subject := agent.NewAgent(
+			subject := agent.NewPlanExecuteAgent(
 				mockClock,
 				mockPlanner,
 				mockRunner,
@@ -98,7 +98,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 				RunStep(gomock.Any(), gomock.Any(), plan.Steps[1]).
 				Times(0)
 
-			subject := agent.NewAgent(
+			subject := agent.NewPlanExecuteAgent(
 				mockClock,
 				mockPlanner,
 				mockRunner,
@@ -132,7 +132,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 				}, nil).
 				Times(1)
 
-			subject := agent.NewAgent(
+			subject := agent.NewPlanExecuteAgent(
 				mockClock,
 				mockPlanner,
 				mockRunner,
@@ -157,7 +157,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 				RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
 				Times(0)
 
-			subject := agent.NewAgent(
+			subject := agent.NewPlanExecuteAgent(
 				mockClock,
 				mockPlanner,
 				mockRunner,
@@ -194,7 +194,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 				RunStep(gomock.Any(), gomock.Any(), plan.Steps[1]).
 				Times(0)
 
-			subject := agent.NewAgent(
+			subject := agent.NewPlanExecuteAgent(
 				mockClock,
 				mockPlanner,
 				mockRunner,
@@ -238,7 +238,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 				}, nil).
 				Times(1)
 
-			subject := agent.NewAgent(
+			subject := agent.NewPlanExecuteAgent(
 				mockClock,
 				mockPlanner,
 				mockRunner,
@@ -268,7 +268,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 				}).
 				Times(1)
 
-			subject := agent.NewAgent(
+			subject := agent.NewPlanExecuteAgent(
 				mockClock,
 				mockPlanner,
 				mockRunner,
@@ -299,7 +299,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 				}).
 				Times(1)
 
-			subject := agent.NewAgent(
+			subject := agent.NewPlanExecuteAgent(
 				mockClock,
 				mockPlanner,
 				mockRunner,
@@ -309,7 +309,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 			Expect(subject.RunAgentGoal(context.Background(), goal)).To(Succeed())
 		})
 
-		it("should run all planned steps (Agent no longer enforces MaxSteps)", func() {
+		it("should run all planned steps (PlanExecuteAgent no longer enforces MaxSteps)", func() {
 			plan := agent.Plan{
 				Goal: goal,
 				Steps: []agent.Step{
@@ -336,7 +336,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 					Return(agent.StepResult{Step: plan.Steps[2], Outcome: agent.OutcomeOK}, nil),
 			)
 
-			subject := agent.NewAgent(
+			subject := agent.NewPlanExecuteAgent(
 				mockClock,
 				mockPlanner,
 				mockRunner,
@@ -378,7 +378,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 				}).
 				Times(1)
 
-			subject := agent.NewAgent(mockClock, mockPlanner, mockRunner)
+			subject := agent.NewPlanExecuteAgent(mockClock, mockPlanner, mockRunner)
 			Expect(subject.RunAgentGoal(context.Background(), goal)).To(Succeed())
 		})
 
@@ -407,7 +407,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 				RunStep(gomock.Any(), gomock.Any(), plan.Steps[1]).
 				Times(0)
 
-			subject := agent.NewAgent(mockClock, mockPlanner, mockRunner)
+			subject := agent.NewPlanExecuteAgent(mockClock, mockPlanner, mockRunner)
 
 			err := subject.RunAgentGoal(context.Background(), goal)
 			Expect(err).To(HaveOccurred())
@@ -442,7 +442,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 				RunStep(gomock.Any(), gomock.Any(), plan.Steps[1]).
 				Times(0)
 
-			subject := agent.NewAgent(mockClock, mockPlanner, mockRunner)
+			subject := agent.NewPlanExecuteAgent(mockClock, mockPlanner, mockRunner)
 
 			err := subject.RunAgentGoal(context.Background(), goal)
 			Expect(err).To(MatchError(polErr))
@@ -479,7 +479,7 @@ func testAgent(t *testing.T, when spec.G, it spec.S) {
 				RunStep(gomock.Any(), gomock.Any(), plan.Steps[1]).
 				Times(0)
 
-			subject := agent.NewAgent(mockClock, mockPlanner, mockRunner)
+			subject := agent.NewPlanExecuteAgent(mockClock, mockPlanner, mockRunner)
 
 			err := subject.RunAgentGoal(context.Background(), goal)
 			Expect(err).To(MatchError(budgetErr))

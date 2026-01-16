@@ -2,169 +2,77 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
-	"unicode"
+	"time"
 
 	"go.uber.org/zap"
 )
 
-// Agent pipeline: goal → Planner → Steps → Runner → Tools (Shell | LLM | FileOps), governed by Budget/Policy.
-
-// 	Iteration 1: goal → plan → run(plan)
-//	Iteration 2: goal → plan → run until failure → planner(repair) → run repair
-//	Iteration 3: (repeat pipeline per chunk/step): goal → planner(next) → step(s) → runner → observe → planner(next) ..
-
-type Agent struct {
-	clock   Clock
-	planner Planner
-	runner  Runner
-	config  Config
-
-	out   *zap.SugaredLogger
-	debug *zap.SugaredLogger
+type Agent interface {
+	RunAgentGoal(ctx context.Context, goal string) error
 }
 
-type Option func(*Agent)
+type Mode string
 
-func WithDryRun(v bool) Option    { return func(a *Agent) { a.config.DryRun = v } }
-func WithWorkDir(d string) Option { return func(a *Agent) { a.config.WorkDir = d } }
+const (
+	ModePlanExecute Mode = "plan_execute"
+	ModeReAct       Mode = "react"
+)
 
-func WithHumanLogger(l *zap.SugaredLogger) Option {
-	return func(a *Agent) {
-		if l != nil {
-			a.out = l
-		}
+type Deps struct {
+	Clock   Clock
+	Planner Planner
+	LLM     LLM
+	Runner  Runner
+	Budget  Budget
+}
+
+func New(mode Mode, deps Deps, baseOpts ...func(*BaseAgent)) (Agent, error) {
+	base := NewBaseAgent(deps.Clock)
+	for _, o := range baseOpts {
+		o(base)
+	}
+
+	switch mode {
+	case ModePlanExecute:
+		return &PlanExecuteAgent{BaseAgent: base, planner: deps.Planner, runner: deps.Runner}, nil
+	case ModeReAct:
+		return &ReActAgent{BaseAgent: base, llm: deps.LLM, runner: deps.Runner, budget: deps.Budget}, nil
+	default:
+		return nil, fmt.Errorf("unknown agent mode: %q", mode)
 	}
 }
 
-func WithDebugLogger(l *zap.SugaredLogger) Option {
-	return func(a *Agent) {
-		if l != nil {
-			a.debug = l
-		}
+type BaseAgent struct {
+	clock  Clock
+	config Config
+	out    *zap.SugaredLogger
+	debug  *zap.SugaredLogger
+}
+
+func NewBaseAgent(clock Clock) *BaseAgent {
+	return &BaseAgent{
+		clock:  clock,
+		config: Config{DryRun: false, WorkDir: "."},
+		out:    zap.NewNop().Sugar(),
+		debug:  zap.NewNop().Sugar(),
 	}
 }
 
-func NewAgent(clk Clock, pl Planner, run Runner, opts ...Option) *Agent {
-	a := &Agent{
-		clock:   clk,
-		planner: pl,
-		runner:  run,
-		config:  Config{DryRun: false, WorkDir: "."},
-
-		out:   zap.NewNop().Sugar(),
-		debug: zap.NewNop().Sugar(),
+func (b *BaseAgent) logMode(goal, mode string) {
+	b.out.Infof("Goal: %s", goal)
+	if mode != "" {
+		b.out.Infof("Mode: %s\n", mode)
+	} else {
+		b.out.Info("")
 	}
-	for _, o := range opts {
-		o(a)
-	}
-	return a
 }
 
-func (a *Agent) RunAgentGoal(ctx context.Context, goal string) error {
-	out := a.out
-	dbg := a.debug
-
-	start := a.clock.Now()
-	defer func() {
-		out.Infof("Total duration: %s", a.clock.Now().Sub(start))
-		dbg.Infof("Total duration: %s", a.clock.Now().Sub(start))
-	}()
-
-	plan, err := a.planner.Plan(ctx, goal)
-	if err != nil {
-		dbg.Errorf("planner error: %v", err)
-		return err
-	}
-
-	// Debug: persist raw plan JSON if you have it (see note below).
-	// Debug: always log the plan struct too
-	dbg.Debugf("plan goal=%q steps=%d", plan.Goal, len(plan.Steps))
-
-	execCtx := ExecContext{Goal: goal, Plan: plan, Results: nil}
-
-	// Human header (same as before)
-	out.Infof("Goal: %s", plan.Goal)
-	for i, s := range plan.Steps {
-		switch s.Type {
-		case ToolShell:
-			out.Infof("Step %d/%d: %s (shell %s %v)", i+1, len(plan.Steps), s.Description, s.Command, s.Args)
-		case ToolLLM:
-			out.Infof("Step %d/%d: %s (llm prompt_len=%d)", i+1, len(plan.Steps), s.Description, len(s.Prompt))
-		case ToolFiles:
-			out.Infof("Step %d/%d: %s (file op=%q path=%q)", i+1, len(plan.Steps), s.Description, s.Op, s.Path)
-		default:
-			out.Infof("Step %d/%d: %s (type=%q)", i+1, len(plan.Steps), s.Description, s.Type)
-		}
-	}
-	out.Info("")
-
-	var final string
-	for i, step := range plan.Steps {
-		rendered, err := ApplyTemplate(step, execCtx)
-		if err != nil {
-			out.Errorf("Template render failed (step %d): %s: %v", i+1, step.Description, err)
-			dbg.Errorf("template render failed step=%d desc=%q err=%v", i+1, step.Description, err)
-			return err
-		}
-
-		// Debug: rendered step (includes resolved templates)
-		dbg.Debugf("rendered step %d/%d: %+v", i+1, len(plan.Steps), rendered)
-
-		res, err := a.runner.RunStep(ctx, a.config, rendered)
-		if err != nil {
-			if isBudgetStop(err, out) || isPolicyStop(err, out) {
-				dbg.Errorf("stop error step=%d desc=%q err=%v", i+1, rendered.Description, err)
-				return err
-			}
-			out.Errorf("Step failed: %s: %v", rendered.Description, err)
-			dbg.Errorf("step failed step=%d desc=%q err=%v transcript=%q", i+1, rendered.Description, err, res.Transcript)
-			return err
-		}
-
-		out.Infof("Step %d finished in %s (outcome=%s)", i+1, res.Duration, res.Outcome)
-
-		// Debug: ALWAYS dump transcript
-		if strings.TrimSpace(res.Transcript) != "" {
-			dbg.Debugf("step %d transcript:\n%s", i+1, res.Transcript)
-		}
-
-		if res.Outcome == OutcomeError {
-			if res.Transcript != "" {
-				out.Errorf("Step failed: %s\n%s", rendered.Description, res.Transcript)
-			}
-			dbg.Errorf("step outcome error step=%d desc=%q", i+1, rendered.Description)
-			return fmt.Errorf("step failed: %s", rendered.Description)
-		}
-
-		if res.Output != "" {
-			final = res.Output
-		}
-
-		execCtx.Results = append(execCtx.Results, res)
-	}
-
-	out.Infof("\nResult: %s\n", strings.TrimRightFunc(final, unicode.IsSpace))
-	dbg.Debugf("final (trimmed): %q", strings.TrimRightFunc(final, unicode.IsSpace))
-	return nil
+func (b *BaseAgent) startTimer() time.Time {
+	return b.clock.Now()
 }
 
-func isBudgetStop(err error, log *zap.SugaredLogger) bool {
-	var be BudgetExceededError
-	if errors.As(err, &be) {
-		log.Warnf("Budget exceeded (kind=%s): %v", be.Kind, err)
-		return true
-	}
-	return false
-}
-
-func isPolicyStop(err error, log *zap.SugaredLogger) bool {
-	var pe PolicyDeniedError
-	if errors.As(err, &pe) {
-		log.Warnf("Policy denied (kind=%s): %v", pe.Kind, err)
-		return true
-	}
-	return false
+func (b *BaseAgent) finishTimer(start time.Time) {
+	b.out.Infof("Total duration: %s", b.clock.Now().Sub(start))
+	b.debug.Infof("Total duration: %s", b.clock.Now().Sub(start))
 }

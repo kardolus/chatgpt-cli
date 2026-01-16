@@ -11,21 +11,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// ReActAgent implements the ReAct (Reasoning + Acting) pattern.
-// Instead of planning all steps upfront, it iteratively:
-// 1. Thinks about what to do next
-// 2. Takes an action (tool call or final answer)
-// 3. Observes the result
-// 4. Repeats until task is complete
 type ReActAgent struct {
+	*BaseAgent
 	llm    LLM
 	runner Runner
 	budget Budget
-	clock  Clock
-	config Config
-
-	out   *zap.SugaredLogger
-	debug *zap.SugaredLogger
 }
 
 type ReActOption func(*ReActAgent)
@@ -53,13 +43,10 @@ func WithReActDebugLogger(l *zap.SugaredLogger) ReActOption {
 
 func NewReActAgent(llm LLM, runner Runner, budget Budget, clock Clock, opts ...ReActOption) *ReActAgent {
 	a := &ReActAgent{
-		llm:    llm,
-		runner: runner,
-		budget: budget,
-		clock:  clock,
-		config: Config{DryRun: false, WorkDir: "."},
-		out:    zap.NewNop().Sugar(),
-		debug:  zap.NewNop().Sugar(),
+		BaseAgent: NewBaseAgent(clock),
+		llm:       llm,
+		runner:    runner,
+		budget:    budget,
 	}
 	for _, o := range opts {
 		o(a)
@@ -67,40 +54,49 @@ func NewReActAgent(llm LLM, runner Runner, budget Budget, clock Clock, opts ...R
 	return a
 }
 
-const maxReActIterations = 10
-
 type reActAction struct {
-	Thought     string `json:"thought"`
-	ActionType  string `json:"action_type"`  // "tool" or "answer"
-	Tool        string `json:"tool,omitempty"`
-	Command     string `json:"command,omitempty"`
+	Thought     string   `json:"thought"`
+	ActionType  string   `json:"action_type"` // "tool" or "answer"
+	Tool        string   `json:"tool,omitempty"`
+	Command     string   `json:"command,omitempty"`
 	Args        []string `json:"args,omitempty"`
-	Prompt      string `json:"prompt,omitempty"`
-	Op          string `json:"op,omitempty"`
-	Path        string `json:"path,omitempty"`
-	Data        string `json:"data,omitempty"`
-	FinalAnswer string `json:"final_answer,omitempty"`
+	Prompt      string   `json:"prompt,omitempty"`
+	Op          string   `json:"op,omitempty"`
+	Path        string   `json:"path,omitempty"`
+	Data        string   `json:"data,omitempty"`
+	FinalAnswer string   `json:"final_answer,omitempty"`
 }
 
 func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) error {
+	start := a.startTimer()
+	defer a.finishTimer(start)
+
+	a.logMode(goal, "ReAct (iterative reasoning + acting)")
+
 	out := a.out
 	dbg := a.debug
-
-	start := a.clock.Now()
-	defer func() {
-		out.Infof("Total duration: %s", a.clock.Now().Sub(start))
-		dbg.Infof("Total duration: %s", a.clock.Now().Sub(start))
-	}()
-
-	out.Infof("Goal: %s", goal)
-	out.Infof("Mode: ReAct (iterative reasoning + acting)\n")
 
 	conversation := []string{
 		fmt.Sprintf("USER: %s", goal),
 	}
 
-	for i := 0; i < maxReActIterations; i++ {
+	for i := 0; ; i++ {
 		now := a.clock.Now()
+
+		if err := a.budget.AllowIteration(now); err != nil {
+			dbg.Errorf("iteration budget exceeded at iteration %d: %v", i+1, err)
+			return err
+		}
+
+		snap := a.budget.Snapshot(now)
+		if snap.Limits.MaxLLMTokens > 0 && snap.LLMTokensUsed >= snap.Limits.MaxLLMTokens {
+			return BudgetExceededError{
+				Kind:    BudgetKindLLMTokens,
+				Limit:   snap.Limits.MaxLLMTokens,
+				Used:    snap.LLMTokensUsed,
+				Message: "llm token budget exceeded",
+			}
+		}
 
 		if err := a.budget.AllowTool(ToolLLM, now); err != nil {
 			dbg.Errorf("budget exceeded at iteration %d: %v", i+1, err)
@@ -169,11 +165,6 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) error {
 
 		conversation = append(conversation, fmt.Sprintf("OBSERVATION: %s", res.Output))
 	}
-
-	err := fmt.Errorf("max iterations (%d) reached without final answer", maxReActIterations)
-	out.Warnf("%v", err)
-	dbg.Warnf("%v", err)
-	return err
 }
 
 func buildReActPrompt(conversation []string) string {

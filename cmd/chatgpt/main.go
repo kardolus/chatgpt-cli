@@ -47,6 +47,7 @@ var (
 	useSpeak        bool
 	useDraw         bool
 	useAgent        bool
+	useReact        bool
 	promptFile      string
 	roleFile        string
 	imageFile       string
@@ -446,10 +447,14 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		if len(args) == 0 && !hasPipe && !interactiveMode && !useAgent {
+		if len(args) == 0 && !hasPipe && !interactiveMode && !useAgent && !useReact {
 			sugar.Infof("[MCP: %s] Context injected. No query submitted.", mcp.Tool)
 			return nil
 		}
+	}
+
+	if useAgent && useReact {
+		return errors.New("cannot use both --agent and --react flags simultaneously")
 	}
 
 	if useAgent {
@@ -523,6 +528,65 @@ func run(cmd *cobra.Command, args []string) error {
 			run,
 			agent.WithHumanLogger(zap.S()),
 			agent.WithDebugLogger(logs.DebugLogger),
+		)
+
+		return a.RunAgentGoal(ctx, goal)
+	}
+
+	if useReact {
+		var parts []string
+
+		if strings.TrimSpace(chatContext) != "" {
+			parts = append(parts, chatContext)
+		}
+		if len(args) > 0 {
+			parts = append(parts, strings.Join(args, " "))
+		}
+
+		goal := strings.TrimSpace(strings.Join(parts, "\n"))
+		if goal == "" {
+			return errors.New("missing react agent goal (provide args or pipe)")
+		}
+
+		clk := agent.NewRealClock()
+
+		budget := agent.NewDefaultBudget(agent.BudgetLimits{
+			MaxSteps:      0,  // not used by ReAct
+			MaxWallTime:   0,  // unlimited for now
+			MaxShellCalls: 0,  // unlimited for now
+			MaxLLMCalls:   10, // limit LLM calls to prevent infinite loops
+			MaxFileOps:    0,  // unlimited for now
+			MaxLLMTokens:  0,  // unlimited for now
+		})
+
+		sh := agent.NewExecShellRunner()
+		llm := agent.NewClientLLM(c)
+
+		r := fsio.NewRealReader(fsio.DefaultBufferSize)
+		w := &fsio.RealWriter{}
+		files := agent.NewFSIOFileOps(r, w)
+
+		tools := agent.Tools{
+			Shell: sh,
+			LLM:   llm,
+			Files: files,
+		}
+
+		policy := agent.NewDefaultPolicy(agent.PolicyLimits{
+			AllowedTools:           []agent.ToolKind{agent.ToolShell, agent.ToolLLM, agent.ToolFiles},
+			DeniedShellCommands:    []string{"rm", "sudo", "dd", "mkfs", "shutdown", "reboot"},
+			AllowedFileOps:         []string{"read", "write"},
+			RestrictFilesToWorkDir: true,
+		})
+
+		run := agent.NewDefaultRunner(tools, clk, budget, policy)
+
+		a := agent.NewReActAgent(
+			llm,
+			run,
+			budget,
+			clk,
+			agent.WithReActHumanLogger(zap.S()),
 		)
 
 		return a.RunAgentGoal(ctx, goal)
@@ -928,6 +992,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--debug", "Print debug messages")
 		printFlagWithPadding("--agent", "Run agent (experimental)")
+		printFlagWithPadding("--react", "Run ReAct agent (experimental)")
 		printFlagWithPadding("--target", "Load configuration from config.<target>.yaml")
 		printFlagWithPadding("--mcp", "MCP endpoint URL (e.g. http://localhost:3333)")
 		printFlagWithPadding("--mcp-tool", "Tool name to call on the MCP server")
@@ -992,6 +1057,7 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().StringArrayVar(&paramsList, "mcp-param", []string{}, "Key-value pair as key=value. Can be specified multiple times")
 	rootCmd.PersistentFlags().StringVar(&paramsJSON, "mcp-params", "", "Provide parameters as a raw JSON string")
 	rootCmd.PersistentFlags().BoolVar(&useAgent, "agent", false, "Run agent (experimental)")
+	rootCmd.PersistentFlags().BoolVar(&useReact, "react", false, "Run ReAct agent (experimental)")
 }
 
 func setupConfigFlags(rootCmd *cobra.Command, meta ConfigMetadata) {

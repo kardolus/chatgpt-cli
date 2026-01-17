@@ -124,6 +124,8 @@ var configMetadata = []ConfigMetadata{
 	{"agent.restrict_files_to_work_dir", "set-agent-restrict-files-to-work-dir", true, "Restrict file ops to workdir"},
 	{"agent.write_plan_json", "set-agent-write-plan-json", true, "Write plan.json in plan mode"},
 	{"agent.plan_json_path", "set-agent-plan-json-path", "", "Override plan.json path"},
+	{"agent.work_dir", "set-agent-work-dir", ".", "Agent working directory (default: .)"},
+	{"agent.dry_run", "set-agent-dry-run", false, "Agent dry-run (no side effects)"},
 	{"user_agent", "set-user-agent", "chatgpt-cli", "Set the User-Agent in request header"},
 }
 
@@ -483,9 +485,6 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		// print result like normal
-		zap.S().Infoln(answer)
-
 		// write ONE history interaction (you said you already created the helper)
 		if hs != nil && !cfg.OmitHistory {
 			if err := appendAgentRunToHistory(hs, cfg.Role, goal, answer); err != nil {
@@ -495,6 +494,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 		return nil
 	}
+
 	if interactiveMode {
 		sugar.Infof(
 			"Entering interactive mode. Using thread '%s'. Multiline mode is %s.\n"+
@@ -844,7 +844,7 @@ func buildAgentGoal(chatContext string, args []string) (string, error) {
 
 func runAgent(
 	ctx context.Context,
-	c *client.Client, // adjust type if yours differs
+	c *client.Client,
 	cfg config.Config,
 	mode string,
 	goal string,
@@ -872,17 +872,25 @@ func runAgent(
 		MaxIterations: cfg.Agent.MaxIterations,
 	})
 
-	run := agent.NewDefaultRunner(tools, clk, budget, policy)
+	runner := agent.NewDefaultRunner(tools, clk, budget, policy)
+
+	baseOpts := []agent.BaseOption{
+		agent.WithWorkDir(cfg.Agent.WorkDir),
+		agent.WithDryRun(cfg.Agent.DryRun),
+		agent.WithHumanLogger(zap.S()),
+	}
 
 	switch mode {
 	case "react":
-		a := agent.NewReActAgent(
-			llm,
-			run,
-			budget,
-			clk,
-			agent.WithReActHumanLogger(zap.S()),
-		)
+		a, err := agent.New(agent.ModeReAct, agent.Deps{
+			Clock:  clk,
+			LLM:    llm,
+			Runner: runner,
+			Budget: budget,
+		}, baseOpts...)
+		if err != nil {
+			return "", err
+		}
 		return a.RunAgentGoal(ctx, goal)
 
 	case "plan":
@@ -892,28 +900,39 @@ func runAgent(
 		}
 		defer logs.Close()
 
-		base := agent.NewDefaultPlanner(
+		var planner agent.Planner = agent.NewDefaultPlanner(
 			llm,
 			budget,
 			clk,
 			agent.WithPlannerRawSink(func(raw string) {
-				// configurable output path
-				planPath := cfg.Agent.PlanJSONPath
+				if !cfg.Agent.WritePlanJSON {
+					return
+				}
+				planPath := strings.TrimSpace(cfg.Agent.PlanJSONPath)
 				if planPath == "" {
 					planPath = filepath.Join(logs.Dir, "plan.json")
 				}
 				_ = os.WriteFile(planPath, []byte(strings.TrimSpace(raw)), 0o644)
 			}),
 		)
-		pl := agent.NewLoggingPlanner(base, logs)
 
-		a := agent.NewPlanExecuteAgent(
-			clk,
-			pl,
-			run,
-			agent.WithHumanLogger(zap.S()),
-			agent.WithDebugLogger(logs.DebugLogger),
-		)
+		// wrap it
+		planner = agent.NewLoggingPlanner(planner, logs)
+
+		// Plan mode wants debug logger too
+		planOpts := append([]agent.BaseOption{}, baseOpts...)
+		planOpts = append(planOpts, agent.WithDebugLogger(logs.DebugLogger))
+
+		a, err := agent.New(agent.ModePlanExecute, agent.Deps{
+			Clock:   clk,
+			Planner: planner,
+			Runner:  runner,
+			LLM:     llm,
+			Budget:  budget,
+		}, planOpts...)
+		if err != nil {
+			return "", err
+		}
 		return a.RunAgentGoal(ctx, goal)
 
 	default:
@@ -1346,6 +1365,8 @@ func createConfigFromViper() config.Config {
 		CustomHeaders:        viper.GetStringMapString("custom_headers"),
 		Agent: config.AgentConfig{
 			Mode:          viper.GetString("agent.mode"),
+			WorkDir:       viper.GetString("agent.work_dir"),
+			DryRun:        viper.GetBool("agent.dry_run"),
 			MaxSteps:      viper.GetInt("agent.max_steps"),
 			MaxIterations: viper.GetInt("agent.max_iterations"),
 			MaxWallTime:   viper.GetInt("agent.max_wall_time"),

@@ -44,7 +44,9 @@ type Config struct {
 }
 
 type AgentConfig struct {
-	Mode string `yaml:"mode"`
+	Mode    string `yaml:"mode"`
+	WorkDir string `yaml:"work_dir"`
+	DryRun  bool   `yaml:"dry_run"`
 
 	// Budgets / guardrails (0 = unlimited)
 	MaxSteps      int `yaml:"max_steps"`

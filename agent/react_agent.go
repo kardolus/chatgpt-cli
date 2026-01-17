@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
-
-	"go.uber.org/zap"
 )
 
 type ReActAgent struct {
@@ -18,40 +16,18 @@ type ReActAgent struct {
 	budget Budget
 }
 
-type ReActOption func(*ReActAgent)
-
-func WithReActDryRun(v bool) ReActOption { return func(a *ReActAgent) { a.config.DryRun = v } }
-func WithReActWorkDir(d string) ReActOption {
-	return func(a *ReActAgent) { a.config.WorkDir = d }
-}
-
-func WithReActHumanLogger(l *zap.SugaredLogger) ReActOption {
-	return func(a *ReActAgent) {
-		if l != nil {
-			a.out = l
-		}
+func NewReActAgent(llm LLM, runner Runner, budget Budget, clock Clock, opts ...BaseOption) *ReActAgent {
+	base := NewBaseAgent(clock)
+	for _, o := range opts {
+		o(base)
 	}
-}
 
-func WithReActDebugLogger(l *zap.SugaredLogger) ReActOption {
-	return func(a *ReActAgent) {
-		if l != nil {
-			a.debug = l
-		}
-	}
-}
-
-func NewReActAgent(llm LLM, runner Runner, budget Budget, clock Clock, opts ...ReActOption) *ReActAgent {
-	a := &ReActAgent{
-		BaseAgent: NewBaseAgent(clock),
+	return &ReActAgent{
+		BaseAgent: base,
 		llm:       llm,
 		runner:    runner,
 		budget:    budget,
 	}
-	for _, o := range opts {
-		o(a)
-	}
-	return a
 }
 
 type reActAction struct {

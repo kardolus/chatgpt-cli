@@ -22,37 +22,17 @@ type PlanExecuteAgent struct {
 	runner  Runner
 }
 
-type Option func(*PlanExecuteAgent)
-
-func WithDryRun(v bool) Option    { return func(a *PlanExecuteAgent) { a.config.DryRun = v } }
-func WithWorkDir(d string) Option { return func(a *PlanExecuteAgent) { a.config.WorkDir = d } }
-
-func WithHumanLogger(l *zap.SugaredLogger) Option {
-	return func(a *PlanExecuteAgent) {
-		if l != nil {
-			a.out = l
-		}
+func NewPlanExecuteAgent(clk Clock, pl Planner, run Runner, opts ...BaseOption) *PlanExecuteAgent {
+	base := NewBaseAgent(clk)
+	for _, o := range opts {
+		o(base)
 	}
-}
 
-func WithDebugLogger(l *zap.SugaredLogger) Option {
-	return func(a *PlanExecuteAgent) {
-		if l != nil {
-			a.debug = l
-		}
-	}
-}
-
-func NewPlanExecuteAgent(clk Clock, pl Planner, run Runner, opts ...Option) *PlanExecuteAgent {
-	a := &PlanExecuteAgent{
-		BaseAgent: NewBaseAgent(clk),
+	return &PlanExecuteAgent{
+		BaseAgent: base,
 		planner:   pl,
 		runner:    run,
 	}
-	for _, o := range opts {
-		o(a)
-	}
-	return a
 }
 
 func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) (string, error) {

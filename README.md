@@ -2,10 +2,9 @@
 
 ![Test Workflow](https://github.com/kardolus/chatgpt-cli/actions/workflows/test.yml/badge.svg?branch=main) [![Public Backlog](https://img.shields.io/badge/public%20backlog-808080)](https://github.com/users/kardolus/projects/2)
 
-**Tested and Compatible with OpenAI ChatGPT, Azure OpenAI Service, Perplexity AI, Llama and 302.AI!**
-
-ChatGPT CLI provides a powerful command-line interface for seamless interaction with ChatGPT models via OpenAI and
-Azure, featuring streaming capabilities and extensive configuration options.
+ChatGPT CLI is a powerful, multi-provider command-line interface for working with modern LLMs. It supports OpenAI,
+Azure, Perplexity, LLaMA, and more, and includes streaming, interactive chat, prompt files, image/audio I/O, MCP tool
+calls, and an experimental agent mode for multi-step tasks with safety and budget controls.
 
 ![a screenshot](cmd/chatgpt/resources/vhs.gif)
 
@@ -16,6 +15,11 @@ Azure, featuring streaming capabilities and extensive configuration options.
         - [Using the prompt flag](#using-the---prompt-flag)
         - [Example](#example)
         - [Explore More Prompts](#explore-more-prompts)
+    - [Agent Mode (ReAct + Plan/Execute)](#agent-mode-react--planexecute)
+        - [Quick Start](#quick-start)
+        - [Workdir Safety](#workdir-safety)
+        - [Budgets and Policy](#budgets-and-policy)
+        - [Logs](#logs)
     - [MCP Support](#mcp-support)
         - [Overview](#overview)
         - [Examples](#examples)
@@ -37,6 +41,8 @@ Azure, featuring streaming capabilities and extensive configuration options.
 - [Configuration](#configuration)
     - [General Configuration](#general-configuration)
     - [LLM Specific Configuration](#llm-specific-configuration)
+    - [Agent Configuration](#agent-configuration)
+      - [Default Policy](#default-policy)
     - [Custom Config and Data Directory](#custom-config-and-data-directory)
         - [Example for Custom Directories](#example-for-custom-directories)
         - [Variables for interactive mode](#variables-for-interactive-mode)
@@ -70,6 +76,10 @@ Azure, featuring streaming capabilities and extensive configuration options.
 * **Custom context from any source**: You can provide the GPT model with a custom context during conversation. This
   context can be piped in from any source, such as local files, standard input, or even another program. This
   flexibility allows the model to adapt to a wide range of conversational scenarios.
+* **Agent mode (ReAct + Plan/Execute)**: Run multi-step tasks that can think, act, and observe using tools like shell,
+  file operations, and LLM reasoning. Supports both iterative ReAct loops and Plan/Execute workflows, with built-in *
+  *budget limits** (time, steps, tokens) and **policy enforcement** (allowed tools, denied commands, workdir
+  sandboxing) for safe-by-default automation.
 * **Web search**: Allow compatible models (e.g. `gpt-5+`) to fetch live web data during a query. Enable with the `web`
   setting and tune results using `web_context_size`.
 * **MCP (Model Context Protocol) support**: Call external MCP tools via HTTP(S) or STDIO, inject their results into the
@@ -135,7 +145,77 @@ the diff data from `git diff`.
 For a variety of ready-to-use prompts, check out this [awesome prompts repository](https://github.com/kardolus/prompts).
 These can serve as great starting points or inspiration for your own custom prompts!
 
-Here’s the updated README section for MCP Support, placed after the ### Prompt Support section you shared:
+### Agent Mode (ReAct + Plan/Execute)
+
+![a screenshot](cmd/chatgpt/resources/agent.gif)
+
+ChatGPT CLI includes an experimental **agent mode** that can plan and run multi-step tasks using tools (shell, file ops,
+and LLM reasoning), while enforcing **budget + policy** constraints.
+
+There are two agent modes:
+
+- **ReAct (-agent-mode react)**: iterative “think → act → observe” loop
+- **Plan/Execute (-agent-mode plan)**: generates a plan first, then executes it step-by-step
+
+#### Quick Start
+
+ReAct mode (default):
+
+```
+chatgpt why is my test failing? --agent
+```
+
+Plan/Execute mode:
+
+```
+chatgpt what is the weather like in brooklyn --agent --agent-mode plan
+```
+
+#### Workdir Safety
+
+Agent file access can be restricted to a working directory. This is useful to prevent accidental reads/writes outside a
+project.
+
+```
+chatgpt "what files are in the /tmp directory" \
+  --agent \
+  --agent-work-dir .
+```
+
+If a step tries to read/write outside the workdir, it will be denied by policy (e.g. kind=path_escape).
+
+#### Budgets and Policy
+
+Agent execution is governed by:
+
+- **Budget limits** (iterations, steps, tool calls, wall-time, token usage)
+- **Policy rules** (allowed tools, denied shell commands, file op allowlist, and workdir path restrictions)
+
+This keeps the agent useful while still being safe-by-default.
+
+#### Logs
+
+When running in agent mode, ChatGPT CLI automatically writes detailed execution logs to the cache directory, under:
+
+```
+$OPENAI_CACHE_HOME/agent/
+```
+
+These logs include:
+
+- Planner output (for Plan/Execute mode)
+- Tool calls and their results
+- Timing and budget usage
+- Debug-level traces when debug logging is enabled
+
+Each agent run gets its own timestamped log directory, making it easy to inspect what happened after the fact or debug
+unexpected behavior.
+
+This is especially useful when:
+
+- An agent run fails due to budget or policy limits
+- You want to understand why the agent chose certain steps
+- You’re developing or tuning agent policies and budgets
 
 ### MCP Support
 
@@ -452,6 +532,41 @@ environment variables, a config.yaml file, and default values, in that respectiv
 | `url`                    | The base URL for the OpenAI API.                                                                                                                       | 'https://api.openai.com'       |
 | `user_agent`             | The header used for the user agent in API requests.                                                                                                    | 'chatgpt-cli'                  |
 | `voice`                  | The voice to use when generating audio with TTS models like gpt-4o-mini-tts.                                                                           | 'nova'                         |
+
+### Agent Configuration
+
+| Variable                           | Description                     | Default   |
+|------------------------------------|---------------------------------|-----------|
+| `agent`                            | Enable agent mode               | `false`   |
+| `agent.mode`                       | Strategy (`react` or `plan`)    | `react`   |
+| `agent.work_dir`                   | Working directory               | `.`       |
+| `agent.max_iterations`             | Max ReAct iterations            | `10`      |
+| `agent.max_steps`                  | Max plan steps                  | `10`      |
+| `agent.max_wall_time`              | Max wall time (0 = unlimited)   | `0`       |
+| `agent.max_shell_calls`            | Max shell calls (0 = unlimited) | `0`       |
+| `agent.max_llm_calls`              | Max LLM calls (0 = unlimited)   | `10`      |
+| `agent.max_file_ops`               | Max file ops (0 = unlimited)    | `0`       |
+| `agent.max_llm_tokens`             | Max LLM tokens (0 = unlimited)  | `0`       |
+| `agent.allowed_tools`              | Allowed tools                   | see below |
+| `agent.denied_shell_commands`      | Denied shell commands           | see below |
+| `agent.allowed_file_ops`           | Allowed file ops                | see below |
+| `agent.restrict_files_to_work_dir` | Sandbox to workdir              | `true`    |
+| `agent.write_plan_json`            | Write plan.json in plan mode    | `true`    |
+| `agent.plan_json_path`             | Override plan.json path         | `""`      |
+| `agent.dry_run`                    | No side effects                 | `false`   |
+
+You can also use flags, for example:
+
+```shell
+chatgpt "what files are here?" --agent --agent-work-dir /tmp
+```
+#### Default Policy
+
+```yaml
+allowed_tools: [shell, llm, files]
+denied_shell_commands: [rm, sudo, dd, mkfs, shutdown, reboot]
+allowed_file_ops: [read, write]
+```
 
 ### Custom Config, Cache and Data Directory
 

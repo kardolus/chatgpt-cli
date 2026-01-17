@@ -62,6 +62,12 @@ func (p *DefaultPolicy) AllowStep(cfg Config, step Step) error {
 			return PolicyDeniedError{Kind: PolicyKindShell, Reason: fmt.Sprintf("shell command denied: %s", cmd)}
 		}
 
+		if p.limits.RestrictFilesToWorkDir && cfg.WorkDir != "" {
+			if err := denyShellArgsOutsideWorkDir(cfg.WorkDir, step.Args); err != nil {
+				return err
+			}
+		}
+
 	case ToolLLM:
 		if strings.TrimSpace(step.Prompt) == "" {
 			return PolicyDeniedError{Kind: PolicyKindLLM, Reason: "llm step requires Prompt"}
@@ -90,6 +96,36 @@ func (p *DefaultPolicy) AllowStep(cfg Config, step Step) error {
 		}
 	}
 
+	return nil
+}
+
+// denyShellArgsOutsideWorkDir blocks absolute paths, ~, .., and any arg that would escape workdir.
+func denyShellArgsOutsideWorkDir(workdir string, args []string) error {
+	for _, raw := range args {
+		s := strings.TrimSpace(raw)
+		if s == "" {
+			continue
+		}
+
+		// Hard block obvious escapes
+		if strings.HasPrefix(s, "~") {
+			return PolicyDeniedError{
+				Kind:   PolicyKindPathEscape,
+				Reason: fmt.Sprintf("shell arg escapes workdir: workdir=%q arg=%q", workdir, s),
+			}
+		}
+
+		// If it contains path separators or looks like a path, validate it.
+		// (This is intentionally conservative; better to block than allow rm /tmp.)
+		if strings.Contains(s, "/") || strings.Contains(s, `\`) || strings.Contains(s, "..") || filepath.IsAbs(s) {
+			if escapesWorkDir(workdir, s) {
+				return PolicyDeniedError{
+					Kind:   PolicyKindPathEscape,
+					Reason: fmt.Sprintf("shell arg escapes workdir: workdir=%q arg=%q", workdir, s),
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -123,17 +159,27 @@ func containsString(xs []string, s string) bool {
 
 // escapesWorkDir returns true if path, when resolved relative to workdir, is outside workdir.
 func escapesWorkDir(workdir, path string) bool {
-	wd := filepath.Clean(workdir)
+	// Resolve workdir to absolute path
+	wd, err := filepath.Abs(workdir)
+	if err != nil {
+		return true // fail closed
+	}
+	wd = filepath.Clean(wd)
 
-	// If path is absolute, clean it. If relative, join to workdir.
+	// Resolve target path
 	var full string
 	if filepath.IsAbs(path) {
-		full = filepath.Clean(path)
+		full = path
 	} else {
-		full = filepath.Clean(filepath.Join(wd, path))
+		full = filepath.Join(wd, path)
 	}
+	full, err = filepath.Abs(full)
+	if err != nil {
+		return true // fail closed
+	}
+	full = filepath.Clean(full)
 
-	// Make sure full starts with wd + separator, or equals wd.
+	// Allow exactly wd or anything under wd
 	if full == wd {
 		return false
 	}

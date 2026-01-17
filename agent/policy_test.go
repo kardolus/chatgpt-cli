@@ -1,6 +1,7 @@
 package agent_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/kardolus/chatgpt-cli/agent"
@@ -94,6 +95,104 @@ func testPolicy(t *testing.T, when spec.G, it spec.S) {
 					Command: "echo",
 					Args:    []string{"ok"},
 				})).To(Succeed())
+			})
+
+			it("allows shell args that are not paths when RestrictFilesToWorkDir is enabled", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				tmp := t.TempDir()
+				old, err := os.Getwd()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.Chdir(tmp)).To(Succeed())
+				t.Cleanup(func() { _ = os.Chdir(old) })
+
+				Expect(p.AllowStep(agent.Config{WorkDir: "."}, agent.Step{
+					Type:    agent.ToolShell,
+					Command: "ls",
+					Args:    []string{"-la", "api"},
+				})).To(Succeed())
+			})
+
+			it("denies shell args that are absolute paths outside WorkDir when RestrictFilesToWorkDir is enabled", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				tmp := t.TempDir()
+				old, err := os.Getwd()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.Chdir(tmp)).To(Succeed())
+				t.Cleanup(func() { _ = os.Chdir(old) })
+
+				err = p.AllowStep(agent.Config{WorkDir: "."}, agent.Step{
+					Type:    agent.ToolShell,
+					Command: "ls",
+					Args:    []string{"/tmp"},
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("shell arg escapes workdir"))
+			})
+
+			it("denies shell args that use ~ when RestrictFilesToWorkDir is enabled", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				tmp := t.TempDir()
+				old, err := os.Getwd()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.Chdir(tmp)).To(Succeed())
+				t.Cleanup(func() { _ = os.Chdir(old) })
+
+				err = p.AllowStep(agent.Config{WorkDir: "."}, agent.Step{
+					Type:    agent.ToolShell,
+					Command: "cat",
+					Args:    []string{"~/secrets.txt"},
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("shell arg escapes workdir"))
+			})
+
+			it("denies shell args that escape via .. when RestrictFilesToWorkDir is enabled", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				tmp := t.TempDir()
+				old, err := os.Getwd()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.Chdir(tmp)).To(Succeed())
+				t.Cleanup(func() { _ = os.Chdir(old) })
+
+				err = p.AllowStep(agent.Config{WorkDir: "."}, agent.Step{
+					Type:    agent.ToolShell,
+					Command: "cat",
+					Args:    []string{"../outside.txt"},
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("shell arg escapes workdir"))
+			})
+
+			it("does not treat non-path flags containing '..' as path escapes", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				tmp := t.TempDir()
+				old, err := os.Getwd()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.Chdir(tmp)).To(Succeed())
+				t.Cleanup(func() { _ = os.Chdir(old) })
+
+				// This is not really a filesystem path, but it contains ".."
+				err = p.AllowStep(agent.Config{WorkDir: "."}, agent.Step{
+					Type:    agent.ToolShell,
+					Command: "echo",
+					Args:    []string{"--pattern=.."},
+				})
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 
@@ -220,6 +319,71 @@ func testPolicy(t *testing.T, when spec.G, it spec.S) {
 					Type: agent.ToolFiles,
 					Op:   "read",
 					Path: "/repo",
+				})).To(Succeed())
+			})
+
+			it("allows relative paths inside workdir when WorkDir is '.' (regression)", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				// Make cwd deterministic for filepath.Abs()
+				tmp := t.TempDir()
+				old, err := os.Getwd()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.Chdir(tmp)).To(Succeed())
+				t.Cleanup(func() { _ = os.Chdir(old) })
+
+				// Path is clearly within "." (cwd)
+				Expect(p.AllowStep(agent.Config{WorkDir: "."}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "read",
+					Path: "api/completions.go",
+				})).To(Succeed())
+
+				// Also allow "./..." form
+				Expect(p.AllowStep(agent.Config{WorkDir: "."}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "read",
+					Path: "./api/completions.go",
+				})).To(Succeed())
+			})
+
+			it("denies relative escape paths when WorkDir is '.'", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				tmp := t.TempDir()
+				old, err := os.Getwd()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.Chdir(tmp)).To(Succeed())
+				t.Cleanup(func() { _ = os.Chdir(old) })
+
+				err = p.AllowStep(agent.Config{WorkDir: "."}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "read",
+					Path: "../secrets.txt",
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("path escapes workdir"))
+			})
+
+			it("allows relative workdir like './' (normalized) for in-tree paths", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				tmp := t.TempDir()
+				old, err := os.Getwd()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.Chdir(tmp)).To(Succeed())
+				t.Cleanup(func() { _ = os.Chdir(old) })
+
+				Expect(p.AllowStep(agent.Config{WorkDir: "./"}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "read",
+					Path: "api/file.go",
 				})).To(Succeed())
 			})
 		})

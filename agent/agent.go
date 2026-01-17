@@ -2,22 +2,16 @@ package agent
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
 )
 
 type Agent interface {
-	RunAgentGoal(ctx context.Context, goal string) error
+	RunAgentGoal(ctx context.Context, goal string) (string, error)
 }
 
 type Mode string
-
-const (
-	ModePlanExecute Mode = "plan_execute"
-	ModeReAct       Mode = "react"
-)
 
 type Deps struct {
 	Clock   Clock
@@ -25,22 +19,6 @@ type Deps struct {
 	LLM     LLM
 	Runner  Runner
 	Budget  Budget
-}
-
-func New(mode Mode, deps Deps, baseOpts ...func(*BaseAgent)) (Agent, error) {
-	base := NewBaseAgent(deps.Clock)
-	for _, o := range baseOpts {
-		o(base)
-	}
-
-	switch mode {
-	case ModePlanExecute:
-		return &PlanExecuteAgent{BaseAgent: base, planner: deps.Planner, runner: deps.Runner}, nil
-	case ModeReAct:
-		return &ReActAgent{BaseAgent: base, llm: deps.LLM, runner: deps.Runner, budget: deps.Budget}, nil
-	default:
-		return nil, fmt.Errorf("unknown agent mode: %q", mode)
-	}
 }
 
 type BaseAgent struct {

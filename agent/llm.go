@@ -17,14 +17,23 @@ type ClientLLM struct {
 func NewClientLLM(c *apiclient.Client) *ClientLLM { return &ClientLLM{c: c} }
 
 func (l *ClientLLM) Complete(ctx context.Context, prompt string) (string, int, error) {
-	// we should let the planner set the configuration
+	// save
+	prevOmit := l.c.Config.OmitHistory
+	prevTemp := l.c.Config.Temperature
+
+	// set for agent internals
 	l.c.Config.OmitHistory = true
 	l.c.Config.Temperature = 0
+
+	// restore no matter what
+	defer func() {
+		l.c.Config.OmitHistory = prevOmit
+		l.c.Config.Temperature = prevTemp
+	}()
 
 	out, tokens, err := l.c.Query(ctx, prompt)
 	if err != nil {
 		return "", 0, err
 	}
-
 	return out, tokens, nil
 }

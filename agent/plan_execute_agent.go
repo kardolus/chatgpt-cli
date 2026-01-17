@@ -55,7 +55,7 @@ func NewPlanExecuteAgent(clk Clock, pl Planner, run Runner, opts ...Option) *Pla
 	return a
 }
 
-func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) error {
+func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) (string, error) {
 	start := a.startTimer()
 	defer a.finishTimer(start)
 
@@ -67,7 +67,7 @@ func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) error 
 	plan, err := a.planner.Plan(ctx, goal)
 	if err != nil {
 		dbg.Errorf("planner error: %v", err)
-		return err
+		return "", err
 	}
 
 	dbg.Debugf("plan goal=%q steps=%d", plan.Goal, len(plan.Steps))
@@ -97,7 +97,7 @@ func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) error 
 		if err != nil {
 			out.Errorf("Template render failed (step %d): %s: %v", i+1, step.Description, err)
 			dbg.Errorf("template render failed step=%d desc=%q err=%v", i+1, step.Description, err)
-			return err
+			return "", err
 		}
 
 		// Debug: rendered step (includes resolved templates)
@@ -107,11 +107,11 @@ func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) error 
 		if err != nil {
 			if isBudgetStop(err, out) || isPolicyStop(err, out) {
 				dbg.Errorf("stop error step=%d desc=%q err=%v", i+1, rendered.Description, err)
-				return err
+				return "", err
 			}
 			out.Errorf("Step failed: %s: %v", rendered.Description, err)
 			dbg.Errorf("step failed step=%d desc=%q err=%v transcript=%q", i+1, rendered.Description, err, res.Transcript)
-			return err
+			return "", err
 		}
 
 		out.Infof("Step %d finished in %s (outcome=%s)", i+1, res.Duration, res.Outcome)
@@ -126,7 +126,7 @@ func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) error 
 				out.Errorf("Step failed: %s\n%s", rendered.Description, res.Transcript)
 			}
 			dbg.Errorf("step outcome error step=%d desc=%q", i+1, rendered.Description)
-			return fmt.Errorf("step failed: %s", rendered.Description)
+			return "", fmt.Errorf("step failed: %s", rendered.Description)
 		}
 
 		if res.Output != "" {
@@ -136,9 +136,10 @@ func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) error 
 		execCtx.Results = append(execCtx.Results, res)
 	}
 
-	out.Infof("\nResult: %s\n", strings.TrimRightFunc(final, unicode.IsSpace))
+	result := strings.TrimRightFunc(final, unicode.IsSpace)
+	out.Infof("\nResult: %s\n", result)
 	dbg.Debugf("final (trimmed): %q", strings.TrimRightFunc(final, unicode.IsSpace))
-	return nil
+	return result, nil
 }
 
 func isBudgetStop(err error, log *zap.SugaredLogger) bool {

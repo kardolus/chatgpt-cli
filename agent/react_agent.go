@@ -67,7 +67,7 @@ type reActAction struct {
 	FinalAnswer string   `json:"final_answer,omitempty"`
 }
 
-func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) error {
+func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, error) {
 	start := a.startTimer()
 	defer a.finishTimer(start)
 
@@ -85,12 +85,12 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) error {
 
 		if err := a.budget.AllowIteration(now); err != nil {
 			dbg.Errorf("iteration budget exceeded at iteration %d: %v", i+1, err)
-			return err
+			return "", err
 		}
 
 		snap := a.budget.Snapshot(now)
 		if snap.Limits.MaxLLMTokens > 0 && snap.LLMTokensUsed >= snap.Limits.MaxLLMTokens {
-			return BudgetExceededError{
+			return "", BudgetExceededError{
 				Kind:    BudgetKindLLMTokens,
 				Limit:   snap.Limits.MaxLLMTokens,
 				Used:    snap.LLMTokensUsed,
@@ -100,7 +100,7 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) error {
 
 		if err := a.budget.AllowTool(ToolLLM, now); err != nil {
 			dbg.Errorf("budget exceeded at iteration %d: %v", i+1, err)
-			return err
+			return "", err
 		}
 
 		prompt := buildReActPrompt(conversation)
@@ -109,7 +109,7 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) error {
 		raw, tokens, err := a.llm.Complete(ctx, prompt)
 		if err != nil {
 			dbg.Errorf("llm error at iteration %d: %v", i+1, err)
-			return err
+			return "", err
 		}
 
 		a.budget.ChargeLLMTokens(tokens, now)
@@ -119,7 +119,7 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) error {
 		if err != nil {
 			out.Errorf("Failed to parse ReAct response: %v", err)
 			dbg.Errorf("parse error at iteration %d: %v\nraw: %s", i+1, err, raw)
-			return err
+			return "", err
 		}
 
 		dbg.Debugf("react iteration %d action_type=%s thought=%q", i+1, action.ActionType, action.Thought)
@@ -129,22 +129,23 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) error {
 		}
 
 		if action.ActionType == "answer" {
-			out.Infof("\nResult: %s\n", strings.TrimRightFunc(action.FinalAnswer, unicode.IsSpace))
+			result := strings.TrimRightFunc(action.FinalAnswer, unicode.IsSpace)
+			out.Infof("\nResult: %s\n", result)
 			dbg.Debugf("final answer: %q", action.FinalAnswer)
-			return nil
+			return result, nil
 		}
 
 		if action.ActionType != "tool" {
 			err := fmt.Errorf("unknown action_type: %q", action.ActionType)
 			dbg.Errorf("unknown action_type at iteration %d: %v", i+1, err)
-			return err
+			return "", err
 		}
 
 		step, err := convertReActActionToStep(action)
 		if err != nil {
 			out.Errorf("Failed to convert action to step: %v", err)
 			dbg.Errorf("convert error at iteration %d: %v", i+1, err)
-			return err
+			return "", err
 		}
 
 		out.Infof("[Iteration %d] Action: %s %s", i+1, action.Tool, step.Description)
@@ -153,11 +154,11 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) error {
 		if err != nil {
 			if isBudgetStop(err, out) || isPolicyStop(err, out) {
 				dbg.Errorf("stop error at iteration %d: %v", i+1, err)
-				return err
+				return "", err
 			}
 			out.Errorf("Step failed: %s: %v", step.Description, err)
 			dbg.Errorf("step failed at iteration %d: %v transcript=%q", i+1, err, res.Transcript)
-			return err
+			return "", err
 		}
 
 		out.Infof("[Iteration %d] Observation: %s (took %s)", i+1, truncateForDisplay(res.Output, 100), res.Duration)

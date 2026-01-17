@@ -467,126 +467,34 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Agent mode (experimental)
-	// - If --agent is set (non-empty), run an agent instead of normal query/stream.
-	// - Allowed values: "react" (default), "plan"
 	if agentEnabled {
-		// Determine mode (flag override > config > default)
-		mode := strings.ToLower(strings.TrimSpace(agentMode))
-		if mode == "" {
-			mode = strings.ToLower(strings.TrimSpace(cfg.Agent.Mode))
-		}
-		if mode == "" {
-			mode = "react"
-		}
-		if mode != "react" && mode != "plan" && mode != "plan_execute" && mode != "plan-execute" {
-			return fmt.Errorf("unknown agent mode %q (expected react|plan)", mode)
-		}
-
-		// Build goal once
-		var parts []string
-		if strings.TrimSpace(chatContext) != "" {
-			parts = append(parts, chatContext)
-		}
-		if len(args) > 0 {
-			parts = append(parts, strings.Join(args, " "))
-		}
-		goal := strings.TrimSpace(strings.Join(parts, "\n"))
-		if goal == "" {
-			return errors.New("missing agent goal (provide args or pipe)")
-		}
-
-		clk := agent.NewRealClock()
-		llm := agent.NewClientLLM(c)
-
-		sh := agent.NewExecShellRunner()
-		r := fsio.NewRealReader(fsio.DefaultBufferSize)
-		w := &fsio.RealWriter{}
-		files := agent.NewFSIOFileOps(r, w)
-
-		tools := agent.Tools{
-			Shell: sh,
-			LLM:   llm,
-			Files: files,
-		}
-
-		allowedTools, err := parseToolKinds(cfg.Agent.AllowedTools)
+		mode, err := resolveAgentMode(agentMode, cfg.Agent.Mode)
 		if err != nil {
 			return err
 		}
 
-		policy := agent.NewDefaultPolicy(agent.PolicyLimits{
-			AllowedTools:           allowedTools,
-			DeniedShellCommands:    cfg.Agent.DeniedShellCommands,
-			AllowedFileOps:         cfg.Agent.AllowedFileOps,
-			RestrictFilesToWorkDir: cfg.Agent.RestrictFilesToWorkDir,
-		})
+		goal, err := buildAgentGoal(chatContext, args)
+		if err != nil {
+			return err
+		}
 
-		// Logs only needed for plan mode (if you still only write plan.json there)
-		var logs *agent.Logs
-		if mode != "react" {
-			logs, err = agent.NewLogs()
-			if err != nil {
+		answer, err := runAgent(ctx, c, cfg, mode, goal)
+		if err != nil {
+			return err
+		}
+
+		// print result like normal
+		zap.S().Infoln(answer)
+
+		// write ONE history interaction (you said you already created the helper)
+		if hs != nil && !cfg.OmitHistory {
+			if err := appendAgentRunToHistory(hs, cfg.Role, goal, answer); err != nil {
 				return err
 			}
-			defer logs.Close()
 		}
 
-		// Budget: read from cfg (NO hardcoded 0/10 here)
-		// You’ll need to decide what fields exist in cfg.Agent now that you want it flat.
-		budget := agent.NewDefaultBudget(agent.BudgetLimits{
-			MaxSteps:      cfg.Agent.MaxSteps,
-			MaxWallTime:   time.Duration(cfg.Agent.MaxWallTime) * time.Second,
-			MaxShellCalls: cfg.Agent.MaxShellCalls,
-			MaxLLMCalls:   cfg.Agent.MaxLLMCalls,
-			MaxFileOps:    cfg.Agent.MaxFileOps,
-			MaxLLMTokens:  cfg.Agent.MaxLLMTokens,
-			MaxIterations: cfg.Agent.MaxIterations,
-		})
-
-		run := agent.NewDefaultRunner(tools, clk, budget, policy)
-
-		switch mode {
-		case "react":
-			a := agent.NewReActAgent(
-				llm,
-				run,
-				budget,
-				clk,
-				agent.WithReActHumanLogger(zap.S()),
-			)
-			return a.RunAgentGoal(ctx, goal)
-
-		default:
-			base := agent.NewDefaultPlanner(
-				llm,
-				budget,
-				clk,
-				agent.WithPlannerRawSink(func(raw string) {
-					if logs == nil {
-						return
-					}
-					// If you want configurable output path:
-					planPath := cfg.Agent.PlanJSONPath
-					if planPath == "" {
-						planPath = filepath.Join(logs.Dir, "plan.json")
-					}
-					_ = os.WriteFile(planPath, []byte(strings.TrimSpace(raw)), 0o644)
-				}),
-			)
-			pl := agent.NewLoggingPlanner(base, logs)
-
-			a := agent.NewPlanExecuteAgent(
-				clk,
-				pl,
-				run,
-				agent.WithHumanLogger(zap.S()),
-				agent.WithDebugLogger(logs.DebugLogger),
-			)
-			return a.RunAgentGoal(ctx, goal)
-		}
+		return nil
 	}
-
 	if interactiveMode {
 		sugar.Infof(
 			"Entering interactive mode. Using thread '%s'. Multiline mode is %s.\n"+
@@ -852,6 +760,192 @@ func setShellTitle(title string) error {
 	}
 
 	return nil
+}
+
+func appendAgentRunToHistory(store history.Store, systemRole, goal, answer string) error {
+	thread := store.GetThread()
+
+	entries, err := store.ReadThread(thread)
+	if err != nil {
+		// treat missing history file as empty thread
+		if errors.Is(err, os.ErrNotExist) {
+			entries = nil
+		} else {
+			return err
+		}
+	}
+
+	now := time.Now()
+
+	// Ensure a system message exists at the beginning (optional but matches your UX)
+	if len(entries) == 0 || strings.ToLower(strings.TrimSpace(entries[0].Role)) != "system" {
+		entries = append(entries, history.History{
+			Message: api.Message{
+				Role:    "system",
+				Content: systemRole,
+			},
+			Timestamp: now,
+		})
+	}
+
+	entries = append(entries,
+		history.History{
+			Message:   api.Message{Role: "user", Content: goal},
+			Timestamp: now,
+		},
+		history.History{
+			Message:   api.Message{Role: "assistant", Content: answer},
+			Timestamp: now,
+		},
+	)
+
+	// store already has thread set, but being explicit is fine
+	store.SetThread(thread)
+	return store.Write(entries)
+}
+
+func resolveAgentMode(flagMode, cfgMode string) (string, error) {
+	mode := strings.ToLower(strings.TrimSpace(flagMode))
+	if mode == "" {
+		mode = strings.ToLower(strings.TrimSpace(cfgMode))
+	}
+	if mode == "" {
+		mode = "react"
+	}
+
+	// allow some aliases, normalize to "react" or "plan"
+	switch mode {
+	case "react":
+		return "react", nil
+	case "plan":
+		return "plan", nil
+	case "plan_execute", "plan-execute":
+		return "plan", nil
+	default:
+		return "", fmt.Errorf("unknown agent mode %q (expected react|plan)", mode)
+	}
+}
+
+func buildAgentGoal(chatContext string, args []string) (string, error) {
+	var parts []string
+	if s := strings.TrimSpace(chatContext); s != "" {
+		parts = append(parts, s)
+	}
+	if len(args) > 0 {
+		parts = append(parts, strings.Join(args, " "))
+	}
+
+	goal := strings.TrimSpace(strings.Join(parts, "\n"))
+	if goal == "" {
+		return "", errors.New("missing agent goal (provide args or pipe)")
+	}
+	return goal, nil
+}
+
+func runAgent(
+	ctx context.Context,
+	c *client.Client, // adjust type if yours differs
+	cfg config.Config,
+	mode string,
+	goal string,
+) (string, error) {
+	clk := agent.NewRealClock()
+	llm := agent.NewClientLLM(c)
+
+	tools, err := buildAgentTools(llm)
+	if err != nil {
+		return "", err
+	}
+
+	policy, err := buildAgentPolicy(cfg)
+	if err != nil {
+		return "", err
+	}
+
+	budget := agent.NewDefaultBudget(agent.BudgetLimits{
+		MaxSteps:      cfg.Agent.MaxSteps,
+		MaxWallTime:   time.Duration(cfg.Agent.MaxWallTime) * time.Second,
+		MaxShellCalls: cfg.Agent.MaxShellCalls,
+		MaxLLMCalls:   cfg.Agent.MaxLLMCalls,
+		MaxFileOps:    cfg.Agent.MaxFileOps,
+		MaxLLMTokens:  cfg.Agent.MaxLLMTokens,
+		MaxIterations: cfg.Agent.MaxIterations,
+	})
+
+	run := agent.NewDefaultRunner(tools, clk, budget, policy)
+
+	switch mode {
+	case "react":
+		a := agent.NewReActAgent(
+			llm,
+			run,
+			budget,
+			clk,
+			agent.WithReActHumanLogger(zap.S()),
+		)
+		return a.RunAgentGoal(ctx, goal)
+
+	case "plan":
+		logs, err := agent.NewLogs()
+		if err != nil {
+			return "", err
+		}
+		defer logs.Close()
+
+		base := agent.NewDefaultPlanner(
+			llm,
+			budget,
+			clk,
+			agent.WithPlannerRawSink(func(raw string) {
+				// configurable output path
+				planPath := cfg.Agent.PlanJSONPath
+				if planPath == "" {
+					planPath = filepath.Join(logs.Dir, "plan.json")
+				}
+				_ = os.WriteFile(planPath, []byte(strings.TrimSpace(raw)), 0o644)
+			}),
+		)
+		pl := agent.NewLoggingPlanner(base, logs)
+
+		a := agent.NewPlanExecuteAgent(
+			clk,
+			pl,
+			run,
+			agent.WithHumanLogger(zap.S()),
+			agent.WithDebugLogger(logs.DebugLogger),
+		)
+		return a.RunAgentGoal(ctx, goal)
+
+	default:
+		return "", fmt.Errorf("internal error: unsupported mode %q", mode)
+	}
+}
+
+func buildAgentTools(llm agent.LLM) (agent.Tools, error) {
+	sh := agent.NewExecShellRunner()
+	r := fsio.NewRealReader(fsio.DefaultBufferSize)
+	w := &fsio.RealWriter{}
+	files := agent.NewFSIOFileOps(r, w)
+
+	return agent.Tools{
+		Shell: sh,
+		LLM:   llm,
+		Files: files,
+	}, nil
+}
+
+func buildAgentPolicy(cfg config.Config) (agent.Policy, error) {
+	allowedTools, err := parseToolKinds(cfg.Agent.AllowedTools)
+	if err != nil {
+		return nil, err
+	}
+
+	return agent.NewDefaultPolicy(agent.PolicyLimits{
+		AllowedTools:           allowedTools,
+		DeniedShellCommands:    cfg.Agent.DeniedShellCommands,
+		AllowedFileOps:         cfg.Agent.AllowedFileOps,
+		RestrictFilesToWorkDir: cfg.Agent.RestrictFilesToWorkDir,
+	}), nil
 }
 
 func toAliasFlagName(viperKey string) string {

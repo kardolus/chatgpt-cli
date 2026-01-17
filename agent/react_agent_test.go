@@ -70,7 +70,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			clock.EXPECT().Now().Return(now) // end (defer - out.Infof)
 			clock.EXPECT().Now().Return(now) // end (defer - dbg.Infof)
 
-			err := reactAgent.RunAgentGoal(ctx, "What is the answer?")
+			_, err := reactAgent.RunAgentGoal(ctx, "What is the answer?")
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -132,7 +132,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			clock.EXPECT().Now().Return(now) // end
 			clock.EXPECT().Now().Return(now) // end
 
-			err := reactAgent.RunAgentGoal(ctx, "How many files?")
+			_, err := reactAgent.RunAgentGoal(ctx, "How many files?")
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -154,7 +154,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			clock.EXPECT().Now().Return(now) // end
 			clock.EXPECT().Now().Return(now) // end
 
-			err := reactAgent.RunAgentGoal(ctx, "Do something")
+			_, err := reactAgent.RunAgentGoal(ctx, "Do something")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("llm call budget exceeded"))
 		})
@@ -178,7 +178,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			clock.EXPECT().Now().Return(now) // end
 			clock.EXPECT().Now().Return(now) // end
 
-			err := reactAgent.RunAgentGoal(ctx, "Do something")
+			_, err := reactAgent.RunAgentGoal(ctx, "Do something")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to parse JSON"))
 		})
@@ -202,7 +202,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			clock.EXPECT().Now().Return(now) // end
 			clock.EXPECT().Now().Return(now) // end
 
-			err := reactAgent.RunAgentGoal(ctx, "Do something")
+			_, err := reactAgent.RunAgentGoal(ctx, "Do something")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("missing action_type"))
 		})
@@ -238,7 +238,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			clock.EXPECT().Now().Return(now) // end
 			clock.EXPECT().Now().Return(now) // end
 
-			err := reactAgent.RunAgentGoal(ctx, "Run false")
+			_, err := reactAgent.RunAgentGoal(ctx, "Run false")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("exit 1"))
 		})
@@ -287,7 +287,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			clock.EXPECT().Now().Return(now) // end
 			clock.EXPECT().Now().Return(now) // end
 
-			err := reactAgent.RunAgentGoal(ctx, "Keep looping")
+			_, err := reactAgent.RunAgentGoal(ctx, "Keep looping")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("iteration budget exceeded"))
 		})
@@ -311,7 +311,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			clock.EXPECT().Now().Return(now) // end
 			clock.EXPECT().Now().Return(now) // end
 
-			err := reactAgent.RunAgentGoal(ctx, "Test markdown")
+			_, err := reactAgent.RunAgentGoal(ctx, "Test markdown")
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -338,7 +338,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 				clock.EXPECT().Now().Return(now) // end (defer - out.Infof)
 				clock.EXPECT().Now().Return(now) // end (defer - dbg.Infof)
 
-				err := reactAgent.RunAgentGoal(ctx, "Test")
+				_, err := reactAgent.RunAgentGoal(ctx, "Test")
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("shell tool requires command"))
 			})

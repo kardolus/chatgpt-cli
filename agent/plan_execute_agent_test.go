@@ -65,7 +65,7 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 				mockRunner,
 			)
 
-			err := subject.RunAgentGoal(context.Background(), goal)
+			_, err := subject.RunAgentGoal(context.Background(), goal)
 			Expect(err).To(MatchError(planErr))
 		})
 
@@ -104,7 +104,7 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 				mockRunner,
 			)
 
-			err := subject.RunAgentGoal(context.Background(), goal)
+			_, err := subject.RunAgentGoal(context.Background(), goal)
 			Expect(err).To(MatchError(runErr))
 		})
 
@@ -138,7 +138,7 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 				mockRunner,
 			)
 
-			err := subject.RunAgentGoal(context.Background(), goal)
+			_, err := subject.RunAgentGoal(context.Background(), goal)
 			Expect(err).To(MatchError(`step failed: step 1`))
 		})
 
@@ -163,7 +163,9 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 				mockRunner,
 			)
 
-			Expect(subject.RunAgentGoal(context.Background(), goal)).To(Succeed())
+			out, err := subject.RunAgentGoal(context.Background(), goal)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(out).To(BeEmpty())
 		})
 
 		it("should stop executing further steps when runner returns OutcomeError", func() {
@@ -200,7 +202,7 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 				mockRunner,
 			)
 
-			err := subject.RunAgentGoal(context.Background(), goal)
+			_, err := subject.RunAgentGoal(context.Background(), goal)
 			Expect(err).To(MatchError(`step failed: step 1`))
 		})
 
@@ -244,7 +246,8 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 				mockRunner,
 			)
 
-			Expect(subject.RunAgentGoal(context.Background(), goal)).To(Succeed())
+			_, err := subject.RunAgentGoal(context.Background(), goal)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		it("WithWorkDir should pass cfg.WorkDir into the runner", func() {
@@ -275,7 +278,8 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 				agent.WithWorkDir("/tmp/my-workdir"),
 			)
 
-			Expect(subject.RunAgentGoal(context.Background(), goal)).To(Succeed())
+			_, err := subject.RunAgentGoal(context.Background(), goal)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		it("WithDryRun should pass cfg.DryRun into the runner", func() {
@@ -306,7 +310,53 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 				agent.WithDryRun(true),
 			)
 
-			Expect(subject.RunAgentGoal(context.Background(), goal)).To(Succeed())
+			_, err := subject.RunAgentGoal(context.Background(), goal)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		it("happy path: should return the output of the final step", func() {
+			const goal = "do the thing"
+
+			plan := agent.Plan{
+				Goal: goal,
+				Steps: []agent.Step{
+					{Type: agent.ToolLLM, Description: "step 1", Prompt: "first"},
+					{Type: agent.ToolLLM, Description: "step 2", Prompt: "second"},
+				},
+			}
+
+			mockPlanner.EXPECT().
+				Plan(gomock.Any(), goal).
+				Return(plan, nil).
+				Times(1)
+
+			mockRunner.EXPECT().
+				RunStep(gomock.Any(), gomock.Any(), plan.Steps[0]).
+				Return(agent.StepResult{
+					Step:    plan.Steps[0],
+					Outcome: agent.OutcomeOK,
+					Output:  "A",
+				}, nil).
+				Times(1)
+
+			mockRunner.EXPECT().
+				RunStep(gomock.Any(), gomock.Any(), plan.Steps[1]).
+				Return(agent.StepResult{
+					Step:    plan.Steps[1],
+					Outcome: agent.OutcomeOK,
+					Output:  "B",
+				}, nil).
+				Times(1)
+
+			subject := agent.NewPlanExecuteAgent(
+				mockClock,
+				mockPlanner,
+				mockRunner,
+			)
+
+			out, err := subject.RunAgentGoal(context.Background(), goal)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(out).To(Equal("B")) // last step wins
 		})
 
 		it("should run all planned steps (PlanExecuteAgent no longer enforces MaxSteps)", func() {
@@ -342,7 +392,8 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 				mockRunner,
 			)
 
-			Expect(subject.RunAgentGoal(context.Background(), goal)).To(Succeed())
+			_, err := subject.RunAgentGoal(context.Background(), goal)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		it("should accumulate results and render templates for later steps", func() {
@@ -379,7 +430,8 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 				Times(1)
 
 			subject := agent.NewPlanExecuteAgent(mockClock, mockPlanner, mockRunner)
-			Expect(subject.RunAgentGoal(context.Background(), goal)).To(Succeed())
+			_, err := subject.RunAgentGoal(context.Background(), goal)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		it("should error if template rendering fails and not call runner for that step", func() {
@@ -409,7 +461,7 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 
 			subject := agent.NewPlanExecuteAgent(mockClock, mockPlanner, mockRunner)
 
-			err := subject.RunAgentGoal(context.Background(), goal)
+			_, err := subject.RunAgentGoal(context.Background(), goal)
 			Expect(err).To(HaveOccurred())
 		})
 
@@ -444,7 +496,7 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 
 			subject := agent.NewPlanExecuteAgent(mockClock, mockPlanner, mockRunner)
 
-			err := subject.RunAgentGoal(context.Background(), goal)
+			_, err := subject.RunAgentGoal(context.Background(), goal)
 			Expect(err).To(MatchError(polErr))
 		})
 
@@ -481,7 +533,7 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 
 			subject := agent.NewPlanExecuteAgent(mockClock, mockPlanner, mockRunner)
 
-			err := subject.RunAgentGoal(context.Background(), goal)
+			_, err := subject.RunAgentGoal(context.Background(), goal)
 			Expect(err).To(MatchError(budgetErr))
 		})
 	})

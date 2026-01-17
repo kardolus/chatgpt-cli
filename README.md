@@ -147,7 +147,7 @@ These can serve as great starting points or inspiration for your own custom prom
 
 ### Agent Mode (ReAct + Plan/Execute)
 
-<img src="cmd/chatgpt/resources/poc.png" alt="agent poc" width="680" />
+![a screenshot](cmd/chatgpt/resources/agent.gif)
 
 ChatGPT CLI includes an experimental **agent mode** that can plan and run multi-step tasks using tools (shell, file ops,
 and LLM reasoning), while enforcing **budget + policy** constraints.

@@ -4,6 +4,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/api/http"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/history"
+	"github.com/kardolus/chatgpt-cli/internal/fsio"
 	"time"
 )
 
@@ -11,7 +12,6 @@ const (
 	AssistantRole      = "assistant"
 	ErrHistoryTracking = "history tracking needs to be enabled to use this feature"
 	UserRole           = "user"
-	bufferSize         = 512
 )
 
 type Timer interface {
@@ -32,11 +32,11 @@ type Client struct {
 	historyStore history.Store
 	transport    MCPTransport
 	timer        Timer
-	reader       FileReader
-	writer       FileWriter
+	reader       fsio.Reader
+	writer       fsio.Writer
 }
 
-func New(callerFactory http.CallerFactory, hs history.Store, t Timer, r FileReader, w FileWriter, cfg config.Config) *Client {
+func New(callerFactory http.CallerFactory, hs history.Store, t Timer, r fsio.Reader, w fsio.Writer, cfg config.Config) *Client {
 	caller := callerFactory(cfg)
 
 	return &Client{

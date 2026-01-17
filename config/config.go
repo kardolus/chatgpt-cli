@@ -40,4 +40,30 @@ type Config struct {
 	Voice                string            `yaml:"voice"`
 	UserAgent            string            `yaml:"user_agent"`
 	CustomHeaders        map[string]string `yaml:"custom_headers"`
+	Agent                AgentConfig       `yaml:"agent"`
+}
+
+type AgentConfig struct {
+	Mode    string `yaml:"mode"`
+	WorkDir string `yaml:"work_dir"`
+	DryRun  bool   `yaml:"dry_run"`
+
+	// Budgets / guardrails (0 = unlimited)
+	MaxSteps      int `yaml:"max_steps"`
+	MaxIterations int `yaml:"max_iterations"`
+	MaxWallTime   int `yaml:"max_wall_time"`
+	MaxShellCalls int `yaml:"max_shell_calls"`
+	MaxLLMCalls   int `yaml:"max_llm_calls"`
+	MaxFileOps    int `yaml:"max_file_ops"`
+	MaxLLMTokens  int `yaml:"max_llm_tokens"`
+
+	// Safety/policy
+	AllowedTools           []string `yaml:"allowed_tools"`
+	DeniedShellCommands    []string `yaml:"denied_shell_commands"`
+	AllowedFileOps         []string `yaml:"allowed_file_ops"`
+	RestrictFilesToWorkDir bool     `yaml:"restrict_files_to_work_dir"`
+
+	// Logging / artifacts
+	WritePlanJSON bool   `yaml:"write_plan_json"`
+	PlanJSONPath  string `yaml:"plan_json_path"`
 }

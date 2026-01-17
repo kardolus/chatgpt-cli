@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kardolus/chatgpt-cli/agent"
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/cache"
+	"github.com/kardolus/chatgpt-cli/internal/fsio"
 	"io"
 	"os"
 	"path/filepath"
@@ -44,6 +46,8 @@ var (
 	hasPipe         bool
 	useSpeak        bool
 	useDraw         bool
+	agentMode       string
+	agentEnabled    bool
 	promptFile      string
 	roleFile        string
 	imageFile       string
@@ -106,6 +110,22 @@ var configMetadata = []ConfigMetadata{
 	{"web", "set-web", false, "Enable web search"},
 	{"web_context_size", "set-web-context-size", "low", "Set the context size for web search"},
 	{"voice", "set-voice", "nova", "Set the voice used by tts models"},
+	{"agent.mode", "set-agent-mode", "react", "Default agent mode (react|plan)"},
+	{"agent.max_steps", "set-agent-max-steps", 10, "Max steps (plan mode)"},
+	{"agent.max_iterations", "set-agent-max-iterations", 10, "Max iterations (react mode)"},
+	{"agent.max_wall_time", "set-agent-max-wall-time", 0, "Max wall time in seconds (0=unlimited)"},
+	{"agent.max_shell_calls", "set-agent-max-shell-calls", 0, "Max shell calls (0=unlimited)"},
+	{"agent.max_llm_calls", "set-agent-max-llm-calls", 10, "Max LLM calls (0=unlimited)"},
+	{"agent.max_file_ops", "set-agent-max-file-ops", 0, "Max file ops (0=unlimited)"},
+	{"agent.max_llm_tokens", "set-agent-max-llm-tokens", 0, "Max LLM tokens (0=unlimited)"},
+	{"agent.allowed_tools", "set-agent-allowed-tools", []string{"shell", "llm", "files"}, "Allowed tools for agent"},
+	{"agent.denied_shell_commands", "set-agent-denied-shell-commands", []string{"rm", "sudo", "dd", "mkfs", "shutdown", "reboot"}, "Denied shell commands"},
+	{"agent.allowed_file_ops", "set-agent-allowed-file-ops", []string{"read", "write"}, "Allowed file ops"},
+	{"agent.restrict_files_to_work_dir", "set-agent-restrict-files-to-work-dir", true, "Restrict file ops to workdir"},
+	{"agent.write_plan_json", "set-agent-write-plan-json", true, "Write plan.json in plan mode"},
+	{"agent.plan_json_path", "set-agent-plan-json-path", "", "Override plan.json path"},
+	{"agent.work_dir", "set-agent-work-dir", ".", "Agent working directory (default: .)"},
+	{"agent.dry_run", "set-agent-dry-run", false, "Agent dry-run (no side effects)"},
 	{"user_agent", "set-user-agent", "chatgpt-cli", "Set the User-Agent in request header"},
 }
 
@@ -307,7 +327,7 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, &client.RealFileReader{}, &client.RealFileWriter{}, cfg)
+	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, fsio.NewRealReader(fsio.DefaultBufferSize), &fsio.RealWriter{}, cfg)
 
 	if ServiceURL != "" {
 		c = c.WithServiceURL(ServiceURL)
@@ -443,10 +463,36 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		if len(args) == 0 && !hasPipe && !interactiveMode {
+		if len(args) == 0 && !hasPipe && !interactiveMode && !agentEnabled {
 			sugar.Infof("[MCP: %s] Context injected. No query submitted.", mcp.Tool)
 			return nil
 		}
+	}
+
+	if agentEnabled {
+		mode, err := resolveAgentMode(agentMode, cfg.Agent.Mode)
+		if err != nil {
+			return err
+		}
+
+		goal, err := buildAgentGoal(chatContext, args)
+		if err != nil {
+			return err
+		}
+
+		answer, err := runAgent(ctx, c, cfg, mode, goal)
+		if err != nil {
+			return err
+		}
+
+		// write ONE history interaction (you said you already created the helper)
+		if hs != nil && !cfg.OmitHistory {
+			if err := appendAgentRunToHistory(hs, cfg.Role, goal, answer); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
 	if interactiveMode {
@@ -716,6 +762,217 @@ func setShellTitle(title string) error {
 	return nil
 }
 
+func appendAgentRunToHistory(store history.Store, systemRole, goal, answer string) error {
+	thread := store.GetThread()
+
+	entries, err := store.ReadThread(thread)
+	if err != nil {
+		// treat missing history file as empty thread
+		if errors.Is(err, os.ErrNotExist) {
+			entries = nil
+		} else {
+			return err
+		}
+	}
+
+	now := time.Now()
+
+	// Ensure a system message exists at the beginning (optional but matches your UX)
+	if len(entries) == 0 || strings.ToLower(strings.TrimSpace(entries[0].Role)) != "system" {
+		entries = append(entries, history.History{
+			Message: api.Message{
+				Role:    "system",
+				Content: systemRole,
+			},
+			Timestamp: now,
+		})
+	}
+
+	entries = append(entries,
+		history.History{
+			Message:   api.Message{Role: "user", Content: goal},
+			Timestamp: now,
+		},
+		history.History{
+			Message:   api.Message{Role: "assistant", Content: answer},
+			Timestamp: now,
+		},
+	)
+
+	// store already has thread set, but being explicit is fine
+	store.SetThread(thread)
+	return store.Write(entries)
+}
+
+func resolveAgentMode(flagMode, cfgMode string) (string, error) {
+	mode := strings.ToLower(strings.TrimSpace(flagMode))
+	if mode == "" {
+		mode = strings.ToLower(strings.TrimSpace(cfgMode))
+	}
+	if mode == "" {
+		mode = "react"
+	}
+
+	// allow some aliases, normalize to "react" or "plan"
+	switch mode {
+	case "react":
+		return "react", nil
+	case "plan":
+		return "plan", nil
+	case "plan_execute", "plan-execute":
+		return "plan", nil
+	default:
+		return "", fmt.Errorf("unknown agent mode %q (expected react|plan)", mode)
+	}
+}
+
+func buildAgentGoal(chatContext string, args []string) (string, error) {
+	var parts []string
+	if s := strings.TrimSpace(chatContext); s != "" {
+		parts = append(parts, s)
+	}
+	if len(args) > 0 {
+		parts = append(parts, strings.Join(args, " "))
+	}
+
+	goal := strings.TrimSpace(strings.Join(parts, "\n"))
+	if goal == "" {
+		return "", errors.New("missing agent goal (provide args or pipe)")
+	}
+	return goal, nil
+}
+
+func runAgent(
+	ctx context.Context,
+	c *client.Client,
+	cfg config.Config,
+	mode string,
+	goal string,
+) (string, error) {
+	clk := agent.NewRealClock()
+	llm := agent.NewClientLLM(c)
+
+	tools, err := buildAgentTools(llm)
+	if err != nil {
+		return "", err
+	}
+
+	policy, err := buildAgentPolicy(cfg)
+	if err != nil {
+		return "", err
+	}
+
+	budget := agent.NewDefaultBudget(agent.BudgetLimits{
+		MaxSteps:      cfg.Agent.MaxSteps,
+		MaxWallTime:   time.Duration(cfg.Agent.MaxWallTime) * time.Second,
+		MaxShellCalls: cfg.Agent.MaxShellCalls,
+		MaxLLMCalls:   cfg.Agent.MaxLLMCalls,
+		MaxFileOps:    cfg.Agent.MaxFileOps,
+		MaxLLMTokens:  cfg.Agent.MaxLLMTokens,
+		MaxIterations: cfg.Agent.MaxIterations,
+	})
+
+	runner := agent.NewDefaultRunner(tools, clk, budget, policy)
+
+	baseOpts := []agent.BaseOption{
+		agent.WithWorkDir(cfg.Agent.WorkDir),
+		agent.WithDryRun(cfg.Agent.DryRun),
+		agent.WithHumanLogger(zap.S()),
+	}
+
+	switch mode {
+	case "react":
+		a, err := agent.New(agent.ModeReAct, agent.Deps{
+			Clock:  clk,
+			LLM:    llm,
+			Runner: runner,
+			Budget: budget,
+		}, baseOpts...)
+		if err != nil {
+			return "", err
+		}
+		return a.RunAgentGoal(ctx, goal)
+
+	case "plan":
+		logs, err := agent.NewLogs()
+		if err != nil {
+			return "", err
+		}
+		defer logs.Close()
+
+		var planner agent.Planner = agent.NewDefaultPlanner(
+			llm,
+			budget,
+			clk,
+			agent.WithPlannerRawSink(func(raw string) {
+				if !cfg.Agent.WritePlanJSON {
+					return
+				}
+				planPath := strings.TrimSpace(cfg.Agent.PlanJSONPath)
+				if planPath == "" {
+					planPath = filepath.Join(logs.Dir, "plan.json")
+				}
+				_ = os.WriteFile(planPath, []byte(strings.TrimSpace(raw)), 0o644)
+			}),
+		)
+
+		// wrap it
+		planner = agent.NewLoggingPlanner(planner, logs)
+
+		// Plan mode wants debug logger too
+		planOpts := append([]agent.BaseOption{}, baseOpts...)
+		planOpts = append(planOpts, agent.WithDebugLogger(logs.DebugLogger))
+
+		a, err := agent.New(agent.ModePlanExecute, agent.Deps{
+			Clock:   clk,
+			Planner: planner,
+			Runner:  runner,
+			LLM:     llm,
+			Budget:  budget,
+		}, planOpts...)
+		if err != nil {
+			return "", err
+		}
+		return a.RunAgentGoal(ctx, goal)
+
+	default:
+		return "", fmt.Errorf("internal error: unsupported mode %q", mode)
+	}
+}
+
+func buildAgentTools(llm agent.LLM) (agent.Tools, error) {
+	sh := agent.NewExecShellRunner()
+	r := fsio.NewRealReader(fsio.DefaultBufferSize)
+	w := &fsio.RealWriter{}
+	files := agent.NewFSIOFileOps(r, w)
+
+	return agent.Tools{
+		Shell: sh,
+		LLM:   llm,
+		Files: files,
+	}, nil
+}
+
+func buildAgentPolicy(cfg config.Config) (agent.Policy, error) {
+	allowedTools, err := parseToolKinds(cfg.Agent.AllowedTools)
+	if err != nil {
+		return nil, err
+	}
+
+	return agent.NewDefaultPolicy(agent.PolicyLimits{
+		AllowedTools:           allowedTools,
+		DeniedShellCommands:    cfg.Agent.DeniedShellCommands,
+		AllowedFileOps:         cfg.Agent.AllowedFileOps,
+		RestrictFilesToWorkDir: cfg.Agent.RestrictFilesToWorkDir,
+	}), nil
+}
+
+func toAliasFlagName(viperKey string) string {
+	s := strings.ReplaceAll(viperKey, ".", "-")
+	s = strings.ReplaceAll(s, "_", "-")
+	return s
+}
+
 func updateConfig(node *yaml.Node, changes map[string]interface{}) error {
 	// If the node is not a document or has no content, create an empty mapping node.
 	if node.Kind != yaml.DocumentNode || len(node.Content) == 0 {
@@ -848,6 +1105,7 @@ func setCustomHelp(rootCmd *cobra.Command) {
 		printFlagWithPadding("--output", "The output audio file for text-to-speech")
 		printFlagWithPadding("--role-file", "Set the system role from the specified file")
 		printFlagWithPadding("--debug", "Print debug messages")
+		printFlagWithPadding("--agent", "Enable agent mode")
 		printFlagWithPadding("--target", "Load configuration from config.<target>.yaml")
 		printFlagWithPadding("--mcp", "MCP endpoint URL (e.g. http://localhost:3333)")
 		printFlagWithPadding("--mcp-tool", "Tool name to call on the MCP server")
@@ -911,10 +1169,11 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().StringArrayVar(&mcpHeaders, "mcp-header", []string{}, "MCP header in the form 'Key: Value' (repeatable)")
 	rootCmd.PersistentFlags().StringArrayVar(&paramsList, "mcp-param", []string{}, "Key-value pair as key=value. Can be specified multiple times")
 	rootCmd.PersistentFlags().StringVar(&paramsJSON, "mcp-params", "", "Provide parameters as a raw JSON string")
+	rootCmd.PersistentFlags().BoolVar(&agentEnabled, "agent", false, "Run agent (experimental)")
 }
 
 func setupConfigFlags(rootCmd *cobra.Command, meta ConfigMetadata) {
-	aliasFlagName := strings.ReplaceAll(meta.Key, "_", "-")
+	aliasFlagName := toAliasFlagName(meta.Key)
 
 	switch meta.DefaultValue.(type) {
 	case string:
@@ -929,6 +1188,9 @@ func setupConfigFlags(rootCmd *cobra.Command, meta ConfigMetadata) {
 	case float64:
 		rootCmd.PersistentFlags().Float64(meta.FlagName, viper.GetFloat64(meta.Key), meta.Description)
 		rootCmd.PersistentFlags().Float64(aliasFlagName, viper.GetFloat64(meta.Key), fmt.Sprintf("Alias for setting %s", meta.Key))
+	case []string:
+		rootCmd.PersistentFlags().StringSlice(meta.FlagName, viper.GetStringSlice(meta.Key), meta.Description)
+		rootCmd.PersistentFlags().StringSlice(aliasFlagName, viper.GetStringSlice(meta.Key), fmt.Sprintf("Alias for setting %s", meta.Key))
 	}
 
 	// Bind the flags directly to Viper keys
@@ -954,6 +1216,7 @@ func isGeneralFlag(name string) bool {
 		"delete-thread":   true,
 		"show-history":    true,
 		"prompt":          true,
+		"agent":           true,
 		"set-completions": true,
 		"help":            true,
 		"role-file":       true,
@@ -986,7 +1249,7 @@ func printFlagWithPadding(name, description string) {
 
 func syncFlagsWithViper(cmd *cobra.Command) error {
 	for _, meta := range configMetadata {
-		aliasFlagName := strings.ReplaceAll(meta.Key, "_", "-")
+		aliasFlagName := toAliasFlagName(meta.Key)
 		if err := syncFlag(cmd, meta, aliasFlagName); err != nil {
 			return err
 		}
@@ -995,41 +1258,67 @@ func syncFlagsWithViper(cmd *cobra.Command) error {
 }
 
 func syncFlag(cmd *cobra.Command, meta ConfigMetadata, alias string) error {
-	var value interface{}
-	var err error
+	mainFlag := cmd.Flag(meta.FlagName)
+	aliasFlag := cmd.Flag(alias)
 
-	if cmd.Flag(meta.FlagName).Changed || cmd.Flag(alias).Changed {
-		switch meta.DefaultValue.(type) {
-		case string:
-			value = cmd.Flag(meta.FlagName).Value.String()
-			if cmd.Flag(alias).Changed {
-				value = cmd.Flag(alias).Value.String()
-			}
-		case int:
-			value, err = cmd.Flags().GetInt(meta.FlagName)
-			if cmd.Flag(alias).Changed {
-				value, err = cmd.Flags().GetInt(alias)
-			}
-		case bool:
-			value, err = cmd.Flags().GetBool(meta.FlagName)
-			if cmd.Flag(alias).Changed {
-				value, err = cmd.Flags().GetBool(alias)
-			}
-		case float64:
-			value, err = cmd.Flags().GetFloat64(meta.FlagName)
-			if cmd.Flag(alias).Changed {
-				value, err = cmd.Flags().GetFloat64(alias)
-			}
-		default:
-			return fmt.Errorf("unsupported type for %s", meta.FlagName)
-		}
+	// If either doesn't exist, just treat it as "not changed"
+	mainChanged := mainFlag != nil && mainFlag.Changed
+	aliasChanged := aliasFlag != nil && aliasFlag.Changed
 
-		if err != nil {
-			return fmt.Errorf("failed to parse value for %s: %w", meta.FlagName, err)
-		}
-
-		viper.Set(meta.Key, value)
+	if !mainChanged && !aliasChanged {
+		return nil
 	}
+
+	var (
+		value interface{}
+		err   error
+	)
+
+	switch meta.DefaultValue.(type) {
+	case string:
+		if aliasChanged {
+			value = aliasFlag.Value.String()
+		} else {
+			value = mainFlag.Value.String()
+		}
+
+	case int:
+		if aliasChanged {
+			value, err = cmd.Flags().GetInt(alias)
+		} else {
+			value, err = cmd.Flags().GetInt(meta.FlagName)
+		}
+
+	case bool:
+		if aliasChanged {
+			value, err = cmd.Flags().GetBool(alias)
+		} else {
+			value, err = cmd.Flags().GetBool(meta.FlagName)
+		}
+
+	case float64:
+		if aliasChanged {
+			value, err = cmd.Flags().GetFloat64(alias)
+		} else {
+			value, err = cmd.Flags().GetFloat64(meta.FlagName)
+		}
+
+	case []string:
+		if aliasChanged {
+			value, err = cmd.Flags().GetStringSlice(alias)
+		} else {
+			value, err = cmd.Flags().GetStringSlice(meta.FlagName)
+		}
+
+	default:
+		return fmt.Errorf("unsupported type for %s", meta.FlagName)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to parse value for %s: %w", meta.FlagName, err)
+	}
+
+	viper.Set(meta.Key, value)
 	return nil
 }
 
@@ -1074,7 +1363,63 @@ func createConfigFromViper() config.Config {
 		Voice:                viper.GetString("voice"),
 		UserAgent:            viper.GetString("user_agent"),
 		CustomHeaders:        viper.GetStringMapString("custom_headers"),
+		Agent: config.AgentConfig{
+			Mode:          viper.GetString("agent.mode"),
+			WorkDir:       viper.GetString("agent.work_dir"),
+			DryRun:        viper.GetBool("agent.dry_run"),
+			MaxSteps:      viper.GetInt("agent.max_steps"),
+			MaxIterations: viper.GetInt("agent.max_iterations"),
+			MaxWallTime:   viper.GetInt("agent.max_wall_time"),
+			MaxShellCalls: viper.GetInt("agent.max_shell_calls"),
+			MaxLLMCalls:   viper.GetInt("agent.max_llm_calls"),
+			MaxFileOps:    viper.GetInt("agent.max_file_ops"),
+			MaxLLMTokens:  viper.GetInt("agent.max_llm_tokens"),
+
+			AllowedTools:           viper.GetStringSlice("agent.allowed_tools"),
+			DeniedShellCommands:    viper.GetStringSlice("agent.denied_shell_commands"),
+			AllowedFileOps:         viper.GetStringSlice("agent.allowed_file_ops"),
+			RestrictFilesToWorkDir: viper.GetBool("agent.restrict_files_to_work_dir"),
+
+			WritePlanJSON: viper.GetBool("agent.write_plan_json"),
+			PlanJSONPath:  viper.GetString("agent.plan_json_path"),
+		},
 	}
+}
+
+func parseToolKinds(in []string) ([]agent.ToolKind, error) {
+	out := make([]agent.ToolKind, 0, len(in))
+	seen := map[agent.ToolKind]bool{}
+
+	for _, raw := range in {
+		s := strings.ToLower(strings.TrimSpace(raw))
+		if s == "" {
+			continue
+		}
+
+		var k agent.ToolKind
+		switch s {
+		case "shell":
+			k = agent.ToolShell
+		case "llm":
+			k = agent.ToolLLM
+		case "files", "file":
+			k = agent.ToolFiles
+		default:
+			return nil, fmt.Errorf("unknown agent.allowed_tools entry %q (expected shell|llm|files)", raw)
+		}
+
+		if !seen[k] {
+			seen[k] = true
+			out = append(out, k)
+		}
+	}
+
+	// If config is empty, decide your behavior. I’d rather error than silently allow all.
+	if len(out) == 0 {
+		return nil, errors.New("agent.allowed_tools is empty (expected at least one of shell|llm|files)")
+	}
+
+	return out, nil
 }
 
 func fileExists(filename string) bool {

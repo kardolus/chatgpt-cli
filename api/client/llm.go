@@ -325,6 +325,12 @@ func (c *Client) getEndpoint(path string) string {
 }
 
 func (c *Client) prepareQuery(input string) {
+	if c.Config.OmitHistory {
+		c.History = nil
+		c.addQuery(input)
+		return
+	}
+
 	c.initHistory()
 	c.addQuery(input)
 }

@@ -234,6 +234,19 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			err := utils.ValidateFlags(defaultModel, flags)
 			Expect(err).To(HaveOccurred())
 		})
+		it("should return an error when --agent-mode is used but --agent is omitted", func() {
+			flags["agent-mode"] = true
+
+			err := utils.ValidateFlags(defaultModel, flags)
+			Expect(err).To(HaveOccurred())
+		})
+		it("should NOT return an error when --agent-mode and --agent are both used", func() {
+			flags["agent-mode"] = true
+			flags["agent"] = true
+
+			err := utils.ValidateFlags(defaultModel, flags)
+			Expect(err).NotTo(HaveOccurred())
+		})
 		it("should return an error when --audio is used with an incompatible model", func() {
 			flags["audio"] = true
 

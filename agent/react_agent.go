@@ -47,6 +47,8 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 	start := a.startTimer()
 	defer a.finishTimer(start)
 
+	guard := newRepetitionGuard(32)
+
 	a.logMode(goal, "ReAct (iterative reasoning + acting)")
 
 	out := a.out
@@ -98,6 +100,37 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 			return "", err
 		}
 
+		if action.ActionType == "tool" {
+			sig := signatureForAction(action)
+
+			immediate := guard.isImmediateRepeat(sig)
+			seen := guard.count(sig) // how many times seen so far (before recording this attempt)
+
+			if immediate || seen >= 3 {
+				// Record the repeated attempt so counts can climb and we can hard-stop.
+				guard.observe(sig)
+
+				seenNow := guard.count(sig) // after recording this attempt
+
+				msg := fmt.Sprintf(
+					"OBSERVATION: You are repeating the same tool call (%s %q). Do NOT repeat it. "+
+						"Choose a different next step (e.g., write the file, narrow the read range, or answer).",
+					sig.tool, sig.key,
+				)
+				conversation = append(conversation, msg)
+				dbg.Debugf("repetition guard injected: %s", msg)
+
+				// Hard-stop if it's *really* stuck (e.g., 6+ occurrences in the rolling window)
+				if seenNow >= 6 {
+					return "", fmt.Errorf("agent appears stuck: repeated tool call too many times: %s %q", sig.tool, sig.key)
+				}
+
+				continue
+			}
+
+			// Non-repeat path: record it normally
+			guard.observe(sig)
+		}
 		dbg.Debugf("react iteration %d action_type=%s thought=%q", i+1, action.ActionType, action.Thought)
 
 		if action.Thought != "" {
@@ -140,7 +173,10 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 		out.Infof("[Iteration %d] Observation: %s (took %s)", i+1, truncateForDisplay(res.Output, 100), res.Duration)
 		dbg.Debugf("observation (iteration %d): %q", i+1, res.Output)
 
-		conversation = append(conversation, fmt.Sprintf("OBSERVATION: %s", res.Output))
+		conversation = append(conversation,
+			fmt.Sprintf("ACTION_TAKEN: tool=%s details=%s", action.Tool, step.Description),
+			fmt.Sprintf("OBSERVATION: %s", res.Output),
+		)
 	}
 }
 
@@ -192,6 +228,13 @@ CRITICAL RULES:
 - Keep "thought" concise
 - When you have enough information to answer, respond with action_type="answer" and include "final_answer"
 
+PROGRESS RULES:
+- Never call the exact same tool+args twice in a row.
+- After reading a file once, do not reread it unless you specify what NEW line range you need.
+- Prefer narrow reads (specific sections) over rereading whole files.
+- If you have enough info to proceed, take the next concrete step (e.g., write the updated AGENTS.md).
+- If you are stuck, finish with action_type:"answer" explaining what you need next.
+
 Conversation history:
 
 %s
@@ -218,9 +261,24 @@ func parseReActResponse(raw string) (reActAction, error) {
 
 	action.Thought = strings.TrimSpace(action.Thought)
 	action.ActionType = strings.ToLower(strings.TrimSpace(action.ActionType))
+	action.Tool = strings.ToLower(strings.TrimSpace(action.Tool))
 
 	if action.ActionType == "" {
 		return reActAction{}, errors.New("missing action_type")
+	}
+
+	// Compatibility: allow shorthand like {"action_type":"file", ...}
+	// This must work whether or not "tool" is also set.
+	if action.ActionType != "tool" && action.ActionType != "answer" {
+		switch action.ActionType {
+		case "file", "shell", "llm":
+			// If tool is empty OR matches the shorthand, normalize to canonical form.
+			// (If tool is set to something else, we'll fall through to invalid action_type.)
+			if action.Tool == "" || action.Tool == action.ActionType {
+				action.Tool = action.ActionType
+				action.ActionType = "tool"
+			}
+		}
 	}
 
 	if action.ActionType == "answer" {
@@ -231,7 +289,6 @@ func parseReActResponse(raw string) (reActAction, error) {
 	}
 
 	if action.ActionType == "tool" {
-		action.Tool = strings.ToLower(strings.TrimSpace(action.Tool))
 		if action.Tool == "" {
 			return reActAction{}, errors.New("action_type=tool but tool field is empty")
 		}
@@ -362,4 +419,99 @@ func truncateForDisplay(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+type actionSig struct {
+	tool string
+	key  string
+}
+
+type repetitionGuard struct {
+	last    *actionSig
+	counts  map[actionSig]int
+	history []actionSig
+	limit   int // max history length to keep counts meaningful
+}
+
+func newRepetitionGuard(limit int) *repetitionGuard {
+	if limit <= 0 {
+		limit = 32
+	}
+	return &repetitionGuard{
+		counts: make(map[actionSig]int),
+		limit:  limit,
+	}
+}
+
+func (g *repetitionGuard) observe(sig actionSig) {
+	// maintain rolling window counts
+	g.history = append(g.history, sig)
+	g.counts[sig]++
+
+	if len(g.history) > g.limit {
+		evicted := g.history[0]
+		g.history = g.history[1:]
+		g.counts[evicted]--
+		if g.counts[evicted] <= 0 {
+			delete(g.counts, evicted)
+		}
+	}
+
+	// last is always updated
+	g.last = &sig
+}
+
+func (g *repetitionGuard) isImmediateRepeat(sig actionSig) bool {
+	return g.last != nil && g.last.tool == sig.tool && g.last.key == sig.key
+}
+
+func (g *repetitionGuard) count(sig actionSig) int {
+	return g.counts[sig]
+}
+
+func signatureForAction(a reActAction) actionSig {
+	tool := strings.ToLower(strings.TrimSpace(a.Tool))
+
+	switch tool {
+	case "file":
+		op := strings.ToLower(strings.TrimSpace(a.Op))
+		path := strings.TrimSpace(a.Path)
+		// normalize path slashes a bit (optional)
+		path = strings.TrimPrefix(path, "./")
+		return actionSig{tool: "file", key: op + ":" + path}
+
+	case "shell":
+		cmd := strings.TrimSpace(a.Command)
+		args := normalizeArgs(a.Args)
+		// include args because `bash -lc ...` vs `make help` matters
+		return actionSig{tool: "shell", key: cmd + " " + strings.Join(args, " ")}
+
+	case "llm":
+		// don't key on the whole prompt (huge); use a prefix + length
+		p := strings.TrimSpace(a.Prompt)
+		prefix := p
+		if len(prefix) > 80 {
+			prefix = prefix[:80]
+		}
+		return actionSig{tool: "llm", key: fmt.Sprintf("len=%d:%s", len(p), prefix)}
+
+	default:
+		// fallback: still track tool name
+		return actionSig{tool: tool, key: ""}
+	}
+}
+
+func normalizeArgs(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(in))
+	for _, a := range in {
+		s := strings.TrimSpace(a)
+		if s == "" {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
 }

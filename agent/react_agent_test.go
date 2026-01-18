@@ -3,6 +3,7 @@ package agent_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -257,24 +258,26 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 				llm.EXPECT().
 					Complete(gomock.Any(), gomock.Any()).
-					Return(`{
-						"thought": "still working",
-						"action_type": "tool",
-						"tool": "shell",
-						"command": "echo",
-						"args": ["test"]
-					}`, 10, nil)
+					Return(fmt.Sprintf(`{
+					"thought": "still working",
+					"action_type": "tool",
+					"tool": "shell",
+					"command": "echo",
+					"args": ["test-%d"]
+				}`, i), 10, nil)
 
 				budget.EXPECT().ChargeLLMTokens(10, now)
-
-				runner.EXPECT().
-					RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(agent.StepResult{
-						Outcome:  agent.OutcomeOK,
-						Output:   "test",
-						Duration: 10 * time.Millisecond,
-					}, nil)
 			}
+
+			// We expect 10 tool executions total.
+			runner.EXPECT().
+				RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				Times(10).
+				Return(agent.StepResult{
+					Outcome:  agent.OutcomeOK,
+					Output:   "ok",
+					Duration: 10 * time.Millisecond,
+				}, nil)
 
 			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(agent.BudgetExceededError{
@@ -342,6 +345,365 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("shell tool requires command"))
 			})
+		})
+	})
+
+	when("LLM uses shorthand action_type like file/shell/llm", func() {
+		it("treats action_type=file as a tool call", func() {
+			clock.EXPECT().Now().Return(now) // start
+
+			clock.EXPECT().Now().Return(now)
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			// NOTE: action_type is "file" (shorthand). tool is omitted.
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				Return(`{
+				"thought": "read it",
+				"action_type": "file",
+				"op": "read",
+				"path": "AGENTS.md"
+			}`, 10, nil)
+
+			budget.EXPECT().ChargeLLMTokens(10, now)
+
+			runner.EXPECT().
+				RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ agent.Config, step agent.Step) (agent.StepResult, error) {
+					Expect(step.Type).To(Equal(agent.ToolFiles))
+					Expect(step.Op).To(Equal("read"))
+					Expect(step.Path).To(Equal("AGENTS.md"))
+					return agent.StepResult{
+						Outcome:  agent.OutcomeOK,
+						Output:   "ok",
+						Duration: 1 * time.Millisecond,
+					}, nil
+				})
+
+			// Next iteration: answer
+			clock.EXPECT().Now().Return(now)
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				Return(`{
+				"thought": "done",
+				"action_type": "answer",
+				"final_answer": "ok"
+			}`, 5, nil)
+
+			budget.EXPECT().ChargeLLMTokens(5, now)
+
+			clock.EXPECT().Now().Return(now) // end
+			clock.EXPECT().Now().Return(now) // end
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Read AGENTS")
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	when("LLM returns multiple JSON objects back-to-back", func() {
+		it("parses only the first JSON object", func() {
+			clock.EXPECT().Now().Return(now) // start
+
+			clock.EXPECT().Now().Return(now)
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			// Two JSON objects concatenated. parseReActResponse should take only the first.
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				Return(
+					`{"thought":"one","action_type":"answer","final_answer":"A"}{"thought":"two","action_type":"answer","final_answer":"B"}`,
+					10,
+					nil,
+				)
+
+			budget.EXPECT().ChargeLLMTokens(10, now)
+
+			clock.EXPECT().Now().Return(now) // end
+			clock.EXPECT().Now().Return(now) // end
+
+			res, err := reactAgent.RunAgentGoal(ctx, "Test")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(Equal("A"))
+		})
+	})
+
+	when("LLM repeats the same tool call twice in a row", func() {
+		it("injects a repetition observation and forces a different next step", func() {
+			clock.EXPECT().Now().Return(now) // start
+
+			// Iteration 1: tool
+			clock.EXPECT().Now().Return(now)
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				Return(`{
+				"thought": "do it",
+				"action_type": "tool",
+				"tool": "shell",
+				"command": "ls",
+				"args": ["-la"]
+			}`, 10, nil)
+
+			budget.EXPECT().ChargeLLMTokens(10, now)
+
+			// Only ONE tool execution should happen (iteration 1).
+			runner.EXPECT().
+				RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				Times(1).
+				Return(agent.StepResult{
+					Outcome:  agent.OutcomeOK,
+					Output:   "file1\nfile2\n",
+					Duration: 1 * time.Millisecond,
+				}, nil)
+
+			// Iteration 2: same tool again (should be blocked by repetition guard)
+			clock.EXPECT().Now().Return(now)
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				Return(`{
+				"thought": "try again",
+				"action_type": "tool",
+				"tool": "shell",
+				"command": "ls",
+				"args": ["-la"]
+			}`, 10, nil)
+
+			budget.EXPECT().ChargeLLMTokens(10, now)
+
+			// Iteration 3: must see injected repetition message in prompt, then answer
+			clock.EXPECT().Now().Return(now)
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+					Expect(prompt).To(ContainSubstring("OBSERVATION: You are repeating the same tool call"))
+					return `{
+					"thought": "ok, I'll stop repeating",
+					"action_type": "answer",
+					"final_answer": "done"
+				}`, 5, nil
+				})
+
+			budget.EXPECT().ChargeLLMTokens(5, now)
+
+			clock.EXPECT().Now().Return(now) // end
+			clock.EXPECT().Now().Return(now) // end
+
+			res, err := reactAgent.RunAgentGoal(ctx, "List files")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(Equal("done"))
+		})
+	})
+
+	when("LLM ignores repetition warnings", func() {
+		it("hard-stops after too many repeats in the rolling window", func() {
+			clock.EXPECT().Now().Return(now) // start
+
+			// We'll do 6 iterations total (1 executes, 2-5 skipped, 6 hard-stops)
+			for i := 0; i < 6; i++ {
+				clock.EXPECT().Now().Return(now)
+				budget.EXPECT().AllowIteration(now).Return(nil)
+				budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+				budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+				llm.EXPECT().
+					Complete(gomock.Any(), gomock.Any()).
+					Return(`{
+          "thought": "list files again",
+          "action_type": "tool",
+          "tool": "shell",
+          "command": "ls",
+          "args": ["-la"]
+        }`, 1, nil)
+
+				budget.EXPECT().ChargeLLMTokens(1, now)
+			}
+
+			// Only the FIRST iteration should actually execute the tool.
+			runner.EXPECT().
+				RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				Times(1).
+				DoAndReturn(func(_ context.Context, _ agent.Config, step agent.Step) (agent.StepResult, error) {
+					Expect(step.Type).To(Equal(agent.ToolShell))
+					Expect(step.Command).To(Equal("ls"))
+					Expect(step.Args).To(Equal([]string{"-la"}))
+					return agent.StepResult{
+						Outcome:  agent.OutcomeOK,
+						Output:   "file1\nfile2\n",
+						Duration: 10 * time.Millisecond,
+					}, nil
+				})
+
+			clock.EXPECT().Now().Return(now) // end
+			clock.EXPECT().Now().Return(now) // end
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Loop forever")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("agent appears stuck"))
+			Expect(err.Error()).To(ContainSubstring("repeated tool call too many times"))
+		})
+	})
+
+	when("LLM uses shorthand action_type=file (no tool field)", func() {
+		it("treats it as a tool call and executes file op", func() {
+			clock.EXPECT().Now().Return(now) // start
+
+			// Iteration 1: shorthand file tool
+			clock.EXPECT().Now().Return(now)
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				Return(`{
+				"thought": "read README",
+				"action_type": "file",
+				"op": "read",
+				"path": "README.md"
+			}`, 10, nil)
+
+			budget.EXPECT().ChargeLLMTokens(10, now)
+
+			runner.EXPECT().
+				RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ agent.Config, step agent.Step) (agent.StepResult, error) {
+					Expect(step.Type).To(Equal(agent.ToolFiles))
+					Expect(step.Op).To(Equal("read"))
+					Expect(step.Path).To(Equal("README.md"))
+					return agent.StepResult{
+						Outcome:  agent.OutcomeOK,
+						Output:   "README CONTENT",
+						Duration: 5 * time.Millisecond,
+					}, nil
+				})
+
+			// Iteration 2: answer
+			clock.EXPECT().Now().Return(now)
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+					Expect(prompt).To(ContainSubstring("OBSERVATION: README CONTENT"))
+					return `{
+					"thought": "done",
+					"action_type": "answer",
+					"final_answer": "ok"
+				}`, 1, nil
+				})
+
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			clock.EXPECT().Now().Return(now) // end
+			clock.EXPECT().Now().Return(now) // end
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Read README and answer")
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	when("LLM uses shorthand action_type=file AND also sets tool=file", func() {
+		it("still treats it as a tool call (compat mode)", func() {
+			clock.EXPECT().Now().Return(now) // start
+
+			// Iteration 1: shorthand but with tool field present
+			clock.EXPECT().Now().Return(now)
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				Return(`{
+				"thought": "read AGENTS",
+				"action_type": "file",
+				"tool": "file",
+				"op": "read",
+				"path": "AGENTS.md"
+			}`, 10, nil)
+
+			budget.EXPECT().ChargeLLMTokens(10, now)
+
+			runner.EXPECT().
+				RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(agent.StepResult{
+					Outcome:  agent.OutcomeOK,
+					Output:   "AGENTS CONTENT",
+					Duration: 5 * time.Millisecond,
+				}, nil)
+
+			// Iteration 2: answer
+			clock.EXPECT().Now().Return(now)
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				Return(`{
+				"thought": "done",
+				"action_type": "answer",
+				"final_answer": "ok"
+			}`, 1, nil)
+
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			clock.EXPECT().Now().Return(now) // end
+			clock.EXPECT().Now().Return(now) // end
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Read AGENTS and answer")
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	when("LLM uses shorthand action_type=file but tool mismatches", func() {
+		it("fails validation (invalid action_type) rather than running tools", func() {
+			clock.EXPECT().Now().Return(now) // start
+
+			clock.EXPECT().Now().Return(now)
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				// tool is present but inconsistent; we should NOT normalize
+				Return(`{
+				"thought": "oops",
+				"action_type": "file",
+				"tool": "shell",
+				"command": "ls"
+			}`, 10, nil)
+
+			budget.EXPECT().ChargeLLMTokens(10, now)
+
+			clock.EXPECT().Now().Return(now) // end
+			clock.EXPECT().Now().Return(now) // end
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Bad shorthand")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(`invalid action_type: "file"`))
 		})
 	})
 }

@@ -180,7 +180,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			_, err := reactAgent.RunAgentGoal(ctx, "Do something")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to parse JSON"))
+			Expect(err.Error()).To(ContainSubstring("failed to locate JSON"))
 		})
 	})
 

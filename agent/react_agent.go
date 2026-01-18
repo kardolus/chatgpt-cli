@@ -183,12 +183,14 @@ FOR FINAL ANSWER:
 }
 
 CRITICAL RULES:
-- Return ONLY raw JSON, no markdown, no code fences
-- First character must be '{'
-- Last character must be '}'
+- Return ONLY raw JSON (no markdown, no code fences, no prose)
+- Return EXACTLY ONE JSON object per response (not an array)
+- Do NOT output multiple JSON objects back-to-back (no "}{" and no extra text before/after)
+- One tool call per response. If multiple steps are needed, choose the NEXT single step only.
+- First non-whitespace character must be '{' and the last non-whitespace character must be '}'
 - Include only fields relevant to your chosen tool
-- Keep thoughts concise
-- When you have enough information to answer the user's question, use action_type: "answer"
+- Keep "thought" concise
+- When you have enough information to answer, respond with action_type="answer" and include "final_answer"
 
 Conversation history:
 
@@ -204,8 +206,13 @@ func parseReActResponse(raw string) (reActAction, error) {
 		return reActAction{}, errors.New("empty response from LLM")
 	}
 
+	one, err := extractFirstJSONObject(raw)
+	if err != nil {
+		return reActAction{}, fmt.Errorf("failed to locate JSON object: %w", err)
+	}
+
 	var action reActAction
-	if err := json.Unmarshal([]byte(raw), &action); err != nil {
+	if err := json.Unmarshal([]byte(one), &action); err != nil {
 		return reActAction{}, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
@@ -301,6 +308,52 @@ func convertReActActionToStep(action reActAction) (Step, error) {
 	default:
 		return Step{}, fmt.Errorf("unknown tool: %q", action.Tool)
 	}
+}
+
+func extractFirstJSONObject(s string) (string, error) {
+	// Find first '{'
+	start := strings.IndexByte(s, '{')
+	if start == -1 {
+		return "", errors.New("no '{' found")
+	}
+
+	inString := false
+	escape := false
+	depth := 0
+
+	for i := start; i < len(s); i++ {
+		ch := s[i]
+
+		if inString {
+			if escape {
+				escape = false
+				continue
+			}
+			if ch == '\\' {
+				escape = true
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+
+		switch ch {
+		case '"':
+			inString = true
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				// Return the first complete top-level object
+				return strings.TrimSpace(s[start : i+1]), nil
+			}
+		}
+	}
+
+	return "", errors.New("unterminated JSON object")
 }
 
 func truncateForDisplay(s string, maxLen int) string {

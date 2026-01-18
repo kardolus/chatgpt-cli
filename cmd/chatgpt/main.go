@@ -842,13 +842,7 @@ func buildAgentGoal(chatContext string, args []string) (string, error) {
 	return goal, nil
 }
 
-func runAgent(
-	ctx context.Context,
-	c *client.Client,
-	cfg config.Config,
-	mode string,
-	goal string,
-) (string, error) {
+func runAgent(ctx context.Context, c *client.Client, cfg config.Config, mode string, goal string) (string, error) {
 	clk := agent.NewRealClock()
 	llm := agent.NewClientLLM(c)
 
@@ -862,22 +856,20 @@ func runAgent(
 		return "", err
 	}
 
-	budget := agent.NewDefaultBudget(agent.BudgetLimits{
-		MaxSteps:      cfg.Agent.MaxSteps,
-		MaxWallTime:   time.Duration(cfg.Agent.MaxWallTime) * time.Second,
-		MaxShellCalls: cfg.Agent.MaxShellCalls,
-		MaxLLMCalls:   cfg.Agent.MaxLLMCalls,
-		MaxFileOps:    cfg.Agent.MaxFileOps,
-		MaxLLMTokens:  cfg.Agent.MaxLLMTokens,
-		MaxIterations: cfg.Agent.MaxIterations,
-	})
-
+	budget := agent.NewDefaultBudget(agent.BudgetLimits{ /* ... */ })
 	runner := agent.NewDefaultRunner(tools, clk, budget, policy)
+
+	logs, err := agent.NewLogs()
+	if err != nil {
+		return "", err
+	}
+	defer logs.Close()
 
 	baseOpts := []agent.BaseOption{
 		agent.WithWorkDir(cfg.Agent.WorkDir),
 		agent.WithDryRun(cfg.Agent.DryRun),
 		agent.WithHumanLogger(zap.S()),
+		agent.WithDebugLogger(logs.DebugLogger),
 	}
 
 	switch mode {
@@ -894,12 +886,6 @@ func runAgent(
 		return a.RunAgentGoal(ctx, goal)
 
 	case "plan":
-		logs, err := agent.NewLogs()
-		if err != nil {
-			return "", err
-		}
-		defer logs.Close()
-
 		var planner agent.Planner = agent.NewDefaultPlanner(
 			llm,
 			budget,
@@ -916,12 +902,7 @@ func runAgent(
 			}),
 		)
 
-		// wrap it
 		planner = agent.NewLoggingPlanner(planner, logs)
-
-		// Plan mode wants debug logger too
-		planOpts := append([]agent.BaseOption{}, baseOpts...)
-		planOpts = append(planOpts, agent.WithDebugLogger(logs.DebugLogger))
 
 		a, err := agent.New(agent.ModePlanExecute, agent.Deps{
 			Clock:   clk,
@@ -929,7 +910,7 @@ func runAgent(
 			Runner:  runner,
 			LLM:     llm,
 			Budget:  budget,
-		}, planOpts...)
+		}, baseOpts...)
 		if err != nil {
 			return "", err
 		}

@@ -196,6 +196,23 @@ You have access to these tools:
 3. file - Read or write files
    Fields: "op" ("read" or "write"), "path" (string), "data" (string for write)
 
+IMPORTANT FILE SEMANTICS:
+- file op="read" returns the ENTIRE file contents as text.
+- file op="write" OVERWRITES the ENTIRE file with exactly "data".
+  It does NOT append. It does NOT merge. It replaces the whole file.
+- Therefore: if you want to make a small change to an existing file, you MUST:
+  1) read the file,
+  2) construct the full updated contents (including unchanged parts),
+  3) write the full updated contents back.
+
+FILE TYPE RULE:
+- Determine file type ONLY from the file extension in "path".
+- Never infer format from file contents.
+- Default to plain text if extension is unknown.
+- Only use markdown syntax if:
+  - path ends in ".md", OR
+  - user explicitly asks for markdown formatting.
+
 At each step, respond with ONLY valid JSON in this format:
 
 FOR USING A TOOL:
@@ -203,12 +220,18 @@ FOR USING A TOOL:
   "thought": "your reasoning about what to do next",
   "action_type": "tool",
   "tool": "shell" | "llm" | "file",
+
+  // shell fields:
   "command": "...",
   "args": [...],
+
+  // llm fields:
   "prompt": "...",
+
+  // file fields:
   "op": "read" | "write",
   "path": "...",
-  "data": "..."
+  "data": "..." // REQUIRED for write; ignored for read
 }
 
 FOR FINAL ANSWER:
@@ -230,9 +253,8 @@ CRITICAL RULES:
 
 PROGRESS RULES:
 - Never call the exact same tool+args twice in a row.
-- After reading a file once, do not reread it unless you specify what NEW line range you need.
-- Prefer narrow reads (specific sections) over rereading whole files.
-- If you have enough info to proceed, take the next concrete step (e.g., write the updated AGENTS.md).
+- After reading a file once, do not reread it unless you explain what NEW information you need.
+- Prefer making the smallest safe change, but remember: writes overwrite the entire file.
 - If you are stuck, finish with action_type:"answer" explaining what you need next.
 
 Conversation history:

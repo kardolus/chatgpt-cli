@@ -159,36 +159,36 @@ CRITICAL OUTPUT RULES:
 - Return ONLY raw JSON.
 - Do NOT use markdown.
 - Do NOT use code fences.
-	- Do NOT add prose, comments, or explanations.
-	- The FIRST non-whitespace character MUST be '{'.
-	- The LAST non-whitespace character MUST be '}'.
-	- If you cannot produce valid JSON, return: {"goal": "...", "steps": []}
+- Do NOT add prose, comments, or explanations.
+- The FIRST non-whitespace character MUST be '{'.
+- The LAST non-whitespace character MUST be '}'.
+- If you cannot produce valid JSON, return: {"goal": "...", "steps": []}
 
 Return JSON matching this schema:
 
 {
-"goal": "string",
-"steps": [
-{
-"type": "%s" | "%s" | "%s",
-"description": "string",
+  "goal": "string",
+  "steps": [
+    {
+      "type": "%s" | "%s" | "%s",
+      "description": "string",
 
-// %s-only:
-"command": "string",
-"args": ["string", "..."],
+      // %s-only:
+      "command": "string",
+      "args": ["string", "..."],
 
-// %s-only:
-"prompt": "string",
+      // %s-only:
+      "prompt": "string",
 
-// %s-only:
-"op": "read" | "write",
-"path": "string",
-"data": "string"
+      // %s-only:
+      "op": "read" | "write",
+      "path": "string",
+      "data": "string"
+    }
+  ]
 }
-]
-}
 
-Rules:
+Core rules:
 - Keep steps minimal.
 - Prefer %s steps for concrete actions.
 - Use %s steps for reasoning/summarization based on prior results.
@@ -196,41 +196,72 @@ Rules:
 - Every step must have a non-empty description.
 - You MAY include Go template expressions like {{ ... }} in any string field; they will be rendered later.
 
+FILE TOOL SEMANTICS (IMPORTANT):
+- "op":"read" returns the full current file content as Output.
+- "op":"write" OVERWRITES THE ENTIRE FILE CONTENT with "data".
+- There is NO append mode and NO in-place edit mode.
+- Therefore, for "modify a line or two", plan MUST do:
+  1) file read the current content
+  2) llm produce the FULL updated content (include unchanged parts)
+  3) file write the FULL updated content back
+
+FILE WRITE OUTPUT RULE (CRITICAL):
+When you choose tool="file" with op="write", the value of "data" must be the EXACT file contents to write.
+
+- Do NOT wrap "data" in markdown fences.
+	- Do NOT add leading/trailing backticks.
+	- Do NOT add any prose before/after the file content.
+	- For non-.md files, "data" must be plain raw text/code only.
+
+MARKDOWN IS ONLY ALLOWED INSIDE "data" WHEN:
+- path ends with ".md" AND the user asked for markdown formatting changes.
+Otherwise, preserve the existing file’s formatting and do not introduce markdown syntax.
+
+Prohibited patterns (unless the user explicitly wants to replace the whole file with only that snippet):
+- Writing only a "diff", "patch", or partial snippet to a file.
+- Writing only "the new paragraph" or "the new attempt" without including the existing content.
+
 Template rules:
 - Templates use Go text/template syntax.
 - They are rendered at runtime with missingkey=error, so ALL referenced keys must exist.
 - You can reference prior step outputs via:
-- {{ (index .Results 0).Output }}
-- {{ (index .Results 1).Output }}
+  - {{ (index .Results 0).Output }}
+  - {{ (index .Results 1).Output }}
 - Prefer using .Output unless you explicitly need raw stdout/stderr.
 
 Examples:
 
 1) Shell + summarize:
 {
-"type": "%s",
-"description": "Get git status",
-"command": "git",
-"args": ["status", "--porcelain"]
+  "type": "%s",
+  "description": "Get git status",
+  "command": "git",
+  "args": ["status", "--porcelain"]
 },
 {
-"type": "%s",
-"description": "Summarize changes",
-"prompt": "Summarize these changes:\n{{ (index .Results 0).Output }}"
+  "type": "%s",
+  "description": "Summarize changes",
+  "prompt": "Summarize these changes:\n{{ (index .Results 0).Output }}"
 }
 
-2) LLM + write:
+2) Edit a file safely (read -> generate full new content -> write full file):
 {
-"type": "%s",
-"description": "Generate report text",
-"prompt": "Write a short report about the project"
+  "type": "%s",
+  "description": "Read the existing report",
+  "op": "read",
+  "path": "report.txt"
 },
 {
-"type": "%s",
-"description": "Save report",
-"op": "write",
-"path": "report.txt",
-"data": "{{ (index .Results 0).Output }}"
+  "type": "%s",
+  "description": "Produce the full updated report text (preserve existing content, apply requested changes)",
+  "prompt": "Here is the current file content:\n---\n{{ (index .Results 0).Output }}\n---\nRewrite the ENTIRE file content with the requested changes applied. Return ONLY the full new file content."
+},
+{
+  "type": "%s",
+  "description": "Overwrite report with updated content",
+  "op": "write",
+  "path": "report.txt",
+  "data": "{{ (index .Results 1).Output }}"
 }
 
 User goal:
@@ -251,6 +282,7 @@ If any answer is "no", fix it before returning.
 		ToolFiles,
 		ToolShell,
 		ToolLLM,
+		ToolFiles,
 		ToolLLM,
 		ToolFiles,
 		goal,

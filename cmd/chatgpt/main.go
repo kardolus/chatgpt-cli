@@ -865,11 +865,28 @@ func runAgent(ctx context.Context, c *client.Client, cfg config.Config, mode str
 	}
 	defer logs.Close()
 
+	// Tee human output: terminal + transcript file.
+	// zap.L() uses the global logger core (terminal), logs.HumanZap.Core() writes to transcript file.
+	humanTeeZap := zap.New(zapcore.NewTee(
+		zap.L().Core(),
+		logs.HumanZap.Core(),
+	))
+	humanTeeSug := humanTeeZap.Sugar()
+
 	baseOpts := []agent.BaseOption{
 		agent.WithWorkDir(cfg.Agent.WorkDir),
 		agent.WithDryRun(cfg.Agent.DryRun),
-		agent.WithHumanLogger(zap.S()),
-		agent.WithDebugLogger(logs.DebugLogger),
+
+		// Human (transcript): terminal + file
+		agent.WithHumanLogger(humanTeeSug, func() {
+			// best-effort sync
+			_ = humanTeeZap.Sync()
+		}),
+
+		// Debug: JSONL file only (already JSON encoder in logs.go)
+		agent.WithDebugLogger(logs.DebugLogger, func() {
+			_ = logs.DebugZap.Sync()
+		}),
 	}
 
 	switch mode {

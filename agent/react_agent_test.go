@@ -43,6 +43,8 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 		reactAgent = agent.NewReActAgent(llm, runner, budget, clock)
 		ctx = context.Background()
 		now = time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC)
+
+		clock.EXPECT().Now().Return(now).AnyTimes()
 	})
 
 	it.After(func() {
@@ -51,9 +53,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("LLM returns final answer immediately", func() {
 		it("returns the answer without tool calls", func() {
-			clock.EXPECT().Now().Return(now) // start
 
-			clock.EXPECT().Now().Return(now)                             // iteration 1
 			budget.EXPECT().AllowIteration(now).Return(nil)              // NEW
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{}) // NEW (no token limit)
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -68,9 +68,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			budget.EXPECT().ChargeLLMTokens(10, now)
 
-			clock.EXPECT().Now().Return(now) // end (defer - out.Infof)
-			clock.EXPECT().Now().Return(now) // end (defer - dbg.Infof)
-
 			_, err := reactAgent.RunAgentGoal(ctx, "What is the answer?")
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -78,10 +75,8 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("LLM uses a shell tool then answers", func() {
 		it("executes the tool and returns the final answer", func() {
-			clock.EXPECT().Now().Return(now) // start
 
 			// Iteration 1: tool
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -112,7 +107,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 				})
 
 			// Iteration 2: answer
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -130,9 +124,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			budget.EXPECT().ChargeLLMTokens(12, now)
 
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
-
 			_, err := reactAgent.RunAgentGoal(ctx, "How many files?")
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -140,9 +131,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("budget is exceeded", func() {
 		it("returns budget error", func() {
-			clock.EXPECT().Now().Return(now) // start
 
-			clock.EXPECT().Now().Return(now)                // iteration
 			budget.EXPECT().AllowIteration(now).Return(nil) // allow iteration
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(agent.BudgetExceededError{
@@ -152,9 +141,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 				Message: "llm call budget exceeded",
 			})
 
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
-
 			_, err := reactAgent.RunAgentGoal(ctx, "Do something")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("llm call budget exceeded"))
@@ -163,9 +149,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("LLM returns invalid JSON", func() {
 		it("returns parse error", func() {
-			clock.EXPECT().Now().Return(now) // start
 
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -176,9 +160,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			budget.EXPECT().ChargeLLMTokens(5, now)
 
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
-
 			_, err := reactAgent.RunAgentGoal(ctx, "Do something")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to locate JSON"))
@@ -187,9 +168,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("LLM returns JSON with missing action_type", func() {
 		it("returns validation error", func() {
-			clock.EXPECT().Now().Return(now) // start
 
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -200,9 +179,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			budget.EXPECT().ChargeLLMTokens(5, now)
 
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
-
 			_, err := reactAgent.RunAgentGoal(ctx, "Do something")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("missing action_type"))
@@ -211,9 +187,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("tool execution fails", func() {
 		it("returns the execution error", func() {
-			clock.EXPECT().Now().Return(now) // start
 
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -236,9 +210,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 					Transcript: "command failed",
 				}, errors.New("exit 1"))
 
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
-
 			_, err := reactAgent.RunAgentGoal(ctx, "Run false")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("exit 1"))
@@ -247,11 +218,9 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("iteration budget is exceeded", func() {
 		it("returns iteration budget exceeded error", func() {
-			clock.EXPECT().Now().Return(now) // start
 
 			// 10 successful iterations, then fail on 11th AllowIteration
 			for i := 0; i < 10; i++ {
-				clock.EXPECT().Now().Return(now)
 				budget.EXPECT().AllowIteration(now).Return(nil)
 				budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 				budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -279,16 +248,12 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 					Duration: 10 * time.Millisecond,
 				}, nil)
 
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(agent.BudgetExceededError{
 				Kind:    agent.BudgetKindIterations,
 				Limit:   10,
 				Used:    10,
 				Message: "iteration budget exceeded",
 			})
-
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
 
 			_, err := reactAgent.RunAgentGoal(ctx, "Keep looping")
 			Expect(err).To(HaveOccurred())
@@ -298,9 +263,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("LLM output has markdown code fences", func() {
 		it("strips the fences and parses correctly", func() {
-			clock.EXPECT().Now().Return(now) // start
 
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -311,18 +274,13 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			budget.EXPECT().ChargeLLMTokens(10, now)
 
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
-
 			_, err := reactAgent.RunAgentGoal(ctx, "Test markdown")
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		when("shell tool missing command", func() {
 			it("returns validation error", func() {
-				clock.EXPECT().Now().Return(now) // start
 
-				clock.EXPECT().Now().Return(now) // iteration
 				budget.EXPECT().AllowIteration(now).Return(nil)
 				budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 				budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -338,9 +296,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 				budget.EXPECT().ChargeLLMTokens(10, now)
 
-				clock.EXPECT().Now().Return(now) // end (defer - out.Infof)
-				clock.EXPECT().Now().Return(now) // end (defer - dbg.Infof)
-
 				_, err := reactAgent.RunAgentGoal(ctx, "Test")
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("shell tool requires command"))
@@ -350,9 +305,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("LLM uses shorthand action_type like file/shell/llm", func() {
 		it("treats action_type=file as a tool call", func() {
-			clock.EXPECT().Now().Return(now) // start
 
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -383,7 +336,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 				})
 
 			// Next iteration: answer
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -398,9 +350,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			budget.EXPECT().ChargeLLMTokens(5, now)
 
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
-
 			_, err := reactAgent.RunAgentGoal(ctx, "Read AGENTS")
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -408,9 +357,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("LLM returns multiple JSON objects back-to-back", func() {
 		it("parses only the first JSON object", func() {
-			clock.EXPECT().Now().Return(now) // start
 
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -426,9 +373,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			budget.EXPECT().ChargeLLMTokens(10, now)
 
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
-
 			res, err := reactAgent.RunAgentGoal(ctx, "Test")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(res).To(Equal("A"))
@@ -437,10 +381,8 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("LLM repeats the same tool call twice in a row", func() {
 		it("injects a repetition observation and forces a different next step", func() {
-			clock.EXPECT().Now().Return(now) // start
 
 			// Iteration 1: tool
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -468,7 +410,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 				}, nil)
 
 			// Iteration 2: same tool again (should be blocked by repetition guard)
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -486,7 +427,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			budget.EXPECT().ChargeLLMTokens(10, now)
 
 			// Iteration 3: must see injected repetition message in prompt, then answer
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -504,9 +444,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			budget.EXPECT().ChargeLLMTokens(5, now)
 
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
-
 			res, err := reactAgent.RunAgentGoal(ctx, "List files")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(res).To(Equal("done"))
@@ -515,11 +452,9 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("LLM ignores repetition warnings", func() {
 		it("hard-stops after too many repeats in the rolling window", func() {
-			clock.EXPECT().Now().Return(now) // start
 
 			// We'll do 6 iterations total (1 executes, 2-5 skipped, 6 hard-stops)
 			for i := 0; i < 6; i++ {
-				clock.EXPECT().Now().Return(now)
 				budget.EXPECT().AllowIteration(now).Return(nil)
 				budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 				budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -552,9 +487,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 					}, nil
 				})
 
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
-
 			_, err := reactAgent.RunAgentGoal(ctx, "Loop forever")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("agent appears stuck"))
@@ -564,10 +496,8 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("LLM uses shorthand action_type=file (no tool field)", func() {
 		it("treats it as a tool call and executes file op", func() {
-			clock.EXPECT().Now().Return(now) // start
 
 			// Iteration 1: shorthand file tool
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -597,7 +527,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 				})
 
 			// Iteration 2: answer
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -615,9 +544,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			budget.EXPECT().ChargeLLMTokens(1, now)
 
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
-
 			_, err := reactAgent.RunAgentGoal(ctx, "Read README and answer")
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -625,10 +551,8 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("LLM uses shorthand action_type=file AND also sets tool=file", func() {
 		it("still treats it as a tool call (compat mode)", func() {
-			clock.EXPECT().Now().Return(now) // start
 
 			// Iteration 1: shorthand but with tool field present
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -654,7 +578,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 				}, nil)
 
 			// Iteration 2: answer
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -669,9 +592,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			budget.EXPECT().ChargeLLMTokens(1, now)
 
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
-
 			_, err := reactAgent.RunAgentGoal(ctx, "Read AGENTS and answer")
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -679,9 +599,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 	when("LLM uses shorthand action_type=file but tool mismatches", func() {
 		it("fails validation (invalid action_type) rather than running tools", func() {
-			clock.EXPECT().Now().Return(now) // start
 
-			clock.EXPECT().Now().Return(now)
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -697,9 +615,6 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			}`, 10, nil)
 
 			budget.EXPECT().ChargeLLMTokens(10, now)
-
-			clock.EXPECT().Now().Return(now) // end
-			clock.EXPECT().Now().Return(now) // end
 
 			_, err := reactAgent.RunAgentGoal(ctx, "Bad shorthand")
 			Expect(err).To(HaveOccurred())

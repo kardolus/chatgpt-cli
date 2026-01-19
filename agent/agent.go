@@ -31,8 +31,12 @@ type Deps struct {
 type BaseAgent struct {
 	clock  Clock
 	config Config
-	out    *zap.SugaredLogger
-	debug  *zap.SugaredLogger
+
+	out   *zap.SugaredLogger
+	debug *zap.SugaredLogger
+
+	syncOut   func()
+	syncDebug func()
 }
 
 type BaseOption func(*BaseAgent)
@@ -50,18 +54,24 @@ func WithWorkDir(d string) BaseOption {
 	}
 }
 
-func WithHumanLogger(l *zap.SugaredLogger) BaseOption {
+func WithHumanLogger(l *zap.SugaredLogger, sync func()) BaseOption {
 	return func(b *BaseAgent) {
 		if l != nil {
 			b.out = l
 		}
+		if sync != nil {
+			b.syncOut = sync
+		}
 	}
 }
 
-func WithDebugLogger(l *zap.SugaredLogger) BaseOption {
+func WithDebugLogger(l *zap.SugaredLogger, sync func()) BaseOption {
 	return func(b *BaseAgent) {
 		if l != nil {
 			b.debug = l
+		}
+		if sync != nil {
+			b.syncDebug = sync
 		}
 	}
 }
@@ -141,6 +151,14 @@ func (b *BaseAgent) startTimer() time.Time {
 }
 
 func (b *BaseAgent) finishTimer(start time.Time) {
-	b.out.Infof("Total duration: %s", b.clock.Now().Sub(start))
-	b.debug.Infof("Total duration: %s", b.clock.Now().Sub(start))
+	dur := b.clock.Now().Sub(start)
+	b.out.Infof("Total duration: %s", dur)
+	b.debug.Infof("Total duration: %s", dur)
+
+	if b.syncOut != nil {
+		b.syncOut()
+	}
+	if b.syncDebug != nil {
+		b.syncDebug()
+	}
 }

@@ -18,8 +18,8 @@ type Logs struct {
 	HumanLogger *zap.SugaredLogger
 	DebugLogger *zap.SugaredLogger
 
-	humanZap *zap.Logger
-	debugZap *zap.Logger
+	HumanZap *zap.Logger
+	DebugZap *zap.Logger
 
 	humanFile *os.File
 	debugFile *os.File
@@ -27,11 +27,11 @@ type Logs struct {
 
 func (l *Logs) Close() {
 	// best-effort; ignore errors
-	if l.HumanLogger != nil && l.humanZap != nil {
-		_ = l.humanZap.Sync()
+	if l.HumanZap != nil {
+		_ = l.HumanZap.Sync()
 	}
-	if l.DebugLogger != nil && l.debugZap != nil {
-		_ = l.debugZap.Sync()
+	if l.DebugZap != nil {
+		_ = l.DebugZap.Sync()
 	}
 	if l.humanFile != nil {
 		_ = l.humanFile.Close()
@@ -52,16 +52,21 @@ func NewLogs() (*Logs, error) {
 		return nil, err
 	}
 
-	humanPath := filepath.Join(dir, "agent.log")
-	debugPath := filepath.Join(dir, "agent.debug.log")
+	// Naming + formats:
+	// - transcript: human-readable, line-oriented
+	// - debug: JSONL for machines/grep/jq tooling
+	humanPath := filepath.Join(dir, "agent.transcript.log")
+	debugPath := filepath.Join(dir, "agent.debug.jsonl")
 
-	humanSug, humanZap, humanFile, err := newFileLogger(humanPath, zapcore.InfoLevel)
+	humanSug, humanZap, humanFile, err := newFileLogger(humanPath, zapcore.InfoLevel, false /* json */)
 	if err != nil {
 		return nil, err
 	}
 
-	debugSug, debugZap, debugFile, err := newFileLogger(debugPath, zapcore.DebugLevel)
+	debugSug, debugZap, debugFile, err := newFileLogger(debugPath, zapcore.DebugLevel, true /* json */)
 	if err != nil {
+		_ = humanZap.Sync()
+		_ = humanFile.Close()
 		return nil, err
 	}
 
@@ -71,15 +76,15 @@ func NewLogs() (*Logs, error) {
 		DebugPath:   debugPath,
 		HumanLogger: humanSug,
 		DebugLogger: debugSug,
-		humanZap:    humanZap,
-		debugZap:    debugZap,
+		HumanZap:    humanZap,
+		DebugZap:    debugZap,
 		humanFile:   humanFile,
 		debugFile:   debugFile,
 	}, nil
 }
 
-func newFileLogger(path string, level zapcore.Level) (*zap.SugaredLogger, *zap.Logger, *os.File, error) {
-	f, err := os.Create(path)
+func newFileLogger(path string, level zapcore.Level, json bool) (*zap.SugaredLogger, *zap.Logger, *os.File, error) {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -87,11 +92,15 @@ func newFileLogger(path string, level zapcore.Level) (*zap.SugaredLogger, *zap.L
 	encCfg := zap.NewProductionEncoderConfig()
 	encCfg.TimeKey = "ts"
 	encCfg.EncodeTime = zapcore.ISO8601TimeEncoder
-	enc := zapcore.NewConsoleEncoder(encCfg)
 
-	ws := zapcore.AddSync(f)
-	core := zapcore.NewCore(enc, ws, level)
+	var enc zapcore.Encoder
+	if json {
+		enc = zapcore.NewJSONEncoder(encCfg) // JSONL: 1 JSON object per line
+	} else {
+		enc = zapcore.NewConsoleEncoder(encCfg) // human-readable
+	}
 
+	core := zapcore.NewCore(enc, zapcore.AddSync(f), level)
 	zl := zap.New(core)
 	return zl.Sugar(), zl, f, nil
 }

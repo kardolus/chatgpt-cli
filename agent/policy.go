@@ -82,7 +82,24 @@ func (p *DefaultPolicy) AllowStep(cfg Config, step Step) error {
 			return PolicyDeniedError{Kind: PolicyKindFiles, Reason: "file step requires Path"}
 		}
 
-		if len(p.limits.AllowedFileOps) > 0 && !containsString(p.limits.AllowedFileOps, op) {
+		switch op {
+		case "patch":
+			if strings.TrimSpace(step.Data) == "" {
+				return PolicyDeniedError{
+					Kind:   PolicyKindFiles,
+					Reason: "patch requires Data (unified diff)",
+				}
+			}
+		case "replace":
+			if len(step.Old) == 0 {
+				return PolicyDeniedError{
+					Kind:   PolicyKindFiles,
+					Reason: "replace requires Old pattern",
+				}
+			}
+		}
+
+		if !fileOpAllowed(p.limits.AllowedFileOps, op) {
 			return PolicyDeniedError{Kind: PolicyKindFiles, Reason: fmt.Sprintf("file op not allowed: %s", op)}
 		}
 
@@ -185,4 +202,18 @@ func escapesWorkDir(workdir, path string) bool {
 	}
 	prefix := wd + string(filepath.Separator)
 	return !strings.HasPrefix(full, prefix)
+}
+
+func fileOpAllowed(allowed []string, op string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	if containsString(allowed, op) {
+		return true
+	}
+	// If you can write arbitrary bytes, you can also patch/replace.
+	if (op == "patch" || op == "replace") && containsString(allowed, "write") {
+		return true
+	}
+	return false
 }

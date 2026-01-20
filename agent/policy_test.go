@@ -24,7 +24,7 @@ func testPolicy(t *testing.T, when spec.G, it spec.S) {
 			p := agent.NewDefaultPolicy(agent.PolicyLimits{})
 
 			err := p.AllowStep(agent.Config{WorkDir: "/tmp"}, agent.Step{
-				Type:        agent.ToolKind("wat"),
+				Type:        "wat",
 				Description: "unknown",
 			})
 
@@ -385,6 +385,146 @@ func testPolicy(t *testing.T, when spec.G, it spec.S) {
 					Op:   "read",
 					Path: "api/file.go",
 				})).To(Succeed())
+			})
+
+			it("denies patch when Data (unified diff) is missing/blank", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{})
+
+				err := p.AllowStep(agent.Config{WorkDir: "/tmp"}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "patch",
+					Path: "a.txt",
+					Data: "   \n\t",
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("patch requires Data"))
+			})
+
+			it("allows patch when Data is non-empty", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{})
+
+				Expect(p.AllowStep(agent.Config{WorkDir: "/tmp"}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "patch",
+					Path: "a.txt",
+					Data: "@@ -1 +1 @@\n-a\n+b\n",
+				})).To(Succeed())
+			})
+
+			it("denies replace when Old pattern is missing/empty", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{})
+
+				err := p.AllowStep(agent.Config{WorkDir: "/tmp"}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "replace",
+					Path: "a.txt",
+					Old:  "",
+					New:  "x",
+					N:    -1,
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("replace requires Old pattern"))
+			})
+
+			it("allows replace when Old pattern is provided (New may be empty for deletions)", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{})
+
+				Expect(p.AllowStep(agent.Config{WorkDir: "/tmp"}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "replace",
+					Path: "a.txt",
+					Old:  "hello",
+					New:  "",
+					N:    -1,
+				})).To(Succeed())
+			})
+
+			it("enforces AllowedFileOps for patch (denied when only read is allowed)", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					AllowedFileOps: []string{"read"},
+				})
+
+				err := p.AllowStep(agent.Config{WorkDir: "/tmp"}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "patch",
+					Path: "a.txt",
+					Data: "@@ -1 +1 @@\n-a\n+b\n",
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("file op not allowed"))
+				Expect(err.Error()).To(ContainSubstring("patch"))
+			})
+
+			it("enforces AllowedFileOps for replace (denied when only read is allowed)", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					AllowedFileOps: []string{"read"},
+				})
+
+				err := p.AllowStep(agent.Config{WorkDir: "/tmp"}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "replace",
+					Path: "a.txt",
+					Old:  "a",
+					New:  "b",
+					N:    1,
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("file op not allowed"))
+				Expect(err.Error()).To(ContainSubstring("replace"))
+			})
+
+			it("allows patch when AllowedFileOps includes write (write implies patch)", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					AllowedFileOps: []string{"write"},
+				})
+
+				Expect(p.AllowStep(agent.Config{WorkDir: "/tmp"}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "patch",
+					Path: "a.txt",
+					Data: "@@ -1 +1 @@\n-a\n+b\n",
+				})).To(Succeed())
+			})
+
+			it("allows replace when AllowedFileOps includes write (write implies replace)", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					AllowedFileOps: []string{"write"},
+				})
+
+				Expect(p.AllowStep(agent.Config{WorkDir: "/tmp"}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "replace",
+					Path: "a.txt",
+					Old:  "a",
+					New:  "b",
+					N:    -1,
+				})).To(Succeed())
+			})
+
+			it("still denies patch/replace when AllowedFileOps is set but does not include write/patch/replace", func() {
+				p := agent.NewDefaultPolicy(agent.PolicyLimits{
+					AllowedFileOps: []string{"read"}, // explicitly set
+				})
+
+				err := p.AllowStep(agent.Config{WorkDir: "/tmp"}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "replace",
+					Path: "a.txt",
+					Old:  "a",
+					New:  "b",
+					N:    -1,
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("file op not allowed"))
+
+				err = p.AllowStep(agent.Config{WorkDir: "/tmp"}, agent.Step{
+					Type: agent.ToolFiles,
+					Op:   "patch",
+					Path: "a.txt",
+					Data: "@@ -1 +1 @@\n-a\n+b\n",
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("file op not allowed"))
 			})
 		})
 	})

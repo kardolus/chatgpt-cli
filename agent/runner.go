@@ -3,7 +3,9 @@ package agent
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
+	"time"
 )
 
 type OutcomeKind string
@@ -41,6 +43,7 @@ func NewDefaultRunner(t Tools, c Clock, b Budget, p Policy) *DefaultRunner {
 func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (StepResult, error) {
 	start := r.clock.Now()
 
+	// HARD STOP: budget step gate
 	if err := r.budget.AllowStep(step, start); err != nil {
 		tr := appendBudgetError(buildDryRunTranscript(cfg, step), err)
 		return StepResult{
@@ -48,9 +51,11 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 			Outcome:    OutcomeError,
 			Transcript: limitTranscript(tr, transcriptMaxBytes),
 			Duration:   r.clock.Now().Sub(start),
+			Output:     err.Error(),
 		}, err
 	}
 
+	// HARD STOP: policy gate
 	if err := r.policy.AllowStep(cfg, step); err != nil {
 		var tr string
 		if cfg.DryRun {
@@ -73,6 +78,7 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 			Outcome:    OutcomeError,
 			Transcript: limitTranscript(tr, transcriptMaxBytes),
 			Duration:   r.clock.Now().Sub(start),
+			Output:     err.Error(),
 		}, err
 	}
 
@@ -88,6 +94,7 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 
 	switch step.Type {
 	case ToolShell:
+		// HARD STOP: tool budget gate
 		if err := r.budget.AllowTool(ToolShell, start); err != nil {
 			tr := appendBudgetError(buildShellStartTranscript(cfg, step), err)
 			return StepResult{
@@ -95,23 +102,20 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 				Outcome:    OutcomeError,
 				Transcript: limitTranscript(tr, transcriptMaxBytes),
 				Duration:   r.clock.Now().Sub(start),
+				Output:     err.Error(),
 			}, err
 		}
 
 		res, err := r.tools.Shell.Run(ctx, cfg.WorkDir, step.Command, step.Args...)
 		if err != nil {
+			// SOFT FAIL: let agent recover
 			tr := buildShellStartTranscript(cfg, step)
-			return StepResult{
-				Step:       step,
-				Outcome:    OutcomeError,
-				Transcript: limitTranscript(tr, transcriptMaxBytes),
-				Duration:   r.clock.Now().Sub(start),
-			}, err
+			return softStepError(r, start, step, tr, err), nil
 		}
 
 		outcome := OutcomeOK
 		if res.ExitCode != 0 {
-			outcome = OutcomeError
+			outcome = OutcomeError // already soft: err is nil
 		}
 
 		tr := buildShellTranscript(cfg, step, res)
@@ -131,18 +135,14 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 		}, nil
 
 	case ToolLLM:
+		// SOFT FAIL: agent can correct prompt
 		if strings.TrimSpace(step.Prompt) == "" {
 			err := fmt.Errorf("llm step requires Prompt")
 			tr := buildLLMStartTranscript(step.Prompt)
-			return StepResult{
-				Step:       step,
-				Outcome:    OutcomeError,
-				Transcript: limitTranscript(tr, transcriptMaxBytes),
-				Duration:   r.clock.Now().Sub(start),
-			}, err
+			return softStepError(r, start, step, tr, err), nil
 		}
 
-		// Preflight token budget: block if already out of tokens.
+		// HARD STOP: token budget preflight
 		snap := r.budget.Snapshot(start)
 		if snap.Limits.MaxLLMTokens > 0 && snap.LLMTokensUsed >= snap.Limits.MaxLLMTokens {
 			err := BudgetExceededError{
@@ -157,10 +157,11 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 				Outcome:    OutcomeError,
 				Transcript: limitTranscript(tr, transcriptMaxBytes),
 				Duration:   r.clock.Now().Sub(start),
+				Output:     err.Error(),
 			}, err
 		}
 
-		// Charge LLM call (count + wall-time)
+		// HARD STOP: tool budget gate
 		if err := r.budget.AllowTool(ToolLLM, start); err != nil {
 			tr := appendBudgetError(buildLLMStartTranscript(step.Prompt), err)
 			return StepResult{
@@ -168,18 +169,15 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 				Outcome:    OutcomeError,
 				Transcript: limitTranscript(tr, transcriptMaxBytes),
 				Duration:   r.clock.Now().Sub(start),
+				Output:     err.Error(),
 			}, err
 		}
 
 		out, tokens, err := r.tools.LLM.Complete(ctx, step.Prompt)
 		if err != nil {
+			// SOFT FAIL: agent can retry / simplify / etc
 			tr := buildLLMStartTranscript(step.Prompt)
-			return StepResult{
-				Step:       step,
-				Outcome:    OutcomeError,
-				Transcript: limitTranscript(tr, transcriptMaxBytes),
-				Duration:   r.clock.Now().Sub(start),
-			}, err
+			return softStepError(r, start, step, tr, err), nil
 		}
 
 		r.budget.ChargeLLMTokens(tokens, start)
@@ -192,28 +190,21 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 			Transcript: limitTranscript(tr, transcriptMaxBytes),
 			Duration:   r.clock.Now().Sub(start),
 		}, nil
+
 	case ToolFiles:
+		// SOFT FAIL: agent can correct op/path/data
 		if strings.TrimSpace(step.Op) == "" {
 			err := fmt.Errorf("file step requires Op")
 			tr := buildFileStartTranscript(step)
-			return StepResult{
-				Step:       step,
-				Outcome:    OutcomeError,
-				Transcript: limitTranscript(tr, transcriptMaxBytes),
-				Duration:   r.clock.Now().Sub(start),
-			}, err
+			return softStepError(r, start, step, tr, err), nil
 		}
 		if strings.TrimSpace(step.Path) == "" {
 			err := fmt.Errorf("file step requires Path")
 			tr := buildFileStartTranscript(step)
-			return StepResult{
-				Step:       step,
-				Outcome:    OutcomeError,
-				Transcript: limitTranscript(tr, transcriptMaxBytes),
-				Duration:   r.clock.Now().Sub(start),
-			}, err
+			return softStepError(r, start, step, tr, err), nil
 		}
 
+		// HARD STOP: tool budget gate
 		if err := r.budget.AllowTool(ToolFiles, start); err != nil {
 			tr := appendBudgetError(buildFileStartTranscript(step), err)
 			return StepResult{
@@ -221,6 +212,7 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 				Outcome:    OutcomeError,
 				Transcript: limitTranscript(tr, transcriptMaxBytes),
 				Duration:   r.clock.Now().Sub(start),
+				Output:     err.Error(),
 			}, err
 		}
 
@@ -228,13 +220,9 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 		case "read":
 			b, err := r.tools.Files.ReadFile(step.Path)
 			if err != nil {
+				// SOFT FAIL
 				tr := buildFileStartTranscript(step)
-				return StepResult{
-					Step:       step,
-					Outcome:    OutcomeError,
-					Transcript: limitTranscript(tr, transcriptMaxBytes),
-					Duration:   r.clock.Now().Sub(start),
-				}, err
+				return softStepError(r, start, step, tr, err), nil
 			}
 
 			out := string(b)
@@ -249,13 +237,9 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 
 		case "write":
 			if err := r.tools.Files.WriteFile(step.Path, []byte(step.Data)); err != nil {
+				// SOFT FAIL (agent can fall back / retry)
 				tr := buildFileStartTranscript(step)
-				return StepResult{
-					Step:       step,
-					Outcome:    OutcomeError,
-					Transcript: limitTranscript(tr, transcriptMaxBytes),
-					Duration:   r.clock.Now().Sub(start),
-				}, err
+				return softStepError(r, start, step, tr, err), nil
 			}
 
 			tr := buildFileWriteTranscript(step.Path, step.Data)
@@ -267,25 +251,73 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 				Duration:   r.clock.Now().Sub(start),
 			}, nil
 
-		default:
-			err := fmt.Errorf("unsupported file op: %s", step.Op)
-			tr := buildFileStartTranscript(step)
+		case "patch":
+			patchRes, err := r.tools.Files.PatchFile(step.Path, []byte(step.Data))
+			if err != nil {
+				// SOFT FAIL: this is where the agent can decide to do read+write fallback
+				tr := buildFilePatchTranscript(step.Path, patchRes, err)
+				return softStepError(r, start, step, tr, err), nil
+			}
+
+			tr := buildFilePatchTranscript(step.Path, patchRes, nil)
 			return StepResult{
 				Step:       step,
-				Outcome:    OutcomeError,
+				Outcome:    OutcomeOK,
+				Output:     fmt.Sprintf("patched %s (hunks=%d)", step.Path, patchRes.Hunks),
 				Transcript: limitTranscript(tr, transcriptMaxBytes),
 				Duration:   r.clock.Now().Sub(start),
-			}, err
+			}, nil
+
+		case "replace":
+			replRes, err := r.tools.Files.ReplaceBytesInFile(step.Path, []byte(step.Old), []byte(step.New), step.N)
+			if err != nil {
+				// SOFT FAIL: agent can decide to do read+write fallback
+				tr := buildFileReplaceTranscript(step.Path, step.N, replRes, err)
+				return softStepError(r, start, step, tr, err), nil
+			}
+
+			tr := buildFileReplaceTranscript(step.Path, step.N, replRes, nil)
+			return StepResult{
+				Step:    step,
+				Outcome: OutcomeOK,
+				Output: fmt.Sprintf(
+					"replaced %d occurrence(s) in %s (found=%d)",
+					replRes.Replaced,
+					step.Path,
+					replRes.OccurrencesFound,
+				),
+				Transcript: limitTranscript(tr, transcriptMaxBytes),
+				Duration:   r.clock.Now().Sub(start),
+			}, nil
+
+		default:
+			// SOFT FAIL: agent can correct op
+			err := fmt.Errorf("unsupported file op: %s", step.Op)
+			tr := buildFileStartTranscript(step)
+			return softStepError(r, start, step, tr, err), nil
 		}
 
 	default:
+		// SOFT FAIL: agent can correct tool type
+		err := fmt.Errorf("unsupported step type: %s", step.Type)
 		tr := buildUnsupportedStepTranscript(step)
-		return StepResult{
-			Step:       step,
-			Outcome:    OutcomeError,
-			Transcript: limitTranscript(tr, transcriptMaxBytes),
-			Duration:   r.clock.Now().Sub(start),
-		}, fmt.Errorf("unsupported step type: %s", step.Type)
+		return softStepError(r, start, step, tr, err), nil
+	}
+}
+
+func softStepError(r *DefaultRunner, start time.Time, step Step, tr string, err error) StepResult {
+	// Keep transcript readable; include error in Output so agent sees it in OBSERVATION.
+	if tr != "" && !strings.HasSuffix(tr, "\n") {
+		tr += "\n"
+	}
+	tr += fmt.Sprintf("[error] %v\n", err)
+
+	return StepResult{
+		Step:       step,
+		Outcome:    OutcomeError,
+		Output:     err.Error(),
+		Transcript: limitTranscript(tr, transcriptMaxBytes),
+		Duration:   r.clock.Now().Sub(start),
 	}
 }
 
@@ -307,13 +339,77 @@ func buildDryRunTranscript(cfg Config, step Step) string {
 	switch step.Type {
 	case ToolShell:
 		return fmt.Sprintf("[dry-run][shell] workdir=%q cmd=%q args=%v\n", cfg.WorkDir, step.Command, step.Args)
+
 	case ToolLLM:
 		return fmt.Sprintf("[dry-run][llm]\n%s\n", step.Prompt)
+
 	case ToolFiles:
-		return fmt.Sprintf("[dry-run][file] op=%q path=%q data_len=%d\n", step.Op, step.Path, len(step.Data))
+		op := strings.ToLower(strings.TrimSpace(step.Op))
+
+		switch op {
+		case "replace":
+			return fmt.Sprintf(
+				"[dry-run][file] op=%q path=%q old_len=%d new_len=%d n=%d\n",
+				step.Op, step.Path, len(step.Old), len(step.New), step.N,
+			)
+
+		case "patch":
+			return fmt.Sprintf(
+				"[dry-run][file] op=%q path=%q diff_len=%d\n",
+				step.Op, step.Path, len(step.Data),
+			)
+
+		case "write":
+			return fmt.Sprintf(
+				"[dry-run][file] op=%q path=%q data_len=%d\n",
+				step.Op, step.Path, len(step.Data),
+			)
+
+		case "read":
+			return fmt.Sprintf(
+				"[dry-run][file] op=%q path=%q\n",
+				step.Op, step.Path,
+			)
+
+		default:
+			// Unknown op, keep current behavior as a safe fallback.
+			return fmt.Sprintf("[dry-run][file] op=%q path=%q data_len=%d\n", step.Op, step.Path, len(step.Data))
+		}
+
 	default:
 		return fmt.Sprintf("[dry-run] step_type=%q\n", step.Type)
 	}
+}
+
+var firstMismatchLineRe = regexp.MustCompile(`\bline\s+(\d+)\b`)
+
+func buildFilePatchTranscript(path string, res PatchResult, err error) string {
+	var b strings.Builder
+	_, _ = fmt.Fprintf(&b, "[file] op=%q path=%q\n", "patch", path)
+	_, _ = fmt.Fprintf(&b, "hunks=%d\n", res.Hunks)
+
+	if err != nil {
+		_, _ = fmt.Fprintf(&b, "error=%q\n", err.Error())
+
+		if m := firstMismatchLineRe.FindStringSubmatch(err.Error()); len(m) == 2 {
+			_, _ = fmt.Fprintf(&b, "first_mismatch_line=%s\n", m[1])
+		}
+	}
+
+	return b.String()
+}
+
+func buildFileReplaceTranscript(path string, n int, res ReplaceResult, err error) string {
+	var b strings.Builder
+	_, _ = fmt.Fprintf(&b, "[file] op=%q path=%q\n", "replace", path)
+	_, _ = fmt.Fprintf(&b, "n=%d\n", n)
+	_, _ = fmt.Fprintf(&b, "occurrences_found=%d\n", res.OccurrencesFound)
+	_, _ = fmt.Fprintf(&b, "replaced=%d\n", res.Replaced)
+
+	if err != nil {
+		_, _ = fmt.Fprintf(&b, "error=%q\n", err.Error())
+	}
+	return b.String()
 }
 
 func buildShellStartTranscript(cfg Config, step Step) string {

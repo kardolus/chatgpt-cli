@@ -621,4 +621,207 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			Expect(err.Error()).To(ContainSubstring(`invalid action_type: "file"`))
 		})
 	})
+
+	when("LLM uses file patch", func() {
+		it("converts to a ToolFiles step and executes it", func() {
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).Return(`{
+      "thought":"apply diff",
+      "action_type":"tool",
+      "tool":"file",
+      "op":"patch",
+      "path":"a.txt",
+      "data":"--- a/a.txt\n+++ b/a.txt\n@@\n+hi\n"
+    }`, 1, nil)
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			runner.EXPECT().RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ agent.Config, step agent.Step) (agent.StepResult, error) {
+					Expect(step.Type).To(Equal(agent.ToolFiles))
+					Expect(step.Op).To(Equal("patch"))
+					Expect(step.Path).To(Equal("a.txt"))
+					Expect(step.Data).To(ContainSubstring("+++ b/a.txt"))
+					return agent.StepResult{Outcome: agent.OutcomeOK, Output: "patched"}, nil
+				})
+
+			// next iteration: answer
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).Return(`{
+      "thought":"done",
+      "action_type":"answer",
+      "final_answer":"ok"
+    }`, 1, nil)
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Patch a.txt")
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	when("LLM uses file replace", func() {
+		it("converts to a ToolFiles step with Old/New/N", func() {
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).Return(`{
+      "thought":"swap token",
+      "action_type":"tool",
+      "tool":"file",
+      "op":"replace",
+      "path":"a.txt",
+      "old":"foo",
+      "new":"bar",
+      "n":2
+    }`, 1, nil)
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			runner.EXPECT().RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ agent.Config, step agent.Step) (agent.StepResult, error) {
+					Expect(step.Type).To(Equal(agent.ToolFiles))
+					Expect(step.Op).To(Equal("replace"))
+					Expect(step.Path).To(Equal("a.txt"))
+					Expect(step.Old).To(Equal("foo"))
+					Expect(step.New).To(Equal("bar"))
+					Expect(step.N).To(Equal(2))
+					return agent.StepResult{Outcome: agent.OutcomeOK, Output: "replaced"}, nil
+				})
+
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).Return(`{
+      "thought":"done",
+      "action_type":"answer",
+      "final_answer":"ok"
+    }`, 1, nil)
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Replace in a.txt")
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	when("LLM uses file patch without data", func() {
+		it("returns validation error", func() {
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).Return(`{
+      "thought":"patch",
+      "action_type":"tool",
+      "tool":"file",
+      "op":"patch",
+      "path":"a.txt",
+      "data":"   "
+    }`, 1, nil)
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Patch")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("file patch requires data"))
+		})
+	})
+
+	when("LLM uses file replace without old", func() {
+		it("returns validation error", func() {
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).Return(`{
+      "thought":"replace",
+      "action_type":"tool",
+      "tool":"file",
+      "op":"replace",
+      "path":"a.txt",
+      "new":""
+    }`, 1, nil)
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Replace")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("file replace requires old pattern"))
+		})
+	})
+
+	when("patch fails and agent falls back to full write", func() {
+		it("continues after patch failure observation and then writes", func() {
+			// Iteration 1: patch
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).Return(`{
+      "thought":"try patch first",
+      "action_type":"tool",
+      "tool":"file",
+      "op":"patch",
+      "path":"a.txt",
+      "data":"--- a/a.txt\n+++ b/a.txt\n@@\n+hi\n"
+    }`, 1, nil)
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			runner.EXPECT().RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ agent.Config, step agent.Step) (agent.StepResult, error) {
+					Expect(step.Op).To(Equal("patch"))
+					// IMPORTANT: err == nil, failure is conveyed in Output/Outcome
+					return agent.StepResult{
+						Outcome:  agent.OutcomeError,
+						Output:   "patch failed: hunk did not apply",
+						Duration: 1 * time.Millisecond,
+					}, nil
+				})
+
+			// Iteration 2: LLM sees patch failed and chooses full write
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+					Expect(prompt).To(ContainSubstring("OBSERVATION: ERROR:"))
+					Expect(prompt).To(ContainSubstring("patch failed"))
+					return `{
+          "thought":"fallback to write full file",
+          "action_type":"tool",
+          "tool":"file",
+          "op":"write",
+          "path":"a.txt",
+          "data":"FULL NEW CONTENT\n"
+        }`, 1, nil
+				})
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			runner.EXPECT().RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ agent.Config, step agent.Step) (agent.StepResult, error) {
+					Expect(step.Op).To(Equal("write"))
+					Expect(step.Path).To(Equal("a.txt"))
+					Expect(step.Data).To(Equal("FULL NEW CONTENT\n"))
+					return agent.StepResult{Outcome: agent.OutcomeOK, Output: "wrote"}, nil
+				})
+
+			// Iteration 3: answer
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).Return(`{
+      "thought":"done",
+      "action_type":"answer",
+      "final_answer":"ok"
+    }`, 1, nil)
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Modify a.txt")
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
 }

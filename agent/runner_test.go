@@ -149,7 +149,7 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			expectShellTranscript(res, cfg, step, exec)
 		})
 
-		it("returns StepResult + error when shell runner errors", func() {
+		it("returns OutcomeError (no error) when shell runner errors, and surfaces error in Output", func() {
 			dur := expectDuration(mockClock, 5*time.Millisecond)
 
 			cfg := agent.Config{DryRun: false, WorkDir: "/tmp"}
@@ -171,12 +171,14 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 				Times(1)
 
 			res, err := subject.RunStep(context.Background(), cfg, step)
-			Expect(err).To(MatchError(runErr))
+			Expect(err).NotTo(HaveOccurred())
 
 			Expect(res.Step).To(Equal(step))
 			Expect(res.Outcome).To(Equal(agent.OutcomeError))
 			Expect(res.Duration).To(Equal(dur))
 			Expect(res.Exec).To(BeNil())
+			Expect(res.Output).To(ContainSubstring(runErr.Error()))
+
 			Expect(res.Transcript).To(ContainSubstring("[shell:start]"))
 			Expect(res.Transcript).To(ContainSubstring(`workdir="/tmp"`))
 			Expect(res.Transcript).To(ContainSubstring(`cmd="go"`))
@@ -212,7 +214,7 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(*res.Exec).To(Equal(exec))
 		})
 
-		it("returns error when llm prompt is missing/blank", func() {
+		it("returns OutcomeError (no error) when llm prompt is missing/blank and does not invoke llm tool", func() {
 			dur := expectDuration(mockClock, 123*time.Millisecond)
 
 			cfg := agent.Config{DryRun: false, WorkDir: "/tmp"}
@@ -229,14 +231,12 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			mockLLM.EXPECT().Complete(gomock.Any(), gomock.Any()).Times(0)
 
 			res, err := subject.RunStep(context.Background(), cfg, step)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("llm step requires Prompt"))
+			Expect(err).NotTo(HaveOccurred())
 
 			Expect(res.Step).To(Equal(step))
 			Expect(res.Outcome).To(Equal(agent.OutcomeError))
 			Expect(res.Duration).To(Equal(dur))
-			Expect(res.Transcript).NotTo(BeEmpty())
-			Expect(res.Output).To(BeEmpty())
+			Expect(res.Output).To(ContainSubstring("llm step requires Prompt"))
 			Expect(res.Exec).To(BeNil())
 
 			expectLLMStartTranscript(res, step)
@@ -282,7 +282,7 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			expectLLMOKTranscript(res, step, "hi there")
 		})
 
-		it("returns OutcomeError + start transcript when llm tool errors (and bubbles up error)", func() {
+		it("returns OutcomeError (no error) when llm tool errors and surfaces error in Output", func() {
 			dur := expectDuration(mockClock, 10*time.Millisecond)
 
 			cfg := agent.Config{DryRun: false}
@@ -294,9 +294,8 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			expectAllowStep(mockBudget, step)
 			expectAllowPolicy(mockPolicy, cfg, step)
 
-			// NEW: token preflight
+			// token preflight
 			expectLLMSnapshotOK(mockBudget)
-
 			expectAllowTool(mockBudget, agent.ToolLLM)
 
 			runErr := errors.New("llm boom")
@@ -312,12 +311,12 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 				Times(0)
 
 			res, err := subject.RunStep(context.Background(), cfg, step)
-			Expect(err).To(MatchError(runErr))
+			Expect(err).NotTo(HaveOccurred())
 
 			Expect(res.Step).To(Equal(step))
 			Expect(res.Outcome).To(Equal(agent.OutcomeError))
 			Expect(res.Duration).To(Equal(dur))
-			Expect(res.Output).To(Equal(""))
+			Expect(res.Output).To(ContainSubstring(runErr.Error()))
 			Expect(res.Exec).To(BeNil())
 
 			expectLLMStartTranscript(res, step)
@@ -335,7 +334,7 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			expectAllowStep(mockBudget, step)
 			expectAllowPolicy(mockPolicy, cfg, step)
 
-			// NEW: token preflight must happen before AllowTool
+			// token preflight must happen before AllowTool
 			expectLLMSnapshotOK(mockBudget)
 
 			toolErr := errors.New("tool budget denied")
@@ -359,7 +358,7 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Transcript).To(ContainSubstring(toolErr.Error()))
 		})
 
-		it("returns error StepResult when file path is missing/blank and does not invoke file tool", func() {
+		it("returns OutcomeError (no error) when file path is missing/blank and does not invoke file tool", func() {
 			dur := expectDuration(mockClock, 5*time.Millisecond)
 
 			cfg := agent.Config{DryRun: false, WorkDir: "/tmp"}
@@ -377,19 +376,18 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			mockFiles.EXPECT().WriteFile(gomock.Any(), gomock.Any()).Times(0)
 
 			res, err := subject.RunStep(context.Background(), cfg, step)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("file step requires Path"))
+			Expect(err).NotTo(HaveOccurred())
 
 			Expect(res.Step).To(Equal(step))
 			Expect(res.Outcome).To(Equal(agent.OutcomeError))
 			Expect(res.Duration).To(Equal(dur))
 			Expect(res.Exec).To(BeNil())
-			Expect(res.Output).To(BeEmpty())
+			Expect(res.Output).To(ContainSubstring("file step requires Path"))
 
 			expectFileStartTranscript(res, step)
 		})
 
-		it("returns error StepResult for unsupported file op and does not invoke file tool", func() {
+		it("returns OutcomeError (no error) for unsupported file op and does not invoke file tool", func() {
 			dur := expectDuration(mockClock, 5*time.Millisecond)
 
 			cfg := agent.Config{DryRun: false, WorkDir: "/tmp"}
@@ -401,20 +399,21 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 
 			expectAllowStep(mockBudget, step)
 			expectAllowPolicy(mockPolicy, cfg, step)
+
+			// NOTE: current runner charges tool budget before op switch.
 			mockBudget.EXPECT().AllowTool(agent.ToolFiles, gomock.Any()).Times(1)
 
 			mockFiles.EXPECT().ReadFile(gomock.Any()).Times(0)
 			mockFiles.EXPECT().WriteFile(gomock.Any(), gomock.Any()).Times(0)
 
 			res, err := subject.RunStep(context.Background(), cfg, step)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("unsupported file op"))
+			Expect(err).NotTo(HaveOccurred())
 
 			Expect(res.Step).To(Equal(step))
 			Expect(res.Outcome).To(Equal(agent.OutcomeError))
 			Expect(res.Duration).To(Equal(dur))
 			Expect(res.Exec).To(BeNil())
-			Expect(res.Output).To(BeEmpty())
+			Expect(res.Output).To(ContainSubstring("unsupported file op"))
 
 			expectFileStartTranscript(res, step)
 		})
@@ -453,7 +452,7 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			expectFileReadTranscript(res, step.Path, "hello\n")
 		})
 
-		it("bubbles up read errors and returns error StepResult (with start transcript)", func() {
+		it("returns OutcomeError (no error) when read errors, and surfaces error in Output (with start transcript)", func() {
 			dur := expectDuration(mockClock, 10*time.Millisecond)
 
 			cfg := agent.Config{DryRun: false, WorkDir: "/tmp"}
@@ -477,18 +476,18 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			mockFiles.EXPECT().WriteFile(gomock.Any(), gomock.Any()).Times(0)
 
 			res, err := subject.RunStep(context.Background(), cfg, step)
-			Expect(err).To(MatchError(readErr))
+			Expect(err).NotTo(HaveOccurred())
 
 			Expect(res.Step).To(Equal(step))
 			Expect(res.Outcome).To(Equal(agent.OutcomeError))
 			Expect(res.Duration).To(Equal(dur))
 			Expect(res.Exec).To(BeNil())
-			Expect(res.Output).To(BeEmpty())
+			Expect(res.Output).To(ContainSubstring(readErr.Error()))
 
 			expectFileStartTranscript(res, step)
 		})
 
-		it("writes file and returns ok outcome (no Output)", func() {
+		it("writes file and returns ok outcome", func() {
 			dur := expectDuration(mockClock, 50*time.Millisecond)
 
 			cfg := agent.Config{DryRun: false, WorkDir: "/tmp"}
@@ -523,7 +522,7 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			expectFileWriteTranscript(res, step.Path, len(step.Data))
 		})
 
-		it("bubbles up write errors and returns error StepResult (with start transcript)", func() {
+		it("returns OutcomeError (no error) when write errors, and surfaces error in Output (with start transcript)", func() {
 			dur := expectDuration(mockClock, 50*time.Millisecond)
 
 			cfg := agent.Config{DryRun: false, WorkDir: "/tmp"}
@@ -548,13 +547,13 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			mockFiles.EXPECT().ReadFile(gomock.Any()).Times(0)
 
 			res, err := subject.RunStep(context.Background(), cfg, step)
-			Expect(err).To(MatchError(writeErr))
+			Expect(err).NotTo(HaveOccurred())
 
 			Expect(res.Step).To(Equal(step))
 			Expect(res.Outcome).To(Equal(agent.OutcomeError))
 			Expect(res.Duration).To(Equal(dur))
 			Expect(res.Exec).To(BeNil())
-			Expect(res.Output).To(BeEmpty())
+			Expect(res.Output).To(ContainSubstring(writeErr.Error()))
 
 			expectFileStartTranscript(res, step)
 		})
@@ -587,7 +586,7 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Output).To(Equal("ok"))
 		})
 
-		it("returns error StepResult when step type is unsupported (with transcript)", func() {
+		it("returns OutcomeError (no error) when step type is unsupported (with transcript)", func() {
 			dur := expectDuration(mockClock, 7*time.Millisecond)
 
 			cfg := agent.Config{DryRun: false, WorkDir: "/tmp"}
@@ -602,14 +601,13 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			mockBudget.EXPECT().AllowTool(gomock.Any(), gomock.Any()).Times(0)
 
 			res, err := subject.RunStep(context.Background(), cfg, step)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("unsupported step type: wat"))
+			Expect(err).NotTo(HaveOccurred())
 
 			Expect(res.Step).To(Equal(step))
 			Expect(res.Outcome).To(Equal(agent.OutcomeError))
 			Expect(res.Duration).To(Equal(dur))
 			Expect(res.Exec).To(BeNil())
-			Expect(res.Output).To(BeEmpty())
+			Expect(res.Output).To(ContainSubstring("unsupported step type: wat"))
 			Expect(res.Transcript).To(ContainSubstring(`[unsupported]`))
 			Expect(res.Transcript).To(ContainSubstring(`step_type="wat"`))
 		})
@@ -729,7 +727,6 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			expectAllowPolicy(mockPolicy, cfg, step)
 
 			// Preflight says we're already out of tokens
-			preflightErr := errors.New("llm token budget exceeded")
 			mockBudget.
 				EXPECT().
 				Snapshot(gomock.Any()).
@@ -750,14 +747,14 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 
 			res, err := subject.RunStep(context.Background(), cfg, step)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring(preflightErr.Error())) // or whatever message you actually return
+			Expect(err.Error()).To(ContainSubstring("llm token budget exceeded"))
 
 			Expect(res.Step).To(Equal(step))
 			Expect(res.Outcome).To(Equal(agent.OutcomeError))
 			Expect(res.Duration).To(Equal(dur))
 			Expect(res.Transcript).To(ContainSubstring("[llm:start]"))
 			Expect(res.Transcript).To(ContainSubstring("[budget]"))
-			Expect(res.Transcript).To(ContainSubstring("token")) // budget message should mention tokens
+			Expect(res.Transcript).To(ContainSubstring("token"))
 		})
 
 		it("returns OutcomeError when policy denies a dry-run step (no tools invoked)", func() {
@@ -845,6 +842,247 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Duration).To(Equal(dur))
 			Expect(res.Transcript).To(ContainSubstring("[file:start]"))
 			Expect(res.Transcript).To(ContainSubstring("[policy]"))
+		})
+
+		it("patches file and returns ok outcome (calls PatchFile)", func() {
+			dur := expectDuration(mockClock, 50*time.Millisecond)
+
+			cfg := agent.Config{DryRun: false}
+			step := agent.Step{
+				Type: agent.ToolFiles,
+				Op:   "patch",
+				Path: "/tmp/a.txt",
+				Data: "@@ -1,1 +1,1 @@\n-a\n+b\n",
+			}
+
+			expectAllowStep(mockBudget, step)
+			expectAllowPolicy(mockPolicy, cfg, step)
+			expectAllowTool(mockBudget, agent.ToolFiles)
+
+			mockFiles.
+				EXPECT().
+				PatchFile(step.Path, []byte(step.Data)).
+				Return(agent.PatchResult{Hunks: 2}, nil).
+				Times(1)
+
+			// Guard: no other ops
+			mockFiles.EXPECT().ReadFile(gomock.Any()).Times(0)
+			mockFiles.EXPECT().WriteFile(gomock.Any(), gomock.Any()).Times(0)
+			mockFiles.EXPECT().ReplaceBytesInFile(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+			res, err := subject.RunStep(context.Background(), cfg, step)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(res.Step).To(Equal(step))
+			Expect(res.Outcome).To(Equal(agent.OutcomeOK))
+			Expect(res.Duration).To(Equal(dur))
+			Expect(res.Exec).To(BeNil())
+
+			Expect(res.Output).NotTo(BeEmpty())
+			Expect(res.Transcript).To(ContainSubstring(`op="patch"`))
+			Expect(res.Transcript).To(ContainSubstring(step.Path))
+		})
+
+		it("returns OutcomeError (no error) when patch errors (still includes patch transcript + error in Output)", func() {
+			dur := expectDuration(mockClock, 50*time.Millisecond)
+
+			cfg := agent.Config{DryRun: false}
+			step := agent.Step{
+				Type: agent.ToolFiles,
+				Op:   "patch",
+				Path: "/tmp/a.txt",
+				Data: "@@ -1,1 +1,1 @@\n-a\n+b\n",
+			}
+
+			expectAllowStep(mockBudget, step)
+			expectAllowPolicy(mockPolicy, cfg, step)
+			expectAllowTool(mockBudget, agent.ToolFiles)
+
+			patchErr := errors.New("apply patch /tmp/a.txt: first mismatch at line 7")
+			mockFiles.
+				EXPECT().
+				PatchFile(step.Path, []byte(step.Data)).
+				Return(agent.PatchResult{Hunks: 1}, patchErr).
+				Times(1)
+
+			res, err := subject.RunStep(context.Background(), cfg, step)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(res.Step).To(Equal(step))
+			Expect(res.Outcome).To(Equal(agent.OutcomeError))
+			Expect(res.Duration).To(Equal(dur))
+			Expect(res.Exec).To(BeNil())
+			Expect(res.Output).To(ContainSubstring(patchErr.Error()))
+
+			Expect(res.Transcript).To(ContainSubstring(`op="patch"`))
+			Expect(res.Transcript).To(ContainSubstring(step.Path))
+			Expect(res.Transcript).To(ContainSubstring("error"))
+		})
+
+		it("replaces bytes in file and returns ok outcome (calls ReplaceBytesInFile)", func() {
+			dur := expectDuration(mockClock, 50*time.Millisecond)
+
+			cfg := agent.Config{DryRun: false}
+			step := agent.Step{
+				Type: agent.ToolFiles,
+				Op:   "replace",
+				Path: "/tmp/a.txt",
+				Old:  "aa",
+				New:  "XX",
+				N:    2,
+			}
+
+			expectAllowStep(mockBudget, step)
+			expectAllowPolicy(mockPolicy, cfg, step)
+			expectAllowTool(mockBudget, agent.ToolFiles)
+
+			mockFiles.
+				EXPECT().
+				ReplaceBytesInFile(step.Path, []byte(step.Old), []byte(step.New), step.N).
+				Return(agent.ReplaceResult{OccurrencesFound: 5, Replaced: 2}, nil).
+				Times(1)
+
+			// Guard: no other ops
+			mockFiles.EXPECT().ReadFile(gomock.Any()).Times(0)
+			mockFiles.EXPECT().WriteFile(gomock.Any(), gomock.Any()).Times(0)
+			mockFiles.EXPECT().PatchFile(gomock.Any(), gomock.Any()).Times(0)
+
+			res, err := subject.RunStep(context.Background(), cfg, step)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(res.Step).To(Equal(step))
+			Expect(res.Outcome).To(Equal(agent.OutcomeOK))
+			Expect(res.Duration).To(Equal(dur))
+			Expect(res.Exec).To(BeNil())
+
+			Expect(res.Output).NotTo(BeEmpty())
+			Expect(res.Transcript).To(ContainSubstring(`op="replace"`))
+			Expect(res.Transcript).To(ContainSubstring(step.Path))
+		})
+
+		it("returns OutcomeError (no error) when replace errors and surfaces error in Output", func() {
+			dur := expectDuration(mockClock, 50*time.Millisecond)
+
+			cfg := agent.Config{DryRun: false}
+			step := agent.Step{
+				Type: agent.ToolFiles,
+				Op:   "replace",
+				Path: "/tmp/a.txt",
+				Old:  "nope",
+				New:  "x",
+				N:    -1,
+			}
+
+			expectAllowStep(mockBudget, step)
+			expectAllowPolicy(mockPolicy, cfg, step)
+			expectAllowTool(mockBudget, agent.ToolFiles)
+
+			replErr := errors.New("replace /tmp/a.txt: pattern not found")
+			mockFiles.
+				EXPECT().
+				ReplaceBytesInFile(step.Path, []byte(step.Old), []byte(step.New), step.N).
+				Return(agent.ReplaceResult{OccurrencesFound: 0, Replaced: 0}, replErr).
+				Times(1)
+
+			res, err := subject.RunStep(context.Background(), cfg, step)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(res.Step).To(Equal(step))
+			Expect(res.Outcome).To(Equal(agent.OutcomeError))
+			Expect(res.Duration).To(Equal(dur))
+			Expect(res.Exec).To(BeNil())
+			Expect(res.Output).To(ContainSubstring(replErr.Error()))
+
+			Expect(res.Transcript).To(ContainSubstring(`op="replace"`))
+			Expect(res.Transcript).To(ContainSubstring(step.Path))
+			Expect(res.Transcript).To(ContainSubstring("error"))
+		})
+
+		it("dry-run patch does not invoke PatchFile", func() {
+			dur := expectDuration(mockClock, 10*time.Millisecond)
+
+			cfg := agent.Config{DryRun: true}
+			step := agent.Step{
+				Type: agent.ToolFiles,
+				Op:   "patch",
+				Path: "/tmp/a.txt",
+				Data: "diff-content",
+			}
+
+			expectAllowStep(mockBudget, step)
+			expectAllowPolicy(mockPolicy, cfg, step)
+			mockBudget.EXPECT().AllowTool(agent.ToolFiles, gomock.Any()).Times(0)
+
+			mockFiles.EXPECT().PatchFile(gomock.Any(), gomock.Any()).Times(0)
+			mockFiles.EXPECT().ReplaceBytesInFile(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			mockFiles.EXPECT().ReadFile(gomock.Any()).Times(0)
+			mockFiles.EXPECT().WriteFile(gomock.Any(), gomock.Any()).Times(0)
+
+			res, err := subject.RunStep(context.Background(), cfg, step)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(res.Outcome).To(Equal(agent.OutcomeDryRun))
+			Expect(res.Duration).To(Equal(dur))
+			Expect(res.Transcript).To(ContainSubstring("dry-run"))
+			Expect(res.Transcript).To(ContainSubstring(`op="patch"`))
+		})
+
+		it("dry-run replace does not invoke ReplaceBytesInFile", func() {
+			dur := expectDuration(mockClock, 10*time.Millisecond)
+
+			cfg := agent.Config{DryRun: true}
+			step := agent.Step{
+				Type: agent.ToolFiles,
+				Op:   "replace",
+				Path: "/tmp/a.txt",
+				Old:  "aa",
+				New:  "XX",
+				N:    0,
+			}
+
+			expectAllowStep(mockBudget, step)
+			expectAllowPolicy(mockPolicy, cfg, step)
+			mockBudget.EXPECT().AllowTool(agent.ToolFiles, gomock.Any()).Times(0)
+
+			mockFiles.EXPECT().PatchFile(gomock.Any(), gomock.Any()).Times(0)
+			mockFiles.EXPECT().ReplaceBytesInFile(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			mockFiles.EXPECT().ReadFile(gomock.Any()).Times(0)
+			mockFiles.EXPECT().WriteFile(gomock.Any(), gomock.Any()).Times(0)
+
+			res, err := subject.RunStep(context.Background(), cfg, step)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(res.Outcome).To(Equal(agent.OutcomeDryRun))
+			Expect(res.Duration).To(Equal(dur))
+			Expect(res.Transcript).To(ContainSubstring("dry-run"))
+			Expect(res.Transcript).To(ContainSubstring(`op="replace"`))
+		})
+
+		it("returns error StepResult when files tool budget is denied for patch and does not invoke PatchFile", func() {
+			dur := expectDuration(mockClock, 10*time.Millisecond)
+
+			cfg := agent.Config{DryRun: false}
+			step := agent.Step{
+				Type: agent.ToolFiles,
+				Op:   "patch",
+				Path: "/tmp/a.txt",
+				Data: "diff",
+			}
+
+			expectAllowStep(mockBudget, step)
+			expectAllowPolicy(mockPolicy, cfg, step)
+
+			toolErr := errors.New("tool budget denied")
+			mockBudget.EXPECT().AllowTool(agent.ToolFiles, gomock.Any()).Return(toolErr).Times(1)
+
+			mockFiles.EXPECT().PatchFile(gomock.Any(), gomock.Any()).Times(0)
+
+			res, err := subject.RunStep(context.Background(), cfg, step)
+			Expect(err).To(MatchError(toolErr))
+
+			Expect(res.Outcome).To(Equal(agent.OutcomeError))
+			Expect(res.Duration).To(Equal(dur))
+			Expect(res.Transcript).To(ContainSubstring("[budget]"))
 		})
 	})
 }

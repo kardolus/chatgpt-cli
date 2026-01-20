@@ -3,6 +3,7 @@ package integration_test
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/kardolus/chatgpt-cli/agent"
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/cache"
 	"github.com/kardolus/chatgpt-cli/config"
@@ -1224,4 +1225,190 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			})
 		})
 	})
+
+	when("Agent Files ops", func() {
+		var (
+			tmpDir string
+			err    error
+			ops    agent.FSIOFileOps
+		)
+
+		it.Before(func() {
+			tmpDir, err = os.MkdirTemp("", "chatgpt-cli-files-it")
+			Expect(err).NotTo(HaveOccurred())
+
+			ops = agent.NewFSIOFileOps(osReader{}, osWriter{})
+		})
+
+		it.After(func() {
+			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		})
+
+		it("WriteFile writes and overwrites full content", func() {
+			p := filepath.Join(tmpDir, "a.txt")
+
+			Expect(ops.WriteFile(p, []byte("hello\n"))).To(Succeed())
+			b, err := os.ReadFile(p)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(b)).To(Equal("hello\n"))
+
+			Expect(ops.WriteFile(p, []byte("goodbye\n"))).To(Succeed())
+			b, err = os.ReadFile(p)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(b)).To(Equal("goodbye\n"))
+		})
+
+		it("PatchFile applies unified diff and persists changes", func() {
+			p := filepath.Join(tmpDir, "b.txt")
+			Expect(os.WriteFile(p, []byte("a\nb\nc\n"), 0o644)).To(Succeed())
+
+			diff := []byte(
+				"@@ -1,3 +1,3 @@\n" +
+					" a\n" +
+					"-b\n" +
+					"+B\n" +
+					" c\n",
+			)
+
+			res, err := ops.PatchFile(p, diff)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res.Hunks).To(Equal(1))
+
+			got, err := os.ReadFile(p)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(got)).To(Equal("a\nB\nc\n"))
+		})
+
+		it("PatchFile is a no-op when patch produces no changes", func() {
+			p := filepath.Join(tmpDir, "c.txt")
+			Expect(os.WriteFile(p, []byte("a\nb\n"), 0o644)).To(Succeed())
+
+			// Patch that effectively keeps the file identical.
+			diff := []byte(
+				"@@ -1,2 +1,2 @@\n" +
+					" a\n" +
+					" b\n",
+			)
+
+			res, err := ops.PatchFile(p, diff)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res.Hunks).To(Equal(1))
+
+			got, err := os.ReadFile(p)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(got)).To(Equal("a\nb\n"))
+		})
+
+		it("PatchFile returns a wrapped error when patch cannot be applied", func() {
+			p := filepath.Join(tmpDir, "d.txt")
+			Expect(os.WriteFile(p, []byte("a\nb\nc\n"), 0o644)).To(Succeed())
+
+			// Context mismatch: expects 'x' where file has 'b'
+			diff := []byte(
+				"@@ -1,3 +1,3 @@\n" +
+					" a\n" +
+					"-x\n" +
+					"+B\n" +
+					" c\n",
+			)
+
+			res, err := ops.PatchFile(p, diff)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("apply patch " + p + ":"))
+			Expect(res.Hunks).To(Equal(1))
+		})
+
+		it("ReplaceBytesInFile replaces all occurrences when n<=0", func() {
+			p := filepath.Join(tmpDir, "e.txt")
+			Expect(os.WriteFile(p, []byte("aa bb aa bb aa\n"), 0o644)).To(Succeed())
+
+			res, err := ops.ReplaceBytesInFile(p, []byte("aa"), []byte("XX"), 0)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res.OccurrencesFound).To(Equal(3))
+			Expect(res.Replaced).To(Equal(3))
+
+			got, err := os.ReadFile(p)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(got)).To(Equal("XX bb XX bb XX\n"))
+		})
+
+		it("ReplaceBytesInFile replaces only the first n occurrences when n>0", func() {
+			p := filepath.Join(tmpDir, "f.txt")
+			Expect(os.WriteFile(p, []byte("x x x x\n"), 0o644)).To(Succeed())
+
+			res, err := ops.ReplaceBytesInFile(p, []byte("x"), []byte("y"), 2)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res.OccurrencesFound).To(Equal(4))
+			Expect(res.Replaced).To(Equal(2))
+
+			got, err := os.ReadFile(p)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(got)).To(Equal("y y x x\n"))
+		})
+
+		it("ReplaceBytesInFile errors when old pattern is empty", func() {
+			p := filepath.Join(tmpDir, "g.txt")
+			Expect(os.WriteFile(p, []byte("hello\n"), 0o644)).To(Succeed())
+
+			res, err := ops.ReplaceBytesInFile(p, []byte(""), []byte("x"), -1)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("old pattern must be non-empty"))
+			Expect(res).To(Equal(agent.ReplaceResult{}))
+		})
+
+		it("ReplaceBytesInFile errors when pattern is not found", func() {
+			p := filepath.Join(tmpDir, "h.txt")
+			Expect(os.WriteFile(p, []byte("hello\n"), 0o644)).To(Succeed())
+
+			res, err := ops.ReplaceBytesInFile(p, []byte("nope"), []byte("x"), -1)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("pattern not found"))
+			Expect(res.OccurrencesFound).To(Equal(0))
+			Expect(res.Replaced).To(Equal(0))
+		})
+
+		it("ReplaceBytesInFile errors when replacement produces no change", func() {
+			p := filepath.Join(tmpDir, "i.txt")
+			Expect(os.WriteFile(p, []byte("hello hello\n"), 0o644)).To(Succeed())
+
+			res, err := ops.ReplaceBytesInFile(p, []byte("hello"), []byte("hello"), -1)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("no changes applied"))
+			Expect(res.OccurrencesFound).To(Equal(2))
+			Expect(res.Replaced).To(Equal(0))
+		})
+	})
+}
+
+type osReader struct{}
+
+func (osReader) Open(name string) (*os.File, error) {
+	return os.Open(name)
+}
+
+func (osReader) ReadBufferFromFile(file *os.File) ([]byte, error) {
+	return io.ReadAll(file)
+}
+
+func (r osReader) ReadFile(name string) ([]byte, error) {
+	f, err := r.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	return r.ReadBufferFromFile(f)
+}
+
+type osWriter struct{}
+
+func (osWriter) Create(path string) (*os.File, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, err
+	}
+	return os.Create(path)
+}
+
+func (osWriter) Write(f *os.File, data []byte) error {
+	_, err := f.Write(data)
+	return err
 }

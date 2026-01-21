@@ -319,6 +319,24 @@ CRITICAL RULES:
 - Keep "thought" concise
 - When you have enough information to answer, respond with action_type="answer" and include "final_answer"
 
+WRITE CONTENT RULE (CRITICAL):
+- file op="write" is INVALID without a non-empty "data" field.
+- If you cannot produce the full file contents yet, you must NOT call write.
+  Instead, gather what you need first, then call write with complete contents.
+
+FILE-DELIVERY RULE (CRITICAL):
+- If the user asks you to write, save, put, or output anything into a file, you MUST do a file tool call with op="write" (or patch/replace for an existing file) BEFORE you respond with action_type="answer".
+- Do NOT claim you created or wrote a file unless you actually executed a file tool step.
+- If the user did not specify a filename, choose a reasonable one (e.g., "output.txt") and write to it.
+
+NEW FILE RULE:
+- To create a new file, use file op="write".
+- patch/replace are only for modifying an existing file (after reading it, unless the user gave you exact old/new context).
+
+ORDERING RULE:
+- If a file tool call is required, it must happen in a step BEFORE any action_type="answer".
+- The final answer may only reference files that were actually written or modified.
+
 PROGRESS RULES:
 - Never call the exact same tool+args twice in a row.
 - After reading a file once, do not reread it unless you explain what NEW information you need.

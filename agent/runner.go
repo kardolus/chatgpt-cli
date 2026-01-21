@@ -132,6 +132,14 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 			Output:     out,
 			Transcript: limitTranscript(tr, transcriptMaxBytes),
 			Duration:   r.clock.Now().Sub(start),
+			Effects: []StepEffect{
+				effect("shell.exec", "", 0, map[string]any{
+					"cmd":      step.Command,
+					"args":     step.Args,
+					"workdir":  cfg.WorkDir,
+					"exitCode": res.ExitCode,
+				}),
+			},
 		}, nil
 
 	case ToolLLM:
@@ -236,8 +244,13 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 			}, nil
 
 		case "write":
+			if step.Data == "" {
+				err := fmt.Errorf("file write requires Data")
+				tr := buildFileStartTranscript(step)
+				return softStepError(r, start, step, tr, err), nil
+			}
+
 			if err := r.tools.Files.WriteFile(step.Path, []byte(step.Data)); err != nil {
-				// SOFT FAIL (agent can fall back / retry)
 				tr := buildFileStartTranscript(step)
 				return softStepError(r, start, step, tr, err), nil
 			}
@@ -249,12 +262,20 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 				Output:     fmt.Sprintf("wrote %d bytes to %s", len(step.Data), step.Path),
 				Transcript: limitTranscript(tr, transcriptMaxBytes),
 				Duration:   r.clock.Now().Sub(start),
+				Effects: []StepEffect{
+					effect("file.write", step.Path, len(step.Data), nil),
+				},
 			}, nil
 
 		case "patch":
+			if step.Data == "" {
+				err := fmt.Errorf("file patch requires Data (unified diff)")
+				tr := buildFileStartTranscript(step)
+				return softStepError(r, start, step, tr, err), nil
+			}
+
 			patchRes, err := r.tools.Files.PatchFile(step.Path, []byte(step.Data))
 			if err != nil {
-				// SOFT FAIL: this is where the agent can decide to do read+write fallback
 				tr := buildFilePatchTranscript(step.Path, patchRes, err)
 				return softStepError(r, start, step, tr, err), nil
 			}
@@ -266,12 +287,22 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 				Output:     fmt.Sprintf("patched %s (hunks=%d)", step.Path, patchRes.Hunks),
 				Transcript: limitTranscript(tr, transcriptMaxBytes),
 				Duration:   r.clock.Now().Sub(start),
+				Effects: []StepEffect{
+					effect("file.patch", step.Path, 0, map[string]any{
+						"hunks": patchRes.Hunks,
+					}),
+				},
 			}, nil
 
 		case "replace":
+			if step.Old == "" {
+				err := fmt.Errorf("file replace requires Old")
+				tr := buildFileStartTranscript(step)
+				return softStepError(r, start, step, tr, err), nil
+			}
+
 			replRes, err := r.tools.Files.ReplaceBytesInFile(step.Path, []byte(step.Old), []byte(step.New), step.N)
 			if err != nil {
-				// SOFT FAIL: agent can decide to do read+write fallback
 				tr := buildFileReplaceTranscript(step.Path, step.N, replRes, err)
 				return softStepError(r, start, step, tr, err), nil
 			}
@@ -288,6 +319,13 @@ func (r *DefaultRunner) RunStep(ctx context.Context, cfg Config, step Step) (Ste
 				),
 				Transcript: limitTranscript(tr, transcriptMaxBytes),
 				Duration:   r.clock.Now().Sub(start),
+				Effects: []StepEffect{
+					effect("file.replace", step.Path, 0, map[string]any{
+						"found":    replRes.OccurrencesFound,
+						"replaced": replRes.Replaced,
+						"n":        step.N,
+					}),
+				},
 			}, nil
 
 		default:
@@ -507,4 +545,13 @@ func limitTranscript(s string, max int) string {
 		return s
 	}
 	return s[:max] + "\n…(truncated)\n"
+}
+
+func effect(kind, path string, bytes int, meta map[string]any) StepEffect {
+	return StepEffect{
+		Kind:  kind,
+		Path:  path,
+		Bytes: bytes,
+		Meta:  meta,
+	}
 }

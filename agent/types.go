@@ -61,6 +61,7 @@ type StepResult struct {
 	Duration   time.Duration
 	Exec       *Result
 	Output     string
+	Effects    Effects
 }
 
 type Result struct {

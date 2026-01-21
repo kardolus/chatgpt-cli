@@ -11,9 +11,10 @@ import (
 
 type ReActAgent struct {
 	*BaseAgent
-	llm    LLM
-	runner Runner
-	budget Budget
+	llm     LLM
+	runner  Runner
+	budget  Budget
+	effects Effects
 }
 
 func NewReActAgent(llm LLM, runner Runner, budget Budget, clock Clock, opts ...BaseOption) *ReActAgent {
@@ -84,7 +85,7 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 			return "", err
 		}
 
-		prompt := buildReActPrompt(conversation)
+		prompt := buildReActPrompt(conversation, a.promptStateLine())
 		dbg.Debugf("react iteration %d prompt_len=%d", i+1, len(prompt))
 
 		raw, tokens, err := a.llm.Complete(ctx, prompt)
@@ -143,7 +144,10 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 		if action.ActionType == "answer" {
 			result := strings.TrimRightFunc(action.FinalAnswer, unicode.IsSpace)
 			out.Infof("\nResult: %s\n", result)
-			dbg.Debugf("final answer: %q", action.FinalAnswer)
+
+			if len(a.effects) > 0 {
+				out.Infof("Side effects (total): %s", summarizeEffectsForUI(a.effects))
+			}
 			return result, nil
 		}
 
@@ -177,31 +181,44 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 			return "", err
 		}
 
-		// NEW: tool failures now come back as OutcomeError (err == nil).
 		if res.Outcome == OutcomeError {
+			mergeEffects(&a.effects, res.Effects)
+
 			out.Errorf("[Iteration %d] Step failed: %s", i+1, step.Description)
 			out.Infof("[Iteration %d] Observation: %s (took %s)", i+1, truncateForDisplay(res.Output, 100), res.Duration)
-			dbg.Debugf("error observation (iteration %d): %q transcript=%q", i+1, res.Output, res.Transcript)
+
+			if len(res.Effects) > 0 {
+				out.Infof("[Iteration %d] Side effects: %s", i+1, summarizeEffectsForUI(res.Effects))
+			}
 
 			conversation = append(conversation,
 				fmt.Sprintf("ACTION_TAKEN: tool=%s details=%s", action.Tool, step.Description),
 				fmt.Sprintf("OBSERVATION: ERROR: %s", res.Output),
+				formatEffectsForConversation(res.Effects),
 			)
 			continue
 		}
 
+		mergeEffects(&a.effects, res.Effects)
+
 		out.Infof("[Iteration %d] Observation: %s (took %s)", i+1, truncateForDisplay(res.Output, 100), res.Duration)
 		dbg.Debugf("observation (iteration %d): %q", i+1, res.Output)
+
+		if len(res.Effects) > 0 {
+			out.Infof("[Iteration %d] Side effects: %s", i+1, summarizeEffectsForUI(res.Effects))
+		}
 
 		conversation = append(conversation,
 			fmt.Sprintf("ACTION_TAKEN: tool=%s details=%s", action.Tool, step.Description),
 			fmt.Sprintf("OBSERVATION: %s", res.Output),
+			formatEffectsForConversation(res.Effects),
 		)
 	}
 }
 
-func buildReActPrompt(conversation []string) string {
+func buildReActPrompt(conversation []string, stateLine string) string {
 	history := strings.Join(conversation, "\n\n")
+	stateLine = strings.TrimSpace(stateLine)
 
 	return fmt.Sprintf(`You are a ReAct agent. You will iteratively reason and act to answer the user's question.
 
@@ -343,11 +360,15 @@ PROGRESS RULES:
 - Prefer making the smallest safe change, but remember: writes overwrite the entire file.
 - If you are stuck, finish with action_type:"answer" explaining what you need next.
 
+State:
+
+%s
+
 Conversation history:
 
 %s
 
-What's your next step?`, history)
+What's your next step?`, stateLine, history)
 }
 
 func parseReActResponse(raw string) (reActAction, error) {
@@ -638,7 +659,8 @@ func signatureForAction(a reActAction) actionSig {
 		cmd := strings.TrimSpace(a.Command)
 		args := normalizeArgs(a.Args)
 		// include args because `bash -lc ...` vs `make help` matters
-		return actionSig{tool: "shell", key: cmd + " " + strings.Join(args, " ")}
+		key := strings.TrimSpace(cmd + " " + strings.Join(args, " "))
+		return actionSig{tool: "shell", key: key}
 
 	case "llm":
 		// don't key on the whole prompt (huge); use a prefix + length
@@ -668,4 +690,11 @@ func normalizeArgs(in []string) []string {
 		out = append(out, s)
 	}
 	return out
+}
+
+func (a *ReActAgent) promptStateLine() string {
+	if len(a.effects) == 0 {
+		return ""
+	}
+	return "side_effects_total=" + summarizeEffectsForUI(a.effects)
 }

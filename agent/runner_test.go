@@ -82,6 +82,8 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Transcript).To(ContainSubstring(`workdir="/tmp"`))
 			Expect(res.Transcript).To(ContainSubstring(`cmd="echo"`))
 			Expect(res.Exec).To(BeNil())
+
+			expectNoEffects(res)
 		})
 
 		it("runs shell command and returns ok outcome when exit code is 0", func() {
@@ -115,6 +117,10 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(*res.Exec).To(Equal(exec))
 
 			expectShellTranscript(res, cfg, step, exec)
+
+			expectOneEffect(res, "shell.exec", "", 0)
+			Expect(res.Effects[0].Meta).NotTo(BeNil())
+			Expect(res.Effects[0].Meta["exitCode"]).To(Equal(exec.ExitCode))
 		})
 
 		it("returns error outcome when shell exits non-zero", func() {
@@ -147,6 +153,10 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(*res.Exec).To(Equal(exec))
 
 			expectShellTranscript(res, cfg, step, exec)
+
+			expectOneEffect(res, "shell.exec", "", 0)
+			Expect(res.Effects[0].Meta).NotTo(BeNil())
+			Expect(res.Effects[0].Meta["exitCode"]).To(Equal(exec.ExitCode))
 		})
 
 		it("returns OutcomeError (no error) when shell runner errors, and surfaces error in Output", func() {
@@ -182,6 +192,37 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Transcript).To(ContainSubstring("[shell:start]"))
 			Expect(res.Transcript).To(ContainSubstring(`workdir="/tmp"`))
 			Expect(res.Transcript).To(ContainSubstring(`cmd="go"`))
+
+			expectNoEffects(res)
+		})
+
+		it("returns OutcomeError (no error) when file write is missing Data and does not invoke WriteFile", func() {
+			dur := expectDuration(mockClock, 5*time.Millisecond)
+
+			cfg := agent.Config{DryRun: false}
+			step := agent.Step{
+				Type: agent.ToolFiles,
+				Op:   "write",
+				Path: "/tmp/out.txt",
+				Data: "",
+			}
+
+			expectAllowStep(mockBudget, step)
+			expectAllowPolicy(mockPolicy, cfg, step)
+
+			// Guard: tool budget is still charged before op switch (current behavior)
+			expectAllowTool(mockBudget, agent.ToolFiles)
+
+			mockFiles.EXPECT().WriteFile(gomock.Any(), gomock.Any()).Times(0)
+
+			res, err := subject.RunStep(context.Background(), cfg, step)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(res.Outcome).To(Equal(agent.OutcomeError))
+			Expect(res.Output).To(ContainSubstring("file write requires Data"))
+			Expect(res.Duration).To(Equal(dur))
+
+			expectNoEffects(res)
 		})
 
 		it("handles shell command with no args (variadic call)", func() {
@@ -450,6 +491,7 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Output).To(Equal("hello\n"))
 
 			expectFileReadTranscript(res, step.Path, "hello\n")
+			expectNoEffects(res)
 		})
 
 		it("returns OutcomeError (no error) when read errors, and surfaces error in Output (with start transcript)", func() {
@@ -520,6 +562,7 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Output).To(ContainSubstring("/tmp/out.txt"))
 
 			expectFileWriteTranscript(res, step.Path, len(step.Data))
+			expectOneEffect(res, "file.write", step.Path, len(step.Data))
 		})
 
 		it("returns OutcomeError (no error) when write errors, and surfaces error in Output (with start transcript)", func() {
@@ -881,6 +924,35 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Output).NotTo(BeEmpty())
 			Expect(res.Transcript).To(ContainSubstring(`op="patch"`))
 			Expect(res.Transcript).To(ContainSubstring(step.Path))
+
+			expectOneEffect(res, "file.patch", step.Path, 0)
+			Expect(res.Effects[0].Meta["hunks"]).To(Equal(2)) // since you return Hunks:2
+		})
+
+		it("returns OutcomeError (no error) when file patch is missing Data and does not invoke PatchFile", func() {
+			dur := expectDuration(mockClock, 5*time.Millisecond)
+
+			cfg := agent.Config{DryRun: false}
+			step := agent.Step{
+				Type: agent.ToolFiles,
+				Op:   "patch",
+				Path: "/tmp/a.txt",
+				Data: "",
+			}
+
+			expectAllowStep(mockBudget, step)
+			expectAllowPolicy(mockPolicy, cfg, step)
+			expectAllowTool(mockBudget, agent.ToolFiles)
+
+			mockFiles.EXPECT().PatchFile(gomock.Any(), gomock.Any()).Times(0)
+
+			res, err := subject.RunStep(context.Background(), cfg, step)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(res.Outcome).To(Equal(agent.OutcomeError))
+			Expect(res.Output).To(ContainSubstring("file patch requires Data"))
+			Expect(res.Duration).To(Equal(dur))
+			expectNoEffects(res)
 		})
 
 		it("returns OutcomeError (no error) when patch errors (still includes patch transcript + error in Output)", func() {
@@ -917,6 +989,8 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Transcript).To(ContainSubstring(`op="patch"`))
 			Expect(res.Transcript).To(ContainSubstring(step.Path))
 			Expect(res.Transcript).To(ContainSubstring("error"))
+
+			expectNoEffects(res)
 		})
 
 		it("replaces bytes in file and returns ok outcome (calls ReplaceBytesInFile)", func() {
@@ -958,6 +1032,11 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Output).NotTo(BeEmpty())
 			Expect(res.Transcript).To(ContainSubstring(`op="replace"`))
 			Expect(res.Transcript).To(ContainSubstring(step.Path))
+
+			expectOneEffect(res, "file.replace", step.Path, 0)
+			Expect(res.Effects[0].Meta["replaced"]).To(Equal(2))
+			Expect(res.Effects[0].Meta["found"]).To(Equal(5))
+			Expect(res.Effects[0].Meta["n"]).To(Equal(step.N))
 		})
 
 		it("returns OutcomeError (no error) when replace errors and surfaces error in Output", func() {
@@ -996,6 +1075,7 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Transcript).To(ContainSubstring(`op="replace"`))
 			Expect(res.Transcript).To(ContainSubstring(step.Path))
 			Expect(res.Transcript).To(ContainSubstring("error"))
+			expectNoEffects(res)
 		})
 
 		it("dry-run patch does not invoke PatchFile", func() {
@@ -1025,6 +1105,8 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Duration).To(Equal(dur))
 			Expect(res.Transcript).To(ContainSubstring("dry-run"))
 			Expect(res.Transcript).To(ContainSubstring(`op="patch"`))
+
+			expectNoEffects(res)
 		})
 
 		it("dry-run replace does not invoke ReplaceBytesInFile", func() {
@@ -1056,6 +1138,8 @@ func testRunner(t *testing.T, when spec.G, it spec.S) {
 			Expect(res.Duration).To(Equal(dur))
 			Expect(res.Transcript).To(ContainSubstring("dry-run"))
 			Expect(res.Transcript).To(ContainSubstring(`op="replace"`))
+
+			expectNoEffects(res)
 		})
 
 		it("returns error StepResult when files tool budget is denied for patch and does not invoke PatchFile", func() {
@@ -1187,4 +1271,15 @@ func expectLLMSnapshotOK(mockBudget *MockBudget) {
 			LLMTokensUsed: 0,
 		}).
 		Times(1)
+}
+
+func expectOneEffect(res agent.StepResult, kind, path string, bytes int) {
+	Expect(res.Effects).To(HaveLen(1))
+	Expect(res.Effects[0].Kind).To(Equal(kind))
+	Expect(res.Effects[0].Path).To(Equal(path))
+	Expect(res.Effects[0].Bytes).To(Equal(bytes))
+}
+
+func expectNoEffects(res agent.StepResult) {
+	Expect(res.Effects).To(BeNil()) // or HaveLen(0) if you prefer always-non-nil
 }

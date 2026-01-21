@@ -824,4 +824,53 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	when("a step produces side effects", func() {
+		it("includes STATE line with cumulative effects in the next prompt", func() {
+			// iter 1
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).Return(`{
+      "thought":"write a file",
+      "action_type":"tool",
+      "tool":"file",
+      "op":"write",
+      "path":"a.txt",
+      "data":"hi"
+    }`, 1, nil)
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			runner.EXPECT().RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(agent.StepResult{
+					Outcome:  agent.OutcomeOK,
+					Output:   "wrote",
+					Duration: 1 * time.Millisecond,
+					Effects: agent.Effects{
+						{Kind: "file.write", Path: "a.txt"},
+					},
+				}, nil)
+
+			// iter 2
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+					Expect(prompt).To(ContainSubstring("State:"))
+					Expect(prompt).To(ContainSubstring("file.write x1"))
+					return `{
+          "thought":"done",
+          "action_type":"answer",
+          "final_answer":"ok"
+        }`, 1, nil
+				})
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Write")
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
 }

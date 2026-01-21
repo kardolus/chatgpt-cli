@@ -242,10 +242,6 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 		out.Infof("[Iteration %d] Observation: %s (took %s)", i+1, truncateForDisplay(res.Output, 100), res.Duration)
 		dbg.Debugf("observation (iteration %d): %q", i+1, res.Output)
 
-		if len(res.Effects) > 0 {
-			out.Infof("[Iteration %d] Side effects: %s", i+1, summarizeEffectsForUI(res.Effects))
-		}
-
 		conversation = append(conversation,
 			fmt.Sprintf("ACTION_TAKEN: tool=%s details=%s", action.Tool, step.Description),
 			fmt.Sprintf("OBSERVATION: %s", res.Output),

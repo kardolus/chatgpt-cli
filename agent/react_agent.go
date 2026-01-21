@@ -40,6 +40,9 @@ type reActAction struct {
 	Op          string   `json:"op,omitempty"`
 	Path        string   `json:"path,omitempty"`
 	Data        string   `json:"data,omitempty"`
+	Old         string   `json:"old,omitempty"`
+	New         string   `json:"new,omitempty"`
+	N           int      `json:"n,omitempty"`
 	FinalAnswer string   `json:"final_answer,omitempty"`
 }
 
@@ -160,14 +163,31 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 		out.Infof("[Iteration %d] Action: %s %s", i+1, action.Tool, step.Description)
 
 		res, err := a.runner.RunStep(ctx, a.config, step)
+
+		// NOTE: stop errors still bubble out (budget/policy).
 		if err != nil {
 			if isBudgetStop(err, out) || isPolicyStop(err, out) {
 				dbg.Errorf("stop error at iteration %d: %v", i+1, err)
 				return "", err
 			}
+
+			// Any other runner error is treated as fatal (should be rare after runner change).
 			out.Errorf("Step failed: %s: %v", step.Description, err)
 			dbg.Errorf("step failed at iteration %d: %v transcript=%q", i+1, err, res.Transcript)
 			return "", err
+		}
+
+		// NEW: tool failures now come back as OutcomeError (err == nil).
+		if res.Outcome == OutcomeError {
+			out.Errorf("[Iteration %d] Step failed: %s", i+1, step.Description)
+			out.Infof("[Iteration %d] Observation: %s (took %s)", i+1, truncateForDisplay(res.Output, 100), res.Duration)
+			dbg.Debugf("error observation (iteration %d): %q transcript=%q", i+1, res.Output, res.Transcript)
+
+			conversation = append(conversation,
+				fmt.Sprintf("ACTION_TAKEN: tool=%s details=%s", action.Tool, step.Description),
+				fmt.Sprintf("OBSERVATION: ERROR: %s", res.Output),
+			)
+			continue
 		}
 
 		out.Infof("[Iteration %d] Observation: %s (took %s)", i+1, truncateForDisplay(res.Output, 100), res.Duration)
@@ -193,8 +213,28 @@ You have access to these tools:
 2. llm - Request reasoning or summarization
    Fields: "prompt" (string)
 
-3. file - Read or write files
-   Fields: "op" ("read" or "write"), "path" (string), "data" (string for write)
+3. file - Read or modify files
+   Fields:
+   - "op": "read" | "write" | "patch" | "replace"
+   - "path": string
+
+   For op="read":
+   - returns ENTIRE file contents as text
+
+   For op="write":
+   - "data": string REQUIRED
+   - OVERWRITES the ENTIRE file with exactly "data"
+
+   For op="patch":
+   - "data": string REQUIRED (unified diff)
+   - Applies the unified diff to the file (no full rewrite needed if patch applies cleanly)
+
+   For op="replace":
+   - "old": string REQUIRED (pattern)
+   - "new": string REQUIRED (replacement)
+   - "n": int OPTIONAL
+     - n <= 0 means replace all occurrences
+     - n > 0 means replace first n occurrences
 
 IMPORTANT FILE SEMANTICS:
 - file op="read" returns the ENTIRE file contents as text.
@@ -204,6 +244,27 @@ IMPORTANT FILE SEMANTICS:
   1) read the file,
   2) construct the full updated contents (including unchanged parts),
   3) write the full updated contents back.
+- Prefer op="replace" for small mechanical edits (rename, token swap).
+- Prefer op="patch" when you have a correct unified diff.
+- Fall back to read+write only if patch/replace fails or isn't applicable.
+
+PATCH FORMAT RULES (VERY IMPORTANT):
+- For file op="patch", "data" MUST be a valid unified diff.
+- The diff MUST use ONLY these line prefixes within hunks:
+  - ' ' for context lines
+  - '-' for deletions
+  - '+' for insertions
+  Any other prefix (including no prefix) will FAIL.
+- Each hunk MUST start with a header like: @@ -oldStart,oldCount +newStart,newCount @@
+- Include enough context lines (' ' lines) so the patch applies cleanly.
+- When patching, DO NOT generate prose, explanations, or code fences—only diff text.
+
+NO-NEWLINE-AT-EOF RULE (CRITICAL FOR PATCHING):
+- If the file content you read DOES NOT end with a newline, the last line is "no newline at end of file".
+- If your patch changes or matches that last line, you MUST include the EXACT marker line:
+  \ No newline at end of file
+  immediately AFTER the affected '-' or '+' line in the diff.
+- If your patch does NOT touch the last line, you do NOT need the marker line.
 
 FILE TYPE RULE:
 - Determine file type ONLY from the file extension in "path".
@@ -229,9 +290,16 @@ FOR USING A TOOL:
   "prompt": "...",
 
   // file fields:
-  "op": "read" | "write",
+  "op": "read" | "write" | "patch" | "replace",
   "path": "...",
-  "data": "..." // REQUIRED for write; ignored for read
+
+  // write/patch:
+  "data": "...",  // REQUIRED for write and patch
+
+  // replace:
+  "old": "...",   // REQUIRED for replace
+  "new": "...",   // REQUIRED for replace
+  "n": 0          // OPTIONAL for replace
 }
 
 FOR FINAL ANSWER:
@@ -376,13 +444,39 @@ func convertReActActionToStep(action reActAction) (Step, error) {
 		if path == "" {
 			return Step{}, errors.New("file tool requires path")
 		}
-		return Step{
+
+		step := Step{
 			Type:        ToolFiles,
 			Description: fmt.Sprintf("File %s: %s", op, path),
 			Op:          op,
 			Path:        path,
 			Data:        action.Data,
-		}, nil
+		}
+
+		switch op {
+		case "patch":
+			if strings.TrimSpace(action.Data) == "" {
+				return Step{}, errors.New("file patch requires data (unified diff)")
+			}
+		case "replace":
+			if action.Old == "" {
+				return Step{}, errors.New("file replace requires old pattern")
+			}
+			// new can be empty string in principle (delete), so don't forbid it.
+			step.Old = action.Old
+			step.New = action.New
+			step.N = action.N
+		case "write":
+			if strings.TrimSpace(action.Data) == "" {
+				return Step{}, errors.New("file write requires data")
+			}
+		case "read":
+			// ok
+		default:
+			return Step{}, fmt.Errorf("unsupported file op: %q", op)
+		}
+
+		return step, nil
 
 	default:
 		return Step{}, fmt.Errorf("unknown tool: %q", action.Tool)
@@ -497,9 +591,29 @@ func signatureForAction(a reActAction) actionSig {
 	switch tool {
 	case "file":
 		op := strings.ToLower(strings.TrimSpace(a.Op))
-		path := strings.TrimSpace(a.Path)
-		// normalize path slashes a bit (optional)
-		path = strings.TrimPrefix(path, "./")
+		path := strings.TrimPrefix(strings.TrimSpace(a.Path), "./")
+
+		if op == "replace" {
+			old := a.Old
+			newv := a.New
+			if len(old) > 40 {
+				old = old[:40]
+			}
+			if len(newv) > 40 {
+				newv = newv[:40]
+			}
+			return actionSig{tool: "file", key: fmt.Sprintf("%s:%s old=%q new=%q n=%d", op, path, old, newv, a.N)}
+		}
+
+		if op == "patch" {
+			diff := strings.TrimSpace(a.Data)
+			prefix := diff
+			if len(prefix) > 80 {
+				prefix = prefix[:80]
+			}
+			return actionSig{tool: "file", key: fmt.Sprintf("%s:%s len=%d:%q", op, path, len(diff), prefix)}
+		}
+
 		return actionSig{tool: "file", key: op + ":" + path}
 
 	case "shell":

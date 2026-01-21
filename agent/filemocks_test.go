@@ -8,6 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	agent "github.com/kardolus/chatgpt-cli/agent"
 )
 
 // MockFiles is a mock of Files interface.
@@ -33,6 +34,21 @@ func (m *MockFiles) EXPECT() *MockFilesMockRecorder {
 	return m.recorder
 }
 
+// PatchFile mocks base method.
+func (m *MockFiles) PatchFile(arg0 string, arg1 []byte) (agent.PatchResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PatchFile", arg0, arg1)
+	ret0, _ := ret[0].(agent.PatchResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PatchFile indicates an expected call of PatchFile.
+func (mr *MockFilesMockRecorder) PatchFile(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchFile", reflect.TypeOf((*MockFiles)(nil).PatchFile), arg0, arg1)
+}
+
 // ReadFile mocks base method.
 func (m *MockFiles) ReadFile(arg0 string) ([]byte, error) {
 	m.ctrl.T.Helper()
@@ -46,6 +62,21 @@ func (m *MockFiles) ReadFile(arg0 string) ([]byte, error) {
 func (mr *MockFilesMockRecorder) ReadFile(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadFile", reflect.TypeOf((*MockFiles)(nil).ReadFile), arg0)
+}
+
+// ReplaceBytesInFile mocks base method.
+func (m *MockFiles) ReplaceBytesInFile(arg0 string, arg1, arg2 []byte, arg3 int) (agent.ReplaceResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReplaceBytesInFile", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(agent.ReplaceResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReplaceBytesInFile indicates an expected call of ReplaceBytesInFile.
+func (mr *MockFilesMockRecorder) ReplaceBytesInFile(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplaceBytesInFile", reflect.TypeOf((*MockFiles)(nil).ReplaceBytesInFile), arg0, arg1, arg2, arg3)
 }
 
 // WriteFile mocks base method.

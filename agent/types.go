@@ -38,7 +38,14 @@ type Step struct {
 	// Files
 	Path string
 	Op   string
+
+	// For write/patch: Data is the full content or unified diff
 	Data string
+
+	// For replace:
+	Old string
+	New string
+	N   int
 }
 
 type ExecContext struct {
@@ -50,10 +57,10 @@ type ExecContext struct {
 type StepResult struct {
 	Step       Step
 	Outcome    OutcomeKind
-	Transcript string // human-readable narrative/log of what happened
+	Transcript string
 	Duration   time.Duration
 	Exec       *Result
-	Output     string // semantic result intended for downstream steps
+	Output     string
 }
 
 type Result struct {

@@ -84,7 +84,7 @@ func NewLogs() (*Logs, error) {
 }
 
 func newFileLogger(path string, level zapcore.Level, json bool) (*zap.SugaredLogger, *zap.Logger, *os.File, error) {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return nil, nil, nil, err
 	}

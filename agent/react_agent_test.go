@@ -148,8 +148,9 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 	})
 
 	when("LLM returns invalid JSON", func() {
-		it("returns parse error", func() {
+		it("recovers in-band and returns a final answer", func() {
 
+			// Iteration 1: invalid output
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -160,27 +161,137 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			budget.EXPECT().ChargeLLMTokens(5, now)
 
-			_, err := reactAgent.RunAgentGoal(ctx, "Do something")
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to locate JSON"))
-		})
-	})
-
-	when("LLM returns JSON with missing action_type", func() {
-		it("returns validation error", func() {
-
+			// Iteration 2: recovery prompt, model now returns valid answer JSON
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
 
 			llm.EXPECT().
 				Complete(gomock.Any(), gomock.Any()).
-				Return(`{"thought": "thinking"}`, 5, nil)
+				DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+					Expect(prompt).To(ContainSubstring("ACTION_TAKEN: tool=llm details=INVALID_RESPONSE"))
+					Expect(prompt).To(ContainSubstring("OBSERVATION: ERROR: Your last response violated the ReAct protocol"))
+					Expect(prompt).To(ContainSubstring("failed to locate JSON object"))
+					Expect(prompt).To(ContainSubstring(`Raw response (truncated): "not valid json"`))
+					return `{
+					"thought": "ok",
+					"action_type": "answer",
+					"final_answer": "recovered"
+				}`, 7, nil
+				})
 
-			budget.EXPECT().ChargeLLMTokens(5, now)
+			budget.EXPECT().ChargeLLMTokens(7, now)
+
+			res, err := reactAgent.RunAgentGoal(ctx, "Do something")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(Equal("recovered"))
+		})
+
+		it("recovers in-band, then hard-fails after max parse recoveries", func() {
+
+			// We expect 4 attempts total:
+			// 1..3 => recovery continues
+			// 4    => parseRecoveries becomes 4 (>3) => returns error
+			for i := 0; i < 4; i++ {
+				budget.EXPECT().AllowIteration(now).Return(nil)
+				budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+				budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+				if i == 0 {
+					llm.EXPECT().
+						Complete(gomock.Any(), gomock.Any()).
+						Return("not valid json", 5, nil)
+				} else {
+					// From attempt 2 onward, prompt should include the recovery observations.
+					llm.EXPECT().
+						Complete(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+							Expect(prompt).To(ContainSubstring("ACTION_TAKEN: tool=llm details=INVALID_RESPONSE"))
+							Expect(prompt).To(ContainSubstring("OBSERVATION: ERROR: Your last response violated the ReAct protocol"))
+							Expect(prompt).To(ContainSubstring(`"action_type"`))
+							return "not valid json", 5, nil
+						})
+				}
+
+				budget.EXPECT().ChargeLLMTokens(5, now)
+			}
 
 			_, err := reactAgent.RunAgentGoal(ctx, "Do something")
 			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("agent failed to produce valid JSON after 3 attempts"))
+			Expect(err.Error()).To(ContainSubstring("failed to locate JSON"))
+		})
+	})
+
+	when("LLM returns JSON with missing action_type", func() {
+		it("recovers in-band and returns a final answer", func() {
+
+			// Iteration 1: parse succeeds, validation fails (missing action_type) -> triggers recovery path
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				Return(`{"thought":"thinking"}`, 5, nil)
+
+			budget.EXPECT().ChargeLLMTokens(5, now)
+
+			// Iteration 2: recovery prompt, model returns valid answer JSON
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+					Expect(prompt).To(ContainSubstring("ACTION_TAKEN: tool=llm details=INVALID_RESPONSE"))
+					Expect(prompt).To(ContainSubstring("OBSERVATION: ERROR: Your last response violated the ReAct protocol"))
+					Expect(prompt).To(ContainSubstring("missing action_type"))
+					// raw is JSON, so the snippet should include it
+					Expect(prompt).To(ContainSubstring(`Raw response (truncated): "{\"thought\":\"thinking\"}"`))
+					return `{
+					"thought": "ok",
+					"action_type": "answer",
+					"final_answer": "recovered"
+				}`, 7, nil
+				})
+
+			budget.EXPECT().ChargeLLMTokens(7, now)
+
+			res, err := reactAgent.RunAgentGoal(ctx, "Do something")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(Equal("recovered"))
+		})
+
+		it("recovers in-band, then hard-fails after max parse recoveries", func() {
+
+			for i := 0; i < 4; i++ {
+				budget.EXPECT().AllowIteration(now).Return(nil)
+				budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+				budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+				if i == 0 {
+					llm.EXPECT().
+						Complete(gomock.Any(), gomock.Any()).
+						Return(`{"thought":"thinking"}`, 5, nil)
+				} else {
+					llm.EXPECT().
+						Complete(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+							Expect(prompt).To(ContainSubstring("ACTION_TAKEN: tool=llm details=INVALID_RESPONSE"))
+							Expect(prompt).To(ContainSubstring("OBSERVATION: ERROR: Your last response violated the ReAct protocol"))
+							Expect(prompt).To(ContainSubstring("missing action_type"))
+							return `{"thought":"thinking"}`, 5, nil
+						})
+				}
+
+				budget.EXPECT().ChargeLLMTokens(5, now)
+			}
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Do something")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("agent failed to produce valid JSON after 3 attempts"))
 			Expect(err.Error()).To(ContainSubstring("missing action_type"))
 		})
 	})
@@ -619,15 +730,15 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 	})
 
 	when("LLM uses shorthand action_type=file but tool mismatches", func() {
-		it("fails validation (invalid action_type) rather than running tools", func() {
+		it("recovers in-band rather than failing the whole run", func() {
 
+			// Iteration 1: invalid action_type/tool combination -> parseReActResponse returns invalid action_type
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
 
 			llm.EXPECT().
 				Complete(gomock.Any(), gomock.Any()).
-				// tool is present but inconsistent; we should NOT normalize
 				Return(`{
 				"thought": "oops",
 				"action_type": "file",
@@ -637,8 +748,68 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 
 			budget.EXPECT().ChargeLLMTokens(10, now)
 
+			// Iteration 2: recovery prompt, model returns a valid final answer
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+					Expect(prompt).To(ContainSubstring("ACTION_TAKEN: tool=llm details=INVALID_RESPONSE"))
+					Expect(prompt).To(ContainSubstring("OBSERVATION: ERROR: Your last response violated the ReAct protocol"))
+					Expect(prompt).To(ContainSubstring(`invalid action_type: "file"`))
+					Expect(prompt).To(ContainSubstring(`"tool": "shell"`))
+					return `{
+					"thought": "ack, correct schema",
+					"action_type": "answer",
+					"final_answer": "recovered"
+				}`, 5, nil
+				})
+
+			budget.EXPECT().ChargeLLMTokens(5, now)
+
+			res, err := reactAgent.RunAgentGoal(ctx, "Bad shorthand")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(Equal("recovered"))
+		})
+
+		it("recovers in-band, then hard-fails after max parse recoveries", func() {
+
+			// This is a validation error inside parseReActResponse: invalid action_type: "file"
+			bad := `{
+				"thought": "oops",
+				"action_type": "file",
+				"tool": "shell",
+				"command": "ls"
+			}`
+
+			for i := 0; i < 4; i++ {
+				budget.EXPECT().AllowIteration(now).Return(nil)
+				budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+				budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+				if i == 0 {
+					llm.EXPECT().
+						Complete(gomock.Any(), gomock.Any()).
+						Return(bad, 10, nil)
+				} else {
+					llm.EXPECT().
+						Complete(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+							Expect(prompt).To(ContainSubstring("ACTION_TAKEN: tool=llm details=INVALID_RESPONSE"))
+							Expect(prompt).To(ContainSubstring("invalid action_type"))
+							Expect(prompt).To(ContainSubstring(`Raw response (truncated)`))
+							return bad, 10, nil
+						})
+				}
+
+				budget.EXPECT().ChargeLLMTokens(10, now)
+			}
+
 			_, err := reactAgent.RunAgentGoal(ctx, "Bad shorthand")
 			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("agent failed to produce valid JSON after 3 attempts"))
 			Expect(err.Error()).To(ContainSubstring(`invalid action_type: "file"`))
 		})
 	})
@@ -808,6 +979,7 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			Expect(res).To(Equal("recovered"))
 		})
 	})
+
 	when("patch fails and agent falls back to full write", func() {
 		it("continues after patch failure observation and then writes", func() {
 			// Iteration 1: patch
@@ -926,6 +1098,68 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			budget.EXPECT().ChargeLLMTokens(1, now)
 
 			_, err := reactAgent.RunAgentGoal(ctx, "Write")
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	when("patch fails and agent injects FALLBACK REQUIRED guidance", func() {
+		it("includes fallback-required instruction (read+write) in the next prompt", func() {
+			// Iteration 1: model tries patch
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).Return(`{
+      "thought":"try patch first",
+      "action_type":"tool",
+      "tool":"file",
+      "op":"patch",
+      "path":"a.txt",
+      "data":"--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,1 @@\n-old\n+new\n"
+    }`, 1, nil)
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			// Patch fails via OutcomeError (err == nil)
+			runner.EXPECT().RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ agent.Config, step agent.Step) (agent.StepResult, error) {
+					Expect(step.Type).To(Equal(agent.ToolFiles))
+					Expect(step.Op).To(Equal("patch"))
+					Expect(step.Path).To(Equal("a.txt"))
+					return agent.StepResult{
+						Outcome:  agent.OutcomeError,
+						Output:   "invalid unified diff: missing hunk header",
+						Duration: 1 * time.Millisecond,
+					}, nil
+				})
+
+			// Iteration 2: model sees fallback-required instruction (this is what we’re testing)
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+					// Normal error observation is still present
+					Expect(prompt).To(ContainSubstring("OBSERVATION: ERROR:"))
+					Expect(prompt).To(ContainSubstring("invalid unified diff"))
+
+					// New guardrail line(s)
+					Expect(prompt).To(ContainSubstring("OBSERVATION: FALLBACK REQUIRED"))
+					Expect(prompt).To(ContainSubstring(`Do NOT try op="patch" or op=patch/replace again`))
+
+					// Explicit JSON skeleton that forces read next
+					Expect(prompt).To(ContainSubstring(`{"action_type":"tool","tool":"file","op":"read","path":"a.txt"}`))
+
+					// We can stop here with an answer; no need to actually execute the fallback in this unit test.
+					return `{
+          "thought":"ack",
+          "action_type":"answer",
+          "final_answer":"ok"
+        }`, 1, nil
+				})
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			_, err := reactAgent.RunAgentGoal(ctx, "Modify a.txt")
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

@@ -55,6 +55,9 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 
 	guard := newRepetitionGuard(32)
 
+	parseRecoveries := 0
+	const maxParseRecoveries = 3
+
 	a.logMode(goal, "ReAct (iterative reasoning + acting)")
 
 	out := a.out
@@ -103,8 +106,27 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 		if err != nil {
 			out.Errorf("Failed to parse ReAct response: %v", err)
 			dbg.Errorf("parse error at iteration %d: %v\nraw: %s", i+1, err, raw)
-			return "", err
+
+			parseRecoveries++
+			if parseRecoveries > maxParseRecoveries {
+				return "", fmt.Errorf("agent failed to produce valid JSON after %d attempts: %w", maxParseRecoveries, err)
+			}
+
+			rawTrim := strings.TrimSpace(raw)
+			rawSnippet := rawTrim
+			if len(rawSnippet) > 200 {
+				rawSnippet = rawSnippet[:200] + "..."
+			}
+
+			conversation = append(conversation,
+				"ACTION_TAKEN: tool=llm details=INVALID_RESPONSE",
+				fmt.Sprintf("OBSERVATION: ERROR: Your last response violated the ReAct protocol (%s). You MUST reply with EXACTLY ONE JSON object. The first non-whitespace character must be '{' and the last must be '}'. Include \"action_type\". Do not include any prose.", err.Error()),
+				fmt.Sprintf("OBSERVATION: ERROR: Raw response (truncated): %q", rawSnippet),
+			)
+			continue
 		}
+
+		parseRecoveries = 0
 
 		if action.ActionType == "tool" {
 			sig := signatureForAction(action)
@@ -193,15 +215,25 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 			out.Errorf("[Iteration %d] Step failed: %s", i+1, step.Description)
 			out.Infof("[Iteration %d] Observation: %s (took %s)", i+1, truncateForDisplay(res.Output, 100), res.Duration)
 
-			if len(res.Effects) > 0 {
-				out.Infof("[Iteration %d] Side effects: %s", i+1, summarizeEffectsForUI(res.Effects))
-			}
-
 			conversation = append(conversation,
 				fmt.Sprintf("ACTION_TAKEN: tool=%s details=%s", action.Tool, step.Description),
 				fmt.Sprintf("OBSERVATION: ERROR: %s", res.Output),
 				formatEffectsForConversation(res.Effects),
 			)
+
+			if action.Tool == "file" && (step.Op == "patch" || step.Op == "replace") {
+				// This is intentionally strict: stop the model from retrying patch/replace loops.
+				conversation = append(conversation,
+					fmt.Sprintf(
+						"OBSERVATION: FALLBACK REQUIRED: The %s operation failed for %q. "+
+							"Do NOT try op=%q or op=patch/replace again for this file. "+
+							"Your NEXT step MUST be: {\"action_type\":\"tool\",\"tool\":\"file\",\"op\":\"read\",\"path\":%q}. "+
+							"After reading, you MUST construct the FULL updated file contents and use op=\"write\" to overwrite the file.",
+						step.Op, step.Path, step.Op, step.Path,
+					),
+				)
+			}
+
 			continue
 		}
 
@@ -271,6 +303,14 @@ IMPORTANT FILE SEMANTICS:
 - Prefer op="patch" when you have a correct unified diff.
 - Fall back to read+write only if patch/replace fails or isn't applicable.
 
+WRITE DEFAULT CONTENT RULE (CRITICAL):
+- If the user asks to create a new file but does NOT specify what it should contain,
+  you MUST still use file op="write" and you MUST include a non-empty "data" field.
+- In that case, use EXACTLY one newline as the default content:
+  "data": "\n"
+  (This creates an empty-looking file but satisfies the non-empty data requirement.)
+- Do NOT ask a follow-up question for content unless the user explicitly requests specific content.
+
 PATCH FORMAT RULES (VERY IMPORTANT):
 - For file op="patch", "data" MUST be a valid unified diff.
 - The diff MUST use ONLY these line prefixes within hunks:
@@ -281,6 +321,8 @@ PATCH FORMAT RULES (VERY IMPORTANT):
 - Each hunk MUST start with a header like: @@ -oldStart,oldCount +newStart,newCount @@
 - Include enough context lines (' ' lines) so the patch applies cleanly.
 - When patching, DO NOT generate prose, explanations, or code fences—only diff text.
+
+- PREFER-REPLACE RULE: If the change can be expressed as a simple string substitution, use op="replace" instead of op="patch".
 
 NO-NEWLINE-AT-EOF RULE (CRITICAL FOR PATCHING):
 - If the file content you read DOES NOT end with a newline, the last line is "no newline at end of file".
@@ -317,7 +359,7 @@ FOR USING A TOOL:
   "path": "...",
 
   // write/patch:
-  "data": "...",  // REQUIRED for write and patch
+  "data": "...",  // REQUIRED for write and patch; MUST be non-empty for write
 
   // replace:
   "old": "...",   // REQUIRED for replace
@@ -338,11 +380,11 @@ CRITICAL RULES:
 - Do NOT output multiple JSON objects back-to-back (no "}{" and no extra text before/after)
 - One tool call per response. If multiple steps are needed, choose the NEXT single step only.
 - First non-whitespace character must be '{' and the last non-whitespace character must be '}'
-- You MUST include “action_type” in every response.
-- Do NOT invent alternative schemas (e.g., {“text”:…}, {“content”:…}, {“result”:…} are INVALID).
+- You MUST include "action_type" in every response.
+- Do NOT invent alternative schemas (e.g., {"text":...}, {"content":...}, {"result":...} are INVALID).
 - Allowed top-level keys are STRICT:
-  - For action_type=“tool”: thought, action_type, tool, command, args, prompt, op, path, data, old, new, n
-  - For action_type=“answer”: thought, action_type, final_answer
+  - For action_type="tool": thought, action_type, tool, command, args, prompt, op, path, data, old, new, n
+  - For action_type="answer": thought, action_type, final_answer
   - No other top-level keys are permitted.
 - Include only fields relevant to your chosen tool
 - Keep "thought" concise
@@ -371,6 +413,29 @@ PROGRESS RULES:
 - After reading a file once, do not reread it unless you explain what NEW information you need.
 - Prefer making the smallest safe change, but remember: writes overwrite the entire file.
 - If you are stuck, finish with action_type:"answer" explaining what you need next.
+
+COMPLETION RULE (CRITICAL)
+- After a tool call succeeds and the user’s goal has been satisfied, your very next response MUST be a final JSON answer in this exact shape:
+
+{
+  "thought": "brief reasoning about completion",
+  "action_type": "answer",
+  "final_answer": "clear confirmation of what was done and any relevant result"
+}
+
+- Do NOT say things like:
+  - "I’m ready to assist further."
+  - "Let me know if you need anything else."
+  - Any plain-text response outside JSON.
+
+INVALID EXAMPLE (DO NOT DO THIS)
+
+I’m ready to assist further if you have any new tasks or questions.
+
+This is invalid because:
+  - It is not JSON.
+  - It does not include action_type.
+  - It breaks the ReAct protocol.
 
 State:
 

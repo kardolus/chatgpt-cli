@@ -51,6 +51,8 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 	start := a.startTimer()
 	defer a.finishTimer(start)
 
+	a.effects = nil
+
 	guard := newRepetitionGuard(32)
 
 	a.logMode(goal, "ReAct (iterative reasoning + acting)")
@@ -161,7 +163,11 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 		if err != nil {
 			out.Errorf("Failed to convert action to step: %v", err)
 			dbg.Errorf("convert error at iteration %d: %v", i+1, err)
-			return "", err
+			conversation = append(conversation,
+				fmt.Sprintf("ACTION_TAKEN: tool=%s details=INVALID_REQUEST", action.Tool),
+				fmt.Sprintf("OBSERVATION: ERROR: %s", err.Error()),
+			)
+			continue
 		}
 
 		out.Infof("[Iteration %d] Action: %s %s", i+1, action.Tool, step.Description)

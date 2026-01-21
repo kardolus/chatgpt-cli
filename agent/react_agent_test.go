@@ -279,8 +279,9 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		when("shell tool missing command", func() {
-			it("returns validation error", func() {
+			it("injects error observation and lets LLM recover", func() {
 
+				// Iteration 1: invalid shell tool (missing command)
 				budget.EXPECT().AllowIteration(now).Return(nil)
 				budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 				budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -288,17 +289,37 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 				llm.EXPECT().
 					Complete(gomock.Any(), gomock.Any()).
 					Return(`{
-					"thought": "using shell",
-					"action_type": "tool",
-					"tool": "shell",
-					"command": ""
-				}`, 10, nil)
+				"thought": "using shell",
+				"action_type": "tool",
+				"tool": "shell",
+				"command": ""
+			}`, 10, nil)
 
 				budget.EXPECT().ChargeLLMTokens(10, now)
 
-				_, err := reactAgent.RunAgentGoal(ctx, "Test")
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("shell tool requires command"))
+				// Iteration 2: agent should surface validation error to the model as an observation,
+				// then model answers (or chooses a different tool).
+				budget.EXPECT().AllowIteration(now).Return(nil)
+				budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+				budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+				llm.EXPECT().
+					Complete(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+						Expect(prompt).To(ContainSubstring("OBSERVATION: ERROR"))
+						Expect(prompt).To(ContainSubstring("shell tool requires command"))
+						return `{
+					"thought": "ok",
+					"action_type": "answer",
+					"final_answer": "cannot run shell without a command"
+				}`, 1, nil
+					})
+
+				budget.EXPECT().ChargeLLMTokens(1, now)
+
+				res, err := reactAgent.RunAgentGoal(ctx, "Test")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(Equal("cannot run shell without a command"))
 			})
 		})
 	})
@@ -709,7 +730,8 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 	})
 
 	when("LLM uses file patch without data", func() {
-		it("returns validation error", func() {
+		it("injects error observation and lets LLM recover", func() {
+			// Iteration 1: invalid patch
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -724,14 +746,32 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
     }`, 1, nil)
 			budget.EXPECT().ChargeLLMTokens(1, now)
 
-			_, err := reactAgent.RunAgentGoal(ctx, "Patch")
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("file patch requires data"))
+			// Iteration 2: model sees error and answers
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+					Expect(prompt).To(ContainSubstring("file patch requires data"))
+					Expect(prompt).To(ContainSubstring("OBSERVATION: ERROR"))
+					return `{
+          "thought":"ok",
+          "action_type":"answer",
+          "final_answer":"fixed"
+        }`, 1, nil
+				})
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			res, err := reactAgent.RunAgentGoal(ctx, "Patch")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(Equal("fixed"))
 		})
 	})
 
 	when("LLM uses file replace without old", func() {
-		it("returns validation error", func() {
+		it("injects error observation and lets LLM recover", func() {
+			// Iteration 1: invalid replace
 			budget.EXPECT().AllowIteration(now).Return(nil)
 			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
 			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
@@ -746,12 +786,28 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
     }`, 1, nil)
 			budget.EXPECT().ChargeLLMTokens(1, now)
 
-			_, err := reactAgent.RunAgentGoal(ctx, "Replace")
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("file replace requires old pattern"))
+			// Iteration 2: recover
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(agent.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(agent.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().Complete(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+					Expect(prompt).To(ContainSubstring("file replace requires old"))
+					Expect(prompt).To(ContainSubstring("OBSERVATION: ERROR"))
+					return `{
+          "thought":"ok",
+          "action_type":"answer",
+          "final_answer":"recovered"
+        }`, 1, nil
+				})
+			budget.EXPECT().ChargeLLMTokens(1, now)
+
+			res, err := reactAgent.RunAgentGoal(ctx, "Replace")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(Equal("recovered"))
 		})
 	})
-
 	when("patch fails and agent falls back to full write", func() {
 		it("continues after patch failure observation and then writes", func() {
 			// Iteration 1: patch

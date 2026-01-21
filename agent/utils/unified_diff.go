@@ -57,12 +57,10 @@ func ApplyUnifiedDiff(orig, unified []byte) ([]byte, error) {
 		for _, o := range hk.ops {
 			switch o.kind {
 			case ' ':
-				// context must match
 				if origIdx >= len(origLines) {
 					return nil, errors.New("patch context extends past EOF")
 				}
-				isEOF := origIdx == len(origLines)-1
-				if !equalLine(origLines[origIdx], o.line, isEOF) {
+				if !equalLineContext(origLines[origIdx], o.line) {
 					return nil, fmt.Errorf("patch context mismatch at line %d", origIdx+1)
 				}
 				out = append(out, origLines[origIdx])
@@ -214,4 +212,39 @@ func equalLine(origLine, diffLine []byte, isEOFLine bool) bool {
 		return bytes.Equal(origLine, diffLine[:len(diffLine)-1])
 	}
 	return false
+}
+
+func equalLineContext(origLine, diffLine []byte) bool {
+	if bytes.Equal(origLine, diffLine) {
+		return true
+	}
+	return bytes.Equal(normalizeForContextCompare(origLine), normalizeForContextCompare(diffLine))
+}
+
+func normalizeForContextCompare(line []byte) []byte {
+	// Work on a copy? We can just compute slices since we only trim.
+	b := line
+
+	// Drop trailing newline (context diffLine typically includes '\n'; orig may not at EOF)
+	if len(b) > 0 && b[len(b)-1] == '\n' {
+		b = b[:len(b)-1]
+	}
+	// Drop trailing CR (CRLF)
+	if len(b) > 0 && b[len(b)-1] == '\r' {
+		b = b[:len(b)-1]
+	}
+
+	// Trim trailing spaces/tabs
+	i := len(b)
+	for i > 0 {
+		c := b[i-1]
+		if c == ' ' || c == '\t' {
+			i--
+			continue
+		}
+		break
+	}
+	b = b[:i]
+
+	return b
 }

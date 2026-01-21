@@ -293,5 +293,33 @@ func testUnifiedDiff(t *testing.T, when spec.G, it spec.S) {
 			// so the output will typically end with '\n'.
 			Expect(string(out)).To(Equal("a\nB\n"))
 		})
+
+		it("allows trailing whitespace differences for context lines", func() {
+			orig := []byte("a\nb\nc\n")
+			diff := []byte(
+				"@@ -1,3 +1,3 @@\n" +
+					" a\n" +
+					" b   \n" + // context line with trailing spaces
+					"-c\n" +
+					"+C\n",
+			)
+
+			out, err := utils.ApplyUnifiedDiff(orig, diff)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(out)).To(Equal("a\nb\nC\n"))
+		})
+
+		it("still requires exact match for deletions (whitespace mismatch fails)", func() {
+			orig := []byte("a\nb\n")
+			diff := []byte(
+				"@@ -1,2 +1,1 @@\n" +
+					" a\n" +
+					"-b   \n", // deletion line has extra spaces; should NOT match "b\n"
+			)
+
+			_, err := utils.ApplyUnifiedDiff(orig, diff)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("patch deletion mismatch"))
+		})
 	})
 }

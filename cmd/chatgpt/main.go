@@ -856,7 +856,7 @@ func runAgent(ctx context.Context, c *client.Client, cfg config.Config, mode str
 		return "", err
 	}
 
-	budget := agent.NewDefaultBudget(agent.BudgetLimits{ /* ... */ })
+	budget := agent.NewDefaultBudget(utils.BudgetLimitsFromConfig(cfg))
 	runner := agent.NewDefaultRunner(tools, clk, budget, policy)
 
 	logs, err := agent.NewLogs()

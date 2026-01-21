@@ -2,6 +2,7 @@ package utils_test
 
 import (
 	"fmt"
+	"github.com/kardolus/chatgpt-cli/agent"
 	"github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
 	"github.com/kardolus/chatgpt-cli/config"
 	"testing"
@@ -502,6 +503,32 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			_, err := utils.ParseMCPHeaders([]string{": value"})
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(MatchError(fmt.Sprintf("invalid --mcp-header %q (empty key)", ": value")))
+		})
+	})
+
+	when("BudgetLimitsFromConfig()", func() {
+		it("maps agent config into budget limits", func() {
+			cfg := config.Config{
+				Agent: config.AgentConfig{
+					MaxIterations: 2,
+					MaxWallTime:   123,
+					MaxShellCalls: 7,
+					MaxLLMCalls:   9,
+					MaxFileOps:    11,
+					MaxLLMTokens:  13,
+				},
+			}
+
+			limits := utils.BudgetLimitsFromConfig(cfg)
+
+			Expect(limits).To(Equal(agent.BudgetLimits{
+				MaxIterations: 2,
+				MaxWallTime:   123 * time.Second,
+				MaxShellCalls: 7,
+				MaxLLMCalls:   9,
+				MaxFileOps:    11,
+				MaxLLMTokens:  13,
+			}))
 		})
 	})
 }

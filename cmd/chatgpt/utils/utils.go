@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kardolus/chatgpt-cli/agent"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/internal"
 	"os"
@@ -25,6 +26,17 @@ const (
 	InteractivePrefix      = "int_"
 	CommandPrefix          = "cmd_"
 )
+
+func BudgetLimitsFromConfig(cfg config.Config) agent.BudgetLimits {
+	return agent.BudgetLimits{
+		MaxIterations: cfg.Agent.MaxIterations,
+		MaxWallTime:   time.Duration(cfg.Agent.MaxWallTime) * time.Second,
+		MaxShellCalls: cfg.Agent.MaxShellCalls,
+		MaxLLMCalls:   cfg.Agent.MaxLLMCalls,
+		MaxFileOps:    cfg.Agent.MaxFileOps,
+		MaxLLMTokens:  cfg.Agent.MaxLLMTokens,
+	}
+}
 
 func ColorToAnsi(color string) (string, string) {
 	if color == "" {

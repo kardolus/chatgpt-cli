@@ -2,7 +2,7 @@ package utils_test
 
 import (
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/agent"
+	"github.com/kardolus/chatgpt-cli/agent/core"
 	"github.com/kardolus/chatgpt-cli/cmd/chatgpt/utils"
 	"github.com/kardolus/chatgpt-cli/config"
 	"testing"
@@ -521,7 +521,7 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 
 			limits := utils.BudgetLimitsFromConfig(cfg)
 
-			Expect(limits).To(Equal(agent.BudgetLimits{
+			Expect(limits).To(Equal(core.BudgetLimits{
 				MaxIterations: 2,
 				MaxWallTime:   123 * time.Second,
 				MaxShellCalls: 7,

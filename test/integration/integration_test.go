@@ -3,7 +3,7 @@ package integration_test
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/agent"
+	"github.com/kardolus/chatgpt-cli/agent/tools"
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/cache"
 	"github.com/kardolus/chatgpt-cli/config"
@@ -1230,14 +1230,14 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 		var (
 			tmpDir string
 			err    error
-			ops    agent.FSIOFileOps
+			ops    tools.FSIOFileOps
 		)
 
 		it.Before(func() {
 			tmpDir, err = os.MkdirTemp("", "chatgpt-cli-files-it")
 			Expect(err).NotTo(HaveOccurred())
 
-			ops = agent.NewFSIOFileOps(osReader{}, osWriter{})
+			ops = tools.NewFSIOFileOps(osReader{}, osWriter{})
 		})
 
 		it.After(func() {
@@ -1353,7 +1353,7 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			res, err := ops.ReplaceBytesInFile(p, []byte(""), []byte("x"), -1)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("old pattern must be non-empty"))
-			Expect(res).To(Equal(agent.ReplaceResult{}))
+			Expect(res).To(Equal(tools.ReplaceResult{}))
 		})
 
 		it("ReplaceBytesInFile errors when pattern is not found", func() {

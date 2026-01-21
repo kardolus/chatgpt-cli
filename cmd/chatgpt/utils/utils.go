@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/agent"
+	"github.com/kardolus/chatgpt-cli/agent/core"
 	"github.com/kardolus/chatgpt-cli/config"
 	"github.com/kardolus/chatgpt-cli/internal"
 	"os"
@@ -27,8 +27,8 @@ const (
 	CommandPrefix          = "cmd_"
 )
 
-func BudgetLimitsFromConfig(cfg config.Config) agent.BudgetLimits {
-	return agent.BudgetLimits{
+func BudgetLimitsFromConfig(cfg config.Config) core.BudgetLimits {
+	return core.BudgetLimits{
 		MaxIterations: cfg.Agent.MaxIterations,
 		MaxWallTime:   time.Duration(cfg.Agent.MaxWallTime) * time.Second,
 		MaxShellCalls: cfg.Agent.MaxShellCalls,

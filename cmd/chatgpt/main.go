@@ -4,7 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/agent"
+	"github.com/kardolus/chatgpt-cli/agent/core"
+	"github.com/kardolus/chatgpt-cli/agent/factory"
+	"github.com/kardolus/chatgpt-cli/agent/planexec"
+	"github.com/kardolus/chatgpt-cli/agent/tools"
+	"github.com/kardolus/chatgpt-cli/agent/types"
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/cache"
 	"github.com/kardolus/chatgpt-cli/internal/fsio"
@@ -843,8 +847,8 @@ func buildAgentGoal(chatContext string, args []string) (string, error) {
 }
 
 func runAgent(ctx context.Context, c *client.Client, cfg config.Config, mode string, goal string) (string, error) {
-	clk := agent.NewRealClock()
-	llm := agent.NewClientLLM(c)
+	clk := core.NewRealClock()
+	llm := tools.NewClientLLM(c)
 
 	tools, err := buildAgentTools(llm)
 	if err != nil {
@@ -856,10 +860,10 @@ func runAgent(ctx context.Context, c *client.Client, cfg config.Config, mode str
 		return "", err
 	}
 
-	budget := agent.NewDefaultBudget(utils.BudgetLimitsFromConfig(cfg))
-	runner := agent.NewDefaultRunner(tools, clk, budget, policy)
+	budget := core.NewDefaultBudget(utils.BudgetLimitsFromConfig(cfg))
+	runner := core.NewDefaultRunner(tools, clk, budget, policy)
 
-	logs, err := agent.NewLogs()
+	logs, err := core.NewLogs()
 	if err != nil {
 		return "", err
 	}
@@ -873,25 +877,25 @@ func runAgent(ctx context.Context, c *client.Client, cfg config.Config, mode str
 	))
 	humanTeeSug := humanTeeZap.Sugar()
 
-	baseOpts := []agent.BaseOption{
-		agent.WithWorkDir(cfg.Agent.WorkDir),
-		agent.WithDryRun(cfg.Agent.DryRun),
+	baseOpts := []core.BaseOption{
+		core.WithWorkDir(cfg.Agent.WorkDir),
+		core.WithDryRun(cfg.Agent.DryRun),
 
 		// Human (transcript): terminal + file
-		agent.WithHumanLogger(humanTeeSug, func() {
+		core.WithHumanLogger(humanTeeSug, func() {
 			// best-effort sync
 			_ = humanTeeZap.Sync()
 		}),
 
 		// Debug: JSONL file only (already JSON encoder in logs.go)
-		agent.WithDebugLogger(logs.DebugLogger, func() {
+		core.WithDebugLogger(logs.DebugLogger, func() {
 			_ = logs.DebugZap.Sync()
 		}),
 	}
 
 	switch mode {
 	case "react":
-		a, err := agent.New(agent.ModeReAct, agent.Deps{
+		a, err := factory.New(factory.ModeReAct, factory.Deps{
 			Clock:  clk,
 			LLM:    llm,
 			Runner: runner,
@@ -903,11 +907,11 @@ func runAgent(ctx context.Context, c *client.Client, cfg config.Config, mode str
 		return a.RunAgentGoal(ctx, goal)
 
 	case "plan":
-		var planner agent.Planner = agent.NewDefaultPlanner(
+		var planner planexec.Planner = planexec.NewDefaultPlanner(
 			llm,
 			budget,
 			clk,
-			agent.WithPlannerRawSink(func(raw string) {
+			planexec.WithPlannerRawSink(func(raw string) {
 				if !cfg.Agent.WritePlanJSON {
 					return
 				}
@@ -919,9 +923,9 @@ func runAgent(ctx context.Context, c *client.Client, cfg config.Config, mode str
 			}),
 		)
 
-		planner = agent.NewLoggingPlanner(planner, logs)
+		planner = planexec.NewLoggingPlanner(planner, logs)
 
-		a, err := agent.New(agent.ModePlanExecute, agent.Deps{
+		a, err := factory.New(factory.ModePlanExecute, factory.Deps{
 			Clock:   clk,
 			Planner: planner,
 			Runner:  runner,
@@ -938,26 +942,26 @@ func runAgent(ctx context.Context, c *client.Client, cfg config.Config, mode str
 	}
 }
 
-func buildAgentTools(llm agent.LLM) (agent.Tools, error) {
-	sh := agent.NewExecShellRunner()
+func buildAgentTools(llm tools.LLM) (core.Tools, error) {
+	sh := tools.NewExecShellRunner()
 	r := fsio.NewRealReader(fsio.DefaultBufferSize)
 	w := &fsio.RealWriter{}
-	files := agent.NewFSIOFileOps(r, w)
+	files := tools.NewFSIOFileOps(r, w)
 
-	return agent.Tools{
+	return core.Tools{
 		Shell: sh,
 		LLM:   llm,
 		Files: files,
 	}, nil
 }
 
-func buildAgentPolicy(cfg config.Config) (agent.Policy, error) {
+func buildAgentPolicy(cfg config.Config) (core.Policy, error) {
 	allowedTools, err := parseToolKinds(cfg.Agent.AllowedTools)
 	if err != nil {
 		return nil, err
 	}
 
-	return agent.NewDefaultPolicy(agent.PolicyLimits{
+	return core.NewDefaultPolicy(core.PolicyLimits{
 		AllowedTools:           allowedTools,
 		DeniedShellCommands:    cfg.Agent.DeniedShellCommands,
 		AllowedFileOps:         cfg.Agent.AllowedFileOps,
@@ -1384,9 +1388,9 @@ func createConfigFromViper() config.Config {
 	}
 }
 
-func parseToolKinds(in []string) ([]agent.ToolKind, error) {
-	out := make([]agent.ToolKind, 0, len(in))
-	seen := map[agent.ToolKind]bool{}
+func parseToolKinds(in []string) ([]types.ToolKind, error) {
+	out := make([]types.ToolKind, 0, len(in))
+	seen := map[types.ToolKind]bool{}
 
 	for _, raw := range in {
 		s := strings.ToLower(strings.TrimSpace(raw))
@@ -1394,14 +1398,14 @@ func parseToolKinds(in []string) ([]agent.ToolKind, error) {
 			continue
 		}
 
-		var k agent.ToolKind
+		var k types.ToolKind
 		switch s {
 		case "shell":
-			k = agent.ToolShell
+			k = types.ToolShell
 		case "llm":
-			k = agent.ToolLLM
+			k = types.ToolLLM
 		case "files", "file":
-			k = agent.ToolFiles
+			k = types.ToolFiles
 		default:
 			return nil, fmt.Errorf("unknown agent.allowed_tools entry %q (expected shell|llm|files)", raw)
 		}

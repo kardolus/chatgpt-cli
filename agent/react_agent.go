@@ -338,6 +338,12 @@ CRITICAL RULES:
 - Do NOT output multiple JSON objects back-to-back (no "}{" and no extra text before/after)
 - One tool call per response. If multiple steps are needed, choose the NEXT single step only.
 - First non-whitespace character must be '{' and the last non-whitespace character must be '}'
+- You MUST include “action_type” in every response.
+- Do NOT invent alternative schemas (e.g., {“text”:…}, {“content”:…}, {“result”:…} are INVALID).
+- Allowed top-level keys are STRICT:
+  - For action_type=“tool”: thought, action_type, tool, command, args, prompt, op, path, data, old, new, n
+  - For action_type=“answer”: thought, action_type, final_answer
+  - No other top-level keys are permitted.
 - Include only fields relevant to your chosen tool
 - Keep "thought" concise
 - When you have enough information to answer, respond with action_type="answer" and include "final_answer"

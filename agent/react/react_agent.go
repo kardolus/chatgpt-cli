@@ -16,10 +16,11 @@ import (
 
 type ReActAgent struct {
 	*core.BaseAgent
-	LLM     tools.LLM
-	Runner  core.Runner
-	Budget  core.Budget
-	effects types.Effects
+	LLM      tools.LLM
+	Runner   core.Runner
+	Budget   core.Budget
+	effects  types.Effects
+	llmCalls int
 }
 
 func NewReActAgent(llm tools.LLM, runner core.Runner, budget core.Budget, clock core.Clock, opts ...core.BaseOption) *ReActAgent {
@@ -57,6 +58,7 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 	defer a.FinishTimer(start)
 
 	a.effects = nil
+	a.llmCalls = 0
 
 	guard := newRepetitionGuard(32)
 
@@ -98,6 +100,7 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 		prompt := buildReActPrompt(conversation, a.promptStateLine())
 		dbg.Debugf("react iteration %d prompt_len=%d", i+1, len(prompt))
 
+		a.llmCalls++
 		raw, tokens, err := a.LLM.Complete(ctx, prompt)
 		if err != nil {
 			dbg.Errorf("LLM error at iteration %d: %v", i+1, err)
@@ -175,7 +178,7 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 			out.Infof("\nResult: %s\n", result)
 
 			if len(a.effects) > 0 {
-				out.Infof("Side effects (total): %s", summarizeEffectsForUI(a.effects))
+				out.Infof("Actions performed: %s", summarizeActionsForUI(a.effects, a.llmCalls))
 			}
 			return result, nil
 		}
@@ -817,6 +820,27 @@ func summarizeEffectsForUI(effects types.Effects) string {
 	counts := map[string]int{}
 	for _, e := range effects {
 		counts[e.Kind]++
+	}
+
+	var parts []string
+	for k, n := range counts {
+		parts = append(parts, fmt.Sprintf("%s x%d", k, n))
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, ", ")
+}
+
+func summarizeActionsForUI(effects types.Effects, llmCalls int) string {
+	counts := map[string]int{}
+	for _, e := range effects {
+		counts[e.Kind]++
+	}
+	if llmCalls > 0 {
+		counts["llm.call"] += llmCalls
+	}
+
+	if len(counts) == 0 {
+		return "none"
 	}
 
 	var parts []string

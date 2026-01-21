@@ -226,7 +226,7 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 				formatEffectsForConversation(res.Effects),
 			)
 
-			if action.Tool == "file" && (step.Op == "patch" || step.Op == "replace") {
+			if types.ToolKind(action.Tool) == types.ToolFiles && (step.Op == "patch" || step.Op == "replace") {
 				// This is intentionally strict: stop the model from retrying patch/replace loops.
 				conversation = append(conversation,
 					fmt.Sprintf(
@@ -266,7 +266,7 @@ You have access to these tools:
 1. shell - Execute shell commands
    Fields: "command" (string), "args" (array of strings)
 
-2. LLM - Request reasoning or summarization
+2. llm - Request reasoning or summarization
    Fields: "prompt" (string)
 
 3. file - Read or modify files
@@ -346,7 +346,7 @@ FOR USING A TOOL:
 {
   "thought": "your reasoning about what to do next",
   "action_type": "tool",
-  "tool": "shell" | "LLM" | "file",
+  "tool": "%s" | "%s" | "%s",
 
   // shell fields:
   "command": "...",
@@ -446,7 +446,7 @@ Conversation history:
 
 %s
 
-What's your next step?`, stateLine, history)
+What's your next step?`, types.ToolShell, types.ToolLLM, types.ToolFiles, stateLine, history)
 }
 
 func parseReActResponse(raw string) (reActAction, error) {
@@ -478,7 +478,7 @@ func parseReActResponse(raw string) (reActAction, error) {
 	// This must work whether "tool" is also set.
 	if action.ActionType != "tool" && action.ActionType != "answer" {
 		switch action.ActionType {
-		case "file", "shell", "LLM":
+		case "file", "shell", "llm":
 			// If tool is empty OR matches the shorthand, normalize to canonical form.
 			// (If tool is set to something else, we'll fall through to invalid action_type.)
 			if action.Tool == "" || action.Tool == action.ActionType {
@@ -528,8 +528,8 @@ func cleanReActOutput(raw string) string {
 }
 
 func convertReActActionToStep(action reActAction) (types.Step, error) {
-	switch action.Tool {
-	case "shell":
+	switch types.ToolKind(action.Tool) {
+	case types.ToolShell:
 		cmd := strings.TrimSpace(action.Command)
 		if cmd == "" {
 			return types.Step{}, errors.New("shell tool requires command")
@@ -541,7 +541,7 @@ func convertReActActionToStep(action reActAction) (types.Step, error) {
 			Args:        action.Args,
 		}, nil
 
-	case "LLM":
+	case types.ToolLLM:
 		prompt := strings.TrimSpace(action.Prompt)
 		if prompt == "" {
 			return types.Step{}, errors.New("LLM tool requires prompt")
@@ -552,7 +552,7 @@ func convertReActActionToStep(action reActAction) (types.Step, error) {
 			Prompt:      prompt,
 		}, nil
 
-	case "file":
+	case types.ToolFiles:
 		op := strings.ToLower(strings.TrimSpace(action.Op))
 		path := strings.TrimSpace(action.Path)
 		if op == "" {
@@ -705,8 +705,8 @@ func (g *repetitionGuard) count(sig actionSig) int {
 func signatureForAction(a reActAction) actionSig {
 	tool := strings.ToLower(strings.TrimSpace(a.Tool))
 
-	switch tool {
-	case "file":
+	switch types.ToolKind(tool) {
+	case types.ToolFiles:
 		op := strings.ToLower(strings.TrimSpace(a.Op))
 		path := strings.TrimPrefix(strings.TrimSpace(a.Path), "./")
 
@@ -719,7 +719,7 @@ func signatureForAction(a reActAction) actionSig {
 			if len(newv) > 40 {
 				newv = newv[:40]
 			}
-			return actionSig{tool: "file", key: fmt.Sprintf("%s:%s old=%q new=%q n=%d", op, path, old, newv, a.N)}
+			return actionSig{tool: string(types.ToolFiles), key: fmt.Sprintf("%s:%s old=%q new=%q n=%d", op, path, old, newv, a.N)}
 		}
 
 		if op == "patch" {
@@ -728,29 +728,26 @@ func signatureForAction(a reActAction) actionSig {
 			if len(prefix) > 80 {
 				prefix = prefix[:80]
 			}
-			return actionSig{tool: "file", key: fmt.Sprintf("%s:%s len=%d:%q", op, path, len(diff), prefix)}
+			return actionSig{tool: string(types.ToolFiles), key: fmt.Sprintf("%s:%s len=%d:%q", op, path, len(diff), prefix)}
 		}
 
-		return actionSig{tool: "file", key: op + ":" + path}
+		return actionSig{tool: string(types.ToolFiles), key: op + ":" + path}
 
-	case "shell":
+	case types.ToolShell:
 		cmd := strings.TrimSpace(a.Command)
 		args := normalizeArgs(a.Args)
-		// include args because `bash -lc ...` vs `make help` matters
 		key := strings.TrimSpace(cmd + " " + strings.Join(args, " "))
-		return actionSig{tool: "shell", key: key}
+		return actionSig{tool: string(types.ToolShell), key: key}
 
-	case "LLM":
-		// don't key on the whole prompt (huge); use a prefix + length
+	case types.ToolLLM:
 		p := strings.TrimSpace(a.Prompt)
 		prefix := p
 		if len(prefix) > 80 {
 			prefix = prefix[:80]
 		}
-		return actionSig{tool: "LLM", key: fmt.Sprintf("len=%d:%s", len(p), prefix)}
+		return actionSig{tool: string(types.ToolLLM), key: fmt.Sprintf("len=%d:%s", len(p), prefix)}
 
 	default:
-		// fallback: still track tool name
 		return actionSig{tool: tool, key: ""}
 	}
 }

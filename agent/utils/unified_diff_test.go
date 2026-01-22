@@ -321,5 +321,177 @@ func testUnifiedDiff(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("patch deletion mismatch"))
 		})
+
+		it("fuzzy placement chooses the closest match when context appears multiple times", func() {
+			orig := []byte(
+				"header\n" +
+					"a\n" +
+					"b\n" +
+					"c\n" +
+					"mid\n" +
+					"a\n" +
+					"b\n" +
+					"c\n" +
+					"footer\n",
+			)
+
+			// The context block "a\nb\nc\n" appears twice.
+			// We lie in the header and point near the SECOND occurrence, and expect it to patch the second.
+			diff := []byte(
+				"@@ -6,3 +6,3 @@\n" +
+					" a\n" +
+					"-b\n" +
+					"+B\n" +
+					" c\n",
+			)
+
+			out, err := utils.ApplyUnifiedDiff(orig, diff)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(string(out)).To(Equal(
+				"header\n" +
+					"a\n" +
+					"b\n" +
+					"c\n" +
+					"mid\n" +
+					"a\n" +
+					"B\n" +
+					"c\n" +
+					"footer\n",
+			))
+		})
+
+		it("fuzzy-applies when hunk header oldStart is wrong but context matches", func() {
+			orig := []byte(" roses are red\nviolets are blue\n sugar is sweet\nand so are you\n")
+
+			// Wrong oldStart on purpose (says start at line 2, but the hunk matches starting at line 1).
+			diff := []byte(
+				"@@ -2,4 +2,4 @@\n" +
+					"  roses are red\n" + // TWO spaces: ' ' prefix + content-leading space
+					" violets are blue\n" + // ONE space: ' ' prefix; content starts with 'v'
+					"- sugar is sweet\n" +
+					"+ sugar is SWEET\n" +
+					" and so are you\n", // ONE space: ' ' prefix; content starts with 'a'
+			)
+
+			hunks, err := utils.ParseUnifiedDiff(diff)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(hunks).To(HaveLen(1))
+
+			out, err := utils.ApplyUnifiedDiff(orig, diff)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(out)).To(Equal(" roses are red\nviolets are blue\n sugar is SWEET\nand so are you\n"))
+		})
+
+		it("fuzzy is required when header points to wrong place but match exists elsewhere", func() {
+			// Make file long enough so oldStart=20 is within EOF.
+			orig := []byte(
+				" roses are red\n" +
+					"violets are blue\n" +
+					" sugar is sweet\n" +
+					"and so are you\n" +
+					"pad1\npad2\npad3\npad4\npad5\npad6\npad7\npad8\npad9\npad10\npad11\npad12\npad13\npad14\npad15\npad16\n",
+			)
+
+			// oldStart is wrong: points at "pad..." not the poem.
+			diff := []byte(
+				"@@ -20,4 +20,4 @@\n" +
+					"  roses are red\n" + // ' ' prefix + leading space in content
+					" violets are blue\n" + // ' ' prefix only
+					"- sugar is sweet\n" +
+					"+ sugar is SWEET\n" +
+					" and so are you\n",
+			)
+
+			out, err := utils.ApplyUnifiedDiff(orig, diff)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(string(out)).To(Equal(
+				" roses are red\n" +
+					"violets are blue\n" +
+					" sugar is SWEET\n" +
+					"and so are you\n" +
+					"pad1\npad2\npad3\npad4\npad5\npad6\npad7\npad8\npad9\npad10\npad11\npad12\npad13\npad14\npad15\npad16\n",
+			))
+		})
+
+		it("fuzzy placement chooses the closest match when context appears multiple times (forced fuzzy)", func() {
+			orig := []byte(
+				"header\n" +
+					"a\n" +
+					"b\n" +
+					"c\n" +
+					"mid\n" +
+					"a\n" +
+					"b\n" +
+					"c\n" +
+					"footer\n",
+			)
+
+			// oldStart=5 -> preferredIdx=4 points at "mid\n" (cannot match "a\n")
+			// Both occurrences match; closest to line 5 is the SECOND block.
+			diff := []byte(
+				"@@ -5,3 +5,3 @@\n" +
+					" a\n" +
+					"-b\n" +
+					"+B\n" +
+					" c\n",
+			)
+
+			out, err := utils.ApplyUnifiedDiff(orig, diff)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(string(out)).To(Equal(
+				"header\n" +
+					"a\n" +
+					"b\n" +
+					"c\n" +
+					"mid\n" +
+					"a\n" +
+					"B\n" +
+					"c\n" +
+					"footer\n",
+			))
+		})
+
+		it("fuzzy placement never matches before the current origIdx (ordering constraint)", func() {
+			orig := []byte(
+				"a\n" +
+					"b\n" +
+					"c\n" +
+					"X\n" +
+					"a\n" +
+					"b\n" +
+					"c\n",
+			)
+
+			// Hunk1 replaces X -> Y (consumes through line 4)
+			// Hunk2 wants to patch the "a b c" block.
+			// We lie and point header near the FIRST block, but origIdx is already past it.
+			diff := []byte(
+				"@@ -4,1 +4,1 @@\n" +
+					"-X\n" +
+					"+Y\n" +
+					"@@ -1,3 +1,3 @@\n" + // malicious/wrong header: points to first block
+					" a\n" +
+					"-b\n" +
+					"+B\n" +
+					" c\n",
+			)
+
+			out, err := utils.ApplyUnifiedDiff(orig, diff)
+			Expect(err).NotTo(HaveOccurred())
+
+			// It must patch the SECOND block (lines 5-7), not the first.
+			Expect(string(out)).To(Equal(
+				"a\n" +
+					"b\n" +
+					"c\n" +
+					"Y\n" +
+					"a\n" +
+					"B\n" +
+					"c\n",
+			))
+		})
 	})
 }

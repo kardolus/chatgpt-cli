@@ -8,6 +8,8 @@ import (
 	"regexp"
 )
 
+const fuzzyWindow = 50 // lines around preferredIdx to search
+
 var hunkHeaderRe = regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@`)
 
 type diffOp struct {
@@ -28,69 +30,78 @@ func ApplyUnifiedDiff(orig, unified []byte) ([]byte, error) {
 		return nil, err
 	}
 	if len(hunks) == 0 {
-		// Treat empty patch as no-op
 		return orig, nil
 	}
 
-	// Build output by walking orig and applying hunks in order.
 	var out [][]byte
 	origIdx := 0 // 0-based into origLines
 
 	for _, hk := range hunks {
-		// Copy any untouched lines before the hunk.
-		targetIdx := hk.oldStart - 1
-		if targetIdx < 0 {
+		preferredIdx := hk.oldStart - 1
+		if preferredIdx < 0 {
 			return nil, fmt.Errorf("invalid hunk oldStart=%d", hk.oldStart)
 		}
-		if targetIdx > len(origLines) {
+		if preferredIdx > len(origLines) {
 			return nil, fmt.Errorf("hunk starts past EOF: start=%d len=%d", hk.oldStart, len(origLines))
 		}
 
-		// Copy from current position up to hunk start.
-		if targetIdx < origIdx {
-			return nil, fmt.Errorf("overlapping or out-of-order hunks: oldStart=%d", hk.oldStart)
-		}
-		out = append(out, origLines[origIdx:targetIdx]...)
-		origIdx = targetIdx
-
-		// Apply ops.
-		for _, o := range hk.ops {
-			switch o.kind {
-			case ' ':
-				if origIdx >= len(origLines) {
-					return nil, errors.New("patch context extends past EOF")
-				}
-				if !equalLineContext(origLines[origIdx], o.line) {
-					return nil, fmt.Errorf("patch context mismatch at line %d", origIdx+1)
-				}
-				out = append(out, origLines[origIdx])
-				origIdx++
-
-			case '-':
-				// deletion must match
-				if origIdx >= len(origLines) {
-					return nil, errors.New("patch deletion extends past EOF")
-				}
-				isEOF := origIdx == len(origLines)-1
-				if !equalLine(origLines[origIdx], o.line, isEOF) {
-					return nil, fmt.Errorf("patch deletion mismatch at line %d", origIdx+1)
-				}
-				origIdx++ // skip
-
-			case '+':
-				// insertion
-				out = append(out, o.line)
-
-			default:
-				return nil, fmt.Errorf("unknown diff op %q", o.kind)
+		if preferredIdx < origIdx {
+			found, err2 := findFuzzyHunkStart(origLines, origIdx, preferredIdx, hk.ops)
+			if err2 != nil {
+				return nil, fmt.Errorf("overlapping or out-of-order hunks: oldStart=%d", hk.oldStart)
 			}
+
+			// Copy untouched lines up to chosen apply index.
+			out = append(out, origLines[origIdx:found]...)
+			origIdx = found
+
+			// Apply ops into output.
+			out, origIdx, err = applyHunkIntoOut(origLines, out, origIdx, hk.ops)
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		applyIdx := -1
+
+		// Try preferred only if it doesn’t violate ordering.
+		if preferredIdx >= origIdx {
+			_, _, errTry := applyHunkAt(origLines, preferredIdx, hk.ops)
+			if errTry == nil {
+				applyIdx = preferredIdx
+			}
+		}
+
+		if applyIdx == -1 {
+			found, err2 := findFuzzyHunkStart(origLines, origIdx, preferredIdx, hk.ops)
+			if err2 != nil {
+				if preferredIdx >= origIdx {
+					_, _, errTry := applyHunkAt(origLines, preferredIdx, hk.ops)
+					if errTry != nil {
+						return nil, fmt.Errorf("%v (and fuzzy placement failed: %v)", errTry, err2)
+					}
+				}
+				return nil, fmt.Errorf("fuzzy placement failed: %v", err2)
+			}
+			applyIdx = found
+		}
+
+		// Copy untouched lines up to chosen apply index.
+		if applyIdx < origIdx {
+			return nil, fmt.Errorf("fuzzy placement violated ordering: applyIdx=%d origIdx=%d", applyIdx, origIdx)
+		}
+		out = append(out, origLines[origIdx:applyIdx]...)
+		origIdx = applyIdx
+
+		// Apply ops into output.
+		out, origIdx, err = applyHunkIntoOut(origLines, out, origIdx, hk.ops)
+		if err != nil {
+			return nil, err
 		}
 	}
 
-	// Copy remaining lines after last hunk.
 	out = append(out, origLines[origIdx:]...)
-
-	// Join
 	return bytes.Join(out, nil), nil
 }
 
@@ -100,15 +111,19 @@ func ParseUnifiedDiff(unified []byte) ([]diffHunk, error) {
 	const max = 10 * 1024 * 1024
 	sc.Buffer(make([]byte, 0, 64*1024), max)
 
-	var hunks []diffHunk
-	var cur *diffHunk
+	var (
+		hunks  []diffHunk
+		cur    *diffHunk
+		lastOp *diffOp // Track last op so we can apply "\ No newline at end of file"
+	)
 
-	// Track last op so we can apply "\ No newline at end of file"
-	var lastOp *diffOp
+	lineNo := 0
 
 	for sc.Scan() {
+		lineNo++
 		line := sc.Bytes() // no trailing '\n'
 
+		// Ignore common non-hunk headers.
 		if bytes.HasPrefix(line, []byte("diff ")) ||
 			bytes.HasPrefix(line, []byte("index ")) ||
 			bytes.HasPrefix(line, []byte("--- ")) ||
@@ -116,10 +131,11 @@ func ParseUnifiedDiff(unified []byte) ([]diffHunk, error) {
 			continue
 		}
 
+		// New hunk header.
 		if m := hunkHeaderRe.FindSubmatch(line); m != nil {
 			oldStart, err := atoiBytes(m[1])
 			if err != nil {
-				return nil, fmt.Errorf("invalid hunk header: %w", err)
+				return nil, fmt.Errorf("invalid hunk header at diff line %d: %w", lineNo, err)
 			}
 			hunks = append(hunks, diffHunk{oldStart: oldStart})
 			cur = &hunks[len(hunks)-1]
@@ -127,11 +143,12 @@ func ParseUnifiedDiff(unified []byte) ([]diffHunk, error) {
 			continue
 		}
 
+		// Allow whitespace/noise before first hunk only.
 		if cur == nil {
 			if len(bytes.TrimSpace(line)) == 0 {
 				continue
 			}
-			return nil, errors.New("invalid unified diff: missing hunk header")
+			return nil, fmt.Errorf("invalid unified diff: missing hunk header (diff line %d: %q)", lineNo, string(line))
 		}
 
 		// IMPORTANT: this marker refers to the *previous* diff line
@@ -142,23 +159,23 @@ func ParseUnifiedDiff(unified []byte) ([]diffHunk, error) {
 			continue
 		}
 
+		// Within a hunk, every line must have a prefix (' ', '+', '-').
 		if len(line) == 0 {
-			return nil, errors.New("invalid unified diff: empty line without prefix")
+			return nil, fmt.Errorf("invalid unified diff: empty line without prefix (diff line %d)", lineNo)
 		}
 
 		prefix := line[0]
 		if prefix != ' ' && prefix != '+' && prefix != '-' {
-			return nil, fmt.Errorf("invalid diff line prefix %q", prefix)
+			return nil, fmt.Errorf("invalid diff line prefix %q at diff line %d: %q", prefix, lineNo, string(line))
 		}
 
 		// Add newline back (scanner strips it)
 		ln := append([]byte(nil), line...)
 		ln = append(ln, '\n')
 
-		content := append([]byte(nil), ln[1:]...) // WITHOUT prefix, WITH newline
+		// WITHOUT prefix, WITH newline
+		content := append([]byte(nil), ln[1:]...)
 		cur.ops = append(cur.ops, diffOp{kind: prefix, line: content})
-
-		// point at the stored op so we can mutate it if marker appears next
 		lastOp = &cur.ops[len(cur.ops)-1]
 	}
 
@@ -247,4 +264,120 @@ func normalizeForContextCompare(line []byte) []byte {
 	b = b[:i]
 
 	return b
+}
+
+func applyHunkAt(origLines [][]byte, startIdx int, ops []diffOp) (int, int, error) {
+	origIdx := startIdx
+
+	for _, o := range ops {
+		switch o.kind {
+		case ' ':
+			if origIdx >= len(origLines) {
+				return startIdx, origIdx, errors.New("patch context extends past EOF")
+			}
+			if !equalLineContext(origLines[origIdx], o.line) {
+				return startIdx, origIdx, fmt.Errorf("patch context mismatch at line %d", origIdx+1)
+			}
+			origIdx++
+
+		case '-':
+			if origIdx >= len(origLines) {
+				return startIdx, origIdx, errors.New("patch deletion extends past EOF")
+			}
+			isEOF := origIdx == len(origLines)-1
+			if !equalLine(origLines[origIdx], o.line, isEOF) {
+				return startIdx, origIdx, fmt.Errorf("patch deletion mismatch at line %d", origIdx+1)
+			}
+			origIdx++
+
+		case '+':
+			// insertion does not consume orig
+		default:
+			return startIdx, origIdx, fmt.Errorf("unknown diff op %q", o.kind)
+		}
+	}
+
+	return startIdx, origIdx, nil
+}
+
+func applyHunkIntoOut(origLines [][]byte, out [][]byte, origIdx int, ops []diffOp) ([][]byte, int, error) {
+	for _, o := range ops {
+		switch o.kind {
+		case ' ':
+			if origIdx >= len(origLines) {
+				return nil, 0, errors.New("patch context extends past EOF")
+			}
+			if !equalLineContext(origLines[origIdx], o.line) {
+				return nil, 0, fmt.Errorf("patch context mismatch at line %d", origIdx+1)
+			}
+			out = append(out, origLines[origIdx])
+			origIdx++
+
+		case '-':
+			if origIdx >= len(origLines) {
+				return nil, 0, errors.New("patch deletion extends past EOF")
+			}
+			isEOF := origIdx == len(origLines)-1
+			if !equalLine(origLines[origIdx], o.line, isEOF) {
+				return nil, 0, fmt.Errorf("patch deletion mismatch at line %d", origIdx+1)
+			}
+			origIdx++
+
+		case '+':
+			out = append(out, o.line)
+
+		default:
+			return nil, 0, fmt.Errorf("unknown diff op %q", o.kind)
+		}
+	}
+	return out, origIdx, nil
+}
+
+func findFuzzyHunkStart(origLines [][]byte, minIdx, preferredIdx int, ops []diffOp) (int, error) {
+	// Clamp search bounds.
+	lo := preferredIdx - fuzzyWindow
+	hi := preferredIdx + fuzzyWindow
+	if lo < minIdx {
+		lo = minIdx
+	}
+	if hi > len(origLines) {
+		hi = len(origLines)
+	}
+	if lo < 0 {
+		lo = 0
+	}
+
+	// If file is small, scan everything from minIdx.
+	if len(origLines) <= 2*fuzzyWindow {
+		lo = minIdx
+		hi = len(origLines)
+	}
+
+	bestIdx := -1
+	bestDist := 0
+
+	for i := lo; i < hi; i++ {
+		_, _, err := applyHunkAt(origLines, i, ops)
+		if err != nil {
+			continue
+		}
+
+		dist := abs(i - preferredIdx)
+		if bestIdx == -1 || dist < bestDist || (dist == bestDist && i < bestIdx) {
+			bestIdx = i
+			bestDist = dist
+		}
+	}
+
+	if bestIdx == -1 {
+		return -1, fmt.Errorf("no applicable hunk location found in [%d,%d) around preferred=%d", lo, hi, preferredIdx)
+	}
+	return bestIdx, nil
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }

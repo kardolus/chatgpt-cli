@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -162,6 +163,12 @@ func (f *FileIO) ReadDefaults() Config {
 }
 
 func (f *FileIO) Write(config Config) error {
+	lock := newFileLock(f.configFilePath)
+	if err := lock.Lock(); err != nil {
+		return err
+	}
+	defer func() { _ = lock.Unlock() }()
+
 	rootNode, err := f.readNode()
 
 	// If readNode returns an error or there was a problem reading the rootNode, initialize a new rootNode.
@@ -177,7 +184,12 @@ func (f *FileIO) Write(config Config) error {
 		return err
 	}
 
-	return os.WriteFile(f.configFilePath, modifiedContent, 0644)
+	perm := os.FileMode(0644)
+	if st, err := os.Stat(f.configFilePath); err == nil {
+		perm = st.Mode() & 0o777
+	}
+
+	return atomicWriteFile(f.configFilePath, modifiedContent, perm)
 }
 
 func (f *FileIO) readNode() (yaml.Node, error) {
@@ -193,6 +205,53 @@ func (f *FileIO) readNode() (yaml.Node, error) {
 	}
 
 	return rootNode, nil
+}
+
+func atomicWriteFile(filename string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(filename)
+
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(filename)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("create temp: %w", err)
+	}
+	tmpName := tmp.Name()
+
+	defer func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+	}()
+
+	// Best-effort: make sure permissions are correct before rename.
+	if err := tmp.Chmod(perm); err != nil {
+		return fmt.Errorf("chmod temp: %w", err)
+	}
+
+	if _, err := tmp.Write(data); err != nil {
+		return fmt.Errorf("write temp: %w", err)
+	}
+
+	if err := tmp.Sync(); err != nil {
+		return fmt.Errorf("fsync temp: %w", err)
+	}
+
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temp: %w", err)
+	}
+
+	if runtime.GOOS == "windows" {
+		_ = os.Remove(filename)
+	}
+
+	if err := os.Rename(tmpName, filename); err != nil {
+		return fmt.Errorf("rename temp -> target: %w", err)
+	}
+
+	if d, err := os.Open(dir); err == nil {
+		_ = d.Sync()
+		_ = d.Close()
+	}
+
+	return nil
 }
 
 func getPath() (string, error) {

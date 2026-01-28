@@ -6,6 +6,7 @@ import (
 	"github.com/kardolus/chatgpt-cli/agent/core"
 	"github.com/kardolus/chatgpt-cli/agent/planexec"
 	"github.com/kardolus/chatgpt-cli/agent/types"
+	"strings"
 	"testing"
 	"time"
 
@@ -541,6 +542,108 @@ func testPlanExecuteAgent(t *testing.T, when spec.G, it spec.S) {
 
 			_, err := subject.RunAgentGoal(context.Background(), goal)
 			Expect(err).To(MatchError(budgetErr))
+		})
+
+		it("resets transcript and prompt-history at the start of each run", func() {
+			plan := types.Plan{
+				Goal: goal,
+				Steps: []types.Step{
+					{Type: types.ToolLLM, Description: "step 1", Prompt: "first"},
+				},
+			}
+
+			// Run #1
+			mockPlanner.EXPECT().
+				Plan(gomock.Any(), goal).
+				Return(plan, nil).
+				Times(1)
+
+			mockRunner.EXPECT().
+				RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(types.StepResult{Step: plan.Steps[0], Outcome: types.OutcomeOK, Output: "A"}, nil).
+				Times(1)
+
+			subject := planexec.NewPlanExecuteAgent(mockClock, mockPlanner, mockRunner)
+
+			_, err := subject.RunAgentGoal(context.Background(), goal)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Seed old leftovers that MUST be cleared on next run
+			subject.AddTranscript("OLD_TRANSCRIPT_SHOULD_BE_CLEARED")
+			if subject.PromptHistory != nil {
+				subject.PromptHistory.AppendString("OLD_PROMPT_SHOULD_BE_CLEARED")
+			}
+
+			// Run #2 (same goal is fine)
+			mockPlanner.EXPECT().
+				Plan(gomock.Any(), goal).
+				Return(plan, nil).
+				Times(1)
+
+			mockRunner.EXPECT().
+				RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(types.StepResult{Step: plan.Steps[0], Outcome: types.OutcomeOK, Output: "B"}, nil).
+				Times(1)
+
+			_, err = subject.RunAgentGoal(context.Background(), goal)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Assert old content is gone after reset
+			Expect(subject.TranscriptString()).NotTo(ContainSubstring("OLD_TRANSCRIPT_SHOULD_BE_CLEARED"))
+
+			// And prompt history (if enabled) should not contain the old string either
+			if subject.PromptHistory != nil {
+				Expect(subject.PromptHistory.String()).NotTo(ContainSubstring("OLD_PROMPT_SHOULD_BE_CLEARED"))
+			}
+
+			// Sanity: new run wrote fresh markers
+			Expect(subject.TranscriptString()).To(ContainSubstring("[goal]"))
+			Expect(subject.TranscriptString()).To(ContainSubstring(goal))
+		})
+
+		it("caps transcript growth (truncates) when steps produce large transcripts", func() {
+			plan := types.Plan{
+				Goal: goal,
+				Steps: []types.Step{
+					{Type: types.ToolShell, Description: "step 1", Command: "echo", Args: []string{"hi"}},
+				},
+			}
+
+			mockPlanner.EXPECT().
+				Plan(gomock.Any(), goal).
+				Return(plan, nil).
+				Times(1)
+
+			// Runner returns a huge transcript payload
+			big := strings.Repeat("X", 10_000)
+
+			mockRunner.EXPECT().
+				RunStep(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(types.StepResult{
+					Step:       plan.Steps[0],
+					Outcome:    types.OutcomeOK,
+					Output:     "ok",
+					Transcript: big,
+				}, nil).
+				Times(1)
+
+			subject := planexec.NewPlanExecuteAgent(
+				mockClock,
+				mockPlanner,
+				mockRunner,
+				core.WithTranscriptMaxBytes(200),
+			)
+
+			_, err := subject.RunAgentGoal(context.Background(), goal)
+			Expect(err).NotTo(HaveOccurred())
+
+			ts := subject.TranscriptString()
+
+			// Hard check: buffer is capped
+			Expect(len([]byte(ts))).To(BeNumerically("<=", 200))
+
+			// And should include your truncation banner (whatever you used in transcript_buffer)
+			Expect(ts).To(ContainSubstring("…(truncated)"))
 		})
 	})
 }

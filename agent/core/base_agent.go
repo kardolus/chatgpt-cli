@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+const (
+	defaultTranscriptMaxBytes    = 512 * 1024
+	defaultPromptHistoryMaxBytes = 512 * 1024
+)
+
 type BaseAgent struct {
 	Clock  Clock
 	Config types.Config
@@ -16,6 +21,9 @@ type BaseAgent struct {
 
 	SyncOut   func()
 	SyncDebug func()
+
+	Transcript    *TranscriptBuffer
+	PromptHistory *TranscriptBuffer
 }
 
 type BaseOption func(*BaseAgent)
@@ -55,12 +63,30 @@ func WithDebugLogger(l *zap.SugaredLogger, sync func()) BaseOption {
 	}
 }
 
+func WithTranscriptMaxBytes(n int) BaseOption {
+	return func(b *BaseAgent) {
+		if n > 0 {
+			b.Transcript = NewTranscriptBuffer(n)
+		}
+	}
+}
+
+func WithPromptHistoryMaxBytes(n int) BaseOption {
+	return func(b *BaseAgent) {
+		if n > 0 {
+			b.PromptHistory = NewTranscriptBuffer(n)
+		}
+	}
+}
+
 func NewBaseAgent(clock Clock) *BaseAgent {
 	return &BaseAgent{
-		Clock:  clock,
-		Config: types.Config{DryRun: false, WorkDir: "."},
-		Out:    zap.NewNop().Sugar(),
-		Debug:  zap.NewNop().Sugar(),
+		Clock:         clock,
+		Config:        types.Config{DryRun: false, WorkDir: "."},
+		Out:           zap.NewNop().Sugar(),
+		Debug:         zap.NewNop().Sugar(),
+		Transcript:    NewTranscriptBuffer(defaultTranscriptMaxBytes),
+		PromptHistory: NewTranscriptBuffer(defaultPromptHistoryMaxBytes),
 	}
 }
 
@@ -88,4 +114,52 @@ func (b *BaseAgent) FinishTimer(start time.Time) {
 	if b.SyncDebug != nil {
 		b.SyncDebug()
 	}
+}
+
+func (b *BaseAgent) AddTranscript(s string) {
+	if strings.TrimSpace(s) == "" {
+		return
+	}
+	if b.Transcript == nil {
+		b.Transcript = NewTranscriptBuffer(defaultTranscriptMaxBytes)
+	}
+	b.Transcript.AppendString(s)
+}
+
+func (b *BaseAgent) AddTranscriptf(format string, args ...any) {
+	if b.Transcript == nil {
+		b.Transcript = NewTranscriptBuffer(defaultTranscriptMaxBytes)
+	}
+	b.Transcript.Appendf(format, args...)
+}
+
+func (b *BaseAgent) TranscriptString() string {
+	if b.Transcript == nil {
+		return ""
+	}
+	return b.Transcript.String()
+}
+
+func (b *BaseAgent) AddHistory(s string) {
+	if strings.TrimSpace(s) == "" {
+		return
+	}
+	if b.PromptHistory == nil {
+		b.PromptHistory = NewTranscriptBuffer(defaultPromptHistoryMaxBytes)
+	}
+	b.PromptHistory.AppendString(s)
+}
+
+func (b *BaseAgent) AddHistoryf(format string, args ...any) {
+	if b.PromptHistory == nil {
+		b.PromptHistory = NewTranscriptBuffer(defaultPromptHistoryMaxBytes)
+	}
+	b.PromptHistory.Appendf(format, args...)
+}
+
+func (b *BaseAgent) History() string {
+	if b.PromptHistory == nil {
+		return ""
+	}
+	return b.PromptHistory.String()
 }

@@ -1170,4 +1170,86 @@ func testReActAgent(t *testing.T, when spec.G, it spec.S) {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	when("agent already has transcript + history from a previous run", func() {
+		it("resets them before starting a new run", func() {
+			// Seed previous run leftovers
+			reactAgent.AddTranscript("OLD_TRANSCRIPT_SHOULD_BE_CLEARED")
+			reactAgent.AddHistory("OLD_HISTORY_SHOULD_BE_CLEARED")
+
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(core.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(types.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				Return(`{
+					"thought": "ok",
+					"action_type": "answer",
+					"final_answer": "done"
+				}`, 3, nil)
+
+			budget.EXPECT().ChargeLLMTokens(3, now)
+
+			res, err := reactAgent.RunAgentGoal(ctx, "New goal")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(Equal("done"))
+
+			// Assert old data is gone
+			Expect(reactAgent.TranscriptString()).NotTo(ContainSubstring("OLD_TRANSCRIPT_SHOULD_BE_CLEARED"))
+			Expect(reactAgent.History()).NotTo(ContainSubstring("OLD_HISTORY_SHOULD_BE_CLEARED"))
+
+			// And the new goal is present (sanity check)
+			Expect(reactAgent.TranscriptString()).To(ContainSubstring("[goal]"))
+			Expect(reactAgent.TranscriptString()).To(ContainSubstring("New goal"))
+			Expect(reactAgent.History()).To(ContainSubstring("USER: New goal"))
+		})
+	})
+
+	when("prompt logging is enabled and transcript max is small", func() {
+		it("caps transcript length (and truncates) even if prompt is large", func() {
+			// Create an agent with a tiny transcript buffer so truncation is guaranteed.
+			// (We keep using the same mocks.)
+			agent := react.NewReActAgent(
+				llm, runner, budget, clock,
+				core.WithTranscriptMaxBytes(120),
+				core.WithPromptHistoryMaxBytes(120),
+			)
+
+			budget.EXPECT().AllowIteration(now).Return(nil)
+			budget.EXPECT().Snapshot(now).Return(core.BudgetSnapshot{})
+			budget.EXPECT().AllowTool(types.ToolLLM, now).Return(nil)
+
+			llm.EXPECT().
+				Complete(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, prompt string) (string, int, error) {
+					// The prompt should be big (your buildReActPrompt() is huge),
+					// which is what makes prompt-logging risky if uncapped.
+					Expect(len(prompt)).To(BeNumerically(">", 200))
+					return `{
+						"thought": "ok",
+						"action_type": "answer",
+						"final_answer": "done"
+					}`, 2, nil
+				})
+
+			budget.EXPECT().ChargeLLMTokens(2, now)
+
+			_, err := agent.RunAgentGoal(ctx, "Goal that triggers large prompt")
+			Expect(err).NotTo(HaveOccurred())
+
+			ts := agent.TranscriptString()
+
+			// This is the actual regression check:
+			// transcript must be capped at <= 120 bytes.
+			Expect(len([]byte(ts))).To(BeNumerically("<=", 120))
+
+			// And it should show your truncation banner if it overflowed.
+			// (banner text is "\n…(truncated)\n")
+			Expect(ts).To(ContainSubstring("…(truncated)"))
+
+			// Optional: if you used the suggested prompt logging tag:
+			// Expect(ts).To(ContainSubstring("[iteration 1][prompt]"))
+		})
+	})
 }

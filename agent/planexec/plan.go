@@ -25,12 +25,9 @@ type Planner interface {
 }
 
 type LoggingPlanner struct {
-	inner Planner
-	log   *zap.SugaredLogger
-
-	// artifacts (overwritten every run)
+	inner          Planner
+	log            *zap.SugaredLogger
 	dir            string
-	rawPath        string
 	normalizedPath string
 }
 
@@ -49,7 +46,6 @@ func NewLoggingPlanner(inner Planner, logs *core.Logs) *LoggingPlanner {
 	}
 	if logs.Dir != "" {
 		lp.dir = logs.Dir
-		lp.rawPath = filepath.Join(logs.Dir, "plan.json")
 		lp.normalizedPath = filepath.Join(logs.Dir, "plan.normalized.json")
 	}
 	return lp
@@ -70,13 +66,6 @@ func (p *LoggingPlanner) Plan(ctx context.Context, goal string) (types.Plan, err
 
 	p.log.Debugf("Planner: ok steps=%d", len(plan.Steps))
 	return plan, nil
-}
-
-func (p *LoggingPlanner) WriteRaw(raw string) {
-	if p.rawPath == "" {
-		return
-	}
-	_ = os.WriteFile(p.rawPath, []byte(raw), 0o644) // best-effort
 }
 
 func (p *LoggingPlanner) writeNormalized(plan types.Plan) {

@@ -43,9 +43,20 @@ func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) (strin
 	out := a.Out
 	dbg := a.Debug
 
+	if a.PromptHistory != nil {
+		a.PromptHistory.Reset()
+	}
+	if a.Transcript != nil {
+		a.Transcript.Reset()
+	}
+
+	a.AddHistory(fmt.Sprintf("USER: %s", goal))
+	a.AddTranscript(fmt.Sprintf("[goal]\n%s\n", goal))
+
 	plan, err := a.Planner.Plan(ctx, goal)
 	if err != nil {
 		dbg.Errorf("Planner error: %v", err)
+		a.AddTranscript(fmt.Sprintf("[planner:error] %v\n", err))
 		return "", err
 	}
 
@@ -55,6 +66,11 @@ func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) (strin
 
 	out.Infof("Goal: %s", plan.Goal)
 	out.Infof("Mode: Plan-and-Execute (plan first, then run tools)\n")
+
+	a.AddTranscript(fmt.Sprintf("[plan] goal=%q steps=%d\n", plan.Goal, len(plan.Steps)))
+	for i, s := range plan.Steps {
+		a.AddTranscript(fmt.Sprintf("[plan-step %d/%d] type=%s desc=%q\n", i+1, len(plan.Steps), s.Type, s.Description))
+	}
 
 	for i, s := range plan.Steps {
 		switch s.Type {
@@ -76,27 +92,35 @@ func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) (strin
 		if err != nil {
 			out.Errorf("Template render failed (step %d): %s: %v", i+1, step.Description, err)
 			dbg.Errorf("template render failed step=%d desc=%q err=%v", i+1, step.Description, err)
+			a.AddTranscript(fmt.Sprintf("[template:error][step %d] %v\n", i+1, err))
 			return "", err
 		}
 
-		// Debug: rendered step (includes resolved templates)
 		dbg.Debugf("rendered step %d/%d: %+v", i+1, len(plan.Steps), rendered)
+		a.AddTranscript(fmt.Sprintf("[step %d/%d][start] %s\n", i+1, len(plan.Steps), rendered.Description))
 
 		res, err := a.Runner.RunStep(ctx, a.Config, rendered)
 		if err != nil {
 			if core.IsBudgetStop(err, out) || core.IsPolicyStop(err, out) {
 				dbg.Errorf("stop error step=%d desc=%q err=%v", i+1, rendered.Description, err)
+				if strings.TrimSpace(res.Transcript) != "" {
+					a.AddTranscript(res.Transcript)
+				}
 				return "", err
 			}
+
 			out.Errorf("Step failed: %s: %v", rendered.Description, err)
 			dbg.Errorf("step failed step=%d desc=%q err=%v transcript=%q", i+1, rendered.Description, err, res.Transcript)
+			if strings.TrimSpace(res.Transcript) != "" {
+				a.AddTranscript(res.Transcript)
+			}
 			return "", err
 		}
 
 		out.Infof("Step %d finished in %s (outcome=%s)", i+1, res.Duration, res.Outcome)
 
-		// Debug: ALWAYS dump transcript
 		if strings.TrimSpace(res.Transcript) != "" {
+			a.AddTranscript(res.Transcript)
 			dbg.Debugf("step %d transcript:\n%s", i+1, res.Transcript)
 		}
 
@@ -105,6 +129,7 @@ func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) (strin
 				out.Errorf("Step failed: %s\n%s", rendered.Description, res.Transcript)
 			}
 			dbg.Errorf("step outcome error step=%d desc=%q", i+1, rendered.Description)
+			a.AddTranscript(fmt.Sprintf("[step %d/%d][outcome=error] %s\n", i+1, len(plan.Steps), rendered.Description))
 			return "", fmt.Errorf("step failed: %s", rendered.Description)
 		}
 
@@ -113,10 +138,13 @@ func (a *PlanExecuteAgent) RunAgentGoal(ctx context.Context, goal string) (strin
 		}
 
 		execCtx.Results = append(execCtx.Results, res)
+		a.AddTranscript(fmt.Sprintf("[step %d/%d][outcome=%s] duration=%s\n", i+1, len(plan.Steps), res.Outcome, res.Duration))
 	}
 
 	result := strings.TrimRightFunc(final, unicode.IsSpace)
 	out.Infof("\nResult: %s\n", result)
-	dbg.Debugf("final (trimmed): %q", strings.TrimRightFunc(final, unicode.IsSpace))
+	dbg.Debugf("final (trimmed): %q", result)
+
+	a.AddTranscript(fmt.Sprintf("[final]\n%s\n", result))
 	return result, nil
 }

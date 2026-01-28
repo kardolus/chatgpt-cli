@@ -70,9 +70,15 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 	out := a.Out
 	dbg := a.Debug
 
-	conversation := []string{
-		fmt.Sprintf("USER: %s", goal),
+	if a.PromptHistory != nil {
+		a.PromptHistory.Reset()
 	}
+	if a.Transcript != nil {
+		a.Transcript.Reset()
+	}
+
+	a.AddHistory(fmt.Sprintf("USER: %s", goal))
+	a.AddTranscript(fmt.Sprintf("[goal]\n%s\n", goal))
 
 	for i := 0; ; i++ {
 		now := a.Clock.Now()
@@ -97,11 +103,15 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 			return "", err
 		}
 
-		prompt := buildReActPrompt(conversation, a.promptStateLine())
+		prompt := buildReActPromptFromHistory(a.History(), a.promptStateLine())
 		dbg.Debugf("react iteration %d prompt_len=%d", i+1, len(prompt))
 
+		a.AddTranscriptf("[iteration %d][prompt]\n%s\n", i+1, prompt)
+
 		a.llmCalls++
+
 		raw, tokens, err := a.LLM.Complete(ctx, prompt)
+		a.AddTranscriptf("[iteration %d][llm_raw]\n%s\n", i+1, strings.TrimSpace(raw))
 		if err != nil {
 			dbg.Errorf("LLM error at iteration %d: %v", i+1, err)
 			return "", err
@@ -126,11 +136,13 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 				rawSnippet = rawSnippet[:200] + "..."
 			}
 
-			conversation = append(conversation,
-				"ACTION_TAKEN: tool=LLM details=INVALID_RESPONSE",
-				fmt.Sprintf("OBSERVATION: ERROR: Your last response violated the ReAct protocol (%s). You MUST reply with EXACTLY ONE JSON object. The first non-whitespace character must be '{' and the last must be '}'. Include \"action_type\". Do not include any prose.", err.Error()),
-				fmt.Sprintf("OBSERVATION: ERROR: Raw response (truncated): %q", rawSnippet),
-			)
+			a.AddHistory("ACTION_TAKEN: tool=LLM details=INVALID_RESPONSE")
+			a.AddHistory(fmt.Sprintf(
+				"OBSERVATION: ERROR: Your last response violated the ReAct protocol (%s). You MUST reply with EXACTLY ONE JSON object. The first non-whitespace character must be '{' and the last must be '}'. Include \"action_type\". Do not include any prose.",
+				err.Error(),
+			))
+			a.AddHistory(fmt.Sprintf("OBSERVATION: ERROR: Raw response (truncated): %q", rawSnippet))
+			a.AddTranscriptf("[iteration %d][parse-error] %v\nraw=%q\n", i+1, err, rawSnippet)
 			continue
 		}
 
@@ -140,37 +152,36 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 			sig := signatureForAction(action)
 
 			immediate := guard.isImmediateRepeat(sig)
-			seen := guard.count(sig) // how many times seen so far (before recording this attempt)
+			seen := guard.count(sig)
 
 			if immediate || seen >= 3 {
-				// Record the repeated attempt so counts can climb and we can hard-stop.
 				guard.observe(sig)
-
-				seenNow := guard.count(sig) // after recording this attempt
+				seenNow := guard.count(sig)
 
 				msg := fmt.Sprintf(
 					"OBSERVATION: You are repeating the same tool call (%s %q). Do NOT repeat it. "+
 						"Choose a different next step (e.g., write the file, narrow the read range, or answer).",
 					sig.tool, sig.key,
 				)
-				conversation = append(conversation, msg)
+
+				a.AddHistory(msg)
+				a.AddTranscriptf("[iteration %d][repeat-guard] %s\n", i+1, msg)
 				dbg.Debugf("repetition guard injected: %s", msg)
 
-				// Hard-stop if it's *really* stuck (e.g., 6+ occurrences in the rolling window)
 				if seenNow >= 6 {
 					return "", fmt.Errorf("agent appears stuck: repeated tool call too many times: %s %q", sig.tool, sig.key)
 				}
-
 				continue
 			}
 
-			// Non-repeat path: record it normally
 			guard.observe(sig)
 		}
+
 		dbg.Debugf("react iteration %d action_type=%s thought=%q", i+1, action.ActionType, action.Thought)
 
 		if action.Thought != "" {
 			out.Infof("[Iteration %d] Thought: %s", i+1, action.Thought)
+			a.AddTranscriptf("[iteration %d][thought] %s\n", i+1, action.Thought)
 		}
 
 		if action.ActionType == "answer" {
@@ -180,6 +191,8 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 			if len(a.effects) > 0 {
 				out.Infof("Actions performed: %s", summarizeActionsForUI(a.effects, a.llmCalls))
 			}
+
+			a.AddTranscriptf("[final]\n%s\n", result)
 			return result, nil
 		}
 
@@ -193,28 +206,38 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 		if err != nil {
 			out.Errorf("Failed to convert action to step: %v", err)
 			dbg.Errorf("convert error at iteration %d: %v", i+1, err)
-			conversation = append(conversation,
-				fmt.Sprintf("ACTION_TAKEN: tool=%s details=INVALID_REQUEST", action.Tool),
-				fmt.Sprintf("OBSERVATION: ERROR: %s", err.Error()),
-			)
+
+			a.AddHistory(fmt.Sprintf("ACTION_TAKEN: tool=%s details=INVALID_REQUEST", action.Tool))
+			a.AddHistory(fmt.Sprintf("OBSERVATION: ERROR: %s", err.Error()))
+			a.AddTranscriptf("[iteration %d][convert-error] %v\n", i+1, err)
 			continue
 		}
 
 		out.Infof("[Iteration %d] Action: %s %s", i+1, action.Tool, step.Description)
+		a.AddTranscriptf("[iteration %d][action] tool=%s %s\n", i+1, action.Tool, step.Description)
 
 		res, err := a.Runner.RunStep(ctx, a.Config, step)
 
-		// NOTE: stop errors still bubble out (Budget/policy).
 		if err != nil {
 			if core.IsBudgetStop(err, out) || core.IsPolicyStop(err, out) {
 				dbg.Errorf("stop error at iteration %d: %v", i+1, err)
+				if strings.TrimSpace(res.Transcript) != "" {
+					a.AddTranscript(res.Transcript)
+				}
 				return "", err
 			}
 
-			// Any other Runner error is treated as fatal (should be rare after Runner change).
 			out.Errorf("Step failed: %s: %v", step.Description, err)
 			dbg.Errorf("step failed at iteration %d: %v transcript=%q", i+1, err, res.Transcript)
+
+			if strings.TrimSpace(res.Transcript) != "" {
+				a.AddTranscript(res.Transcript)
+			}
 			return "", err
+		}
+
+		if strings.TrimSpace(res.Transcript) != "" {
+			a.AddTranscript(res.Transcript)
 		}
 
 		if res.Outcome == types.OutcomeError {
@@ -223,23 +246,18 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 			out.Errorf("[Iteration %d] Step failed: %s", i+1, step.Description)
 			out.Infof("[Iteration %d] Observation: %s (took %s)", i+1, truncateForDisplay(res.Output, 100), res.Duration)
 
-			conversation = append(conversation,
-				fmt.Sprintf("ACTION_TAKEN: tool=%s details=%s", action.Tool, step.Description),
-				fmt.Sprintf("OBSERVATION: ERROR: %s", res.Output),
-				formatEffectsForConversation(res.Effects),
-			)
+			a.AddHistory(fmt.Sprintf("ACTION_TAKEN: tool=%s details=%s", action.Tool, step.Description))
+			a.AddHistory(fmt.Sprintf("OBSERVATION: ERROR: %s", res.Output))
+			a.AddHistory(formatEffectsForConversation(res.Effects))
 
 			if types.ToolKind(action.Tool) == types.ToolFiles && (step.Op == "patch" || step.Op == "replace") {
-				// This is intentionally strict: stop the model from retrying patch/replace loops.
-				conversation = append(conversation,
-					fmt.Sprintf(
-						"OBSERVATION: FALLBACK REQUIRED: The %s operation failed for %q. "+
-							"Do NOT try op=%q or op=patch/replace again for this file. "+
-							"Your NEXT step MUST be: {\"action_type\":\"tool\",\"tool\":\"file\",\"op\":\"read\",\"path\":%q}. "+
-							"After reading, you MUST construct the FULL updated file contents and use op=\"write\" to overwrite the file.",
-						step.Op, step.Path, step.Op, step.Path,
-					),
-				)
+				a.AddHistory(fmt.Sprintf(
+					"OBSERVATION: FALLBACK REQUIRED: The %s operation failed for %q. "+
+						"Do NOT try op=%q or op=patch/replace again for this file. "+
+						"Your NEXT step MUST be: {\"action_type\":\"tool\",\"tool\":\"file\",\"op\":\"read\",\"path\":%q}. "+
+						"After reading, you MUST construct the FULL updated file contents and use op=\"write\" to overwrite the file.",
+					step.Op, step.Path, step.Op, step.Path,
+				))
 			}
 
 			continue
@@ -250,12 +268,18 @@ func (a *ReActAgent) RunAgentGoal(ctx context.Context, goal string) (string, err
 		out.Infof("[Iteration %d] Observation: %s (took %s)", i+1, truncateForDisplay(res.Output, 100), res.Duration)
 		dbg.Debugf("observation (iteration %d): %q", i+1, res.Output)
 
-		conversation = append(conversation,
-			fmt.Sprintf("ACTION_TAKEN: tool=%s details=%s", action.Tool, step.Description),
-			fmt.Sprintf("OBSERVATION: %s", res.Output),
-			formatEffectsForConversation(res.Effects),
-		)
+		a.AddHistory(fmt.Sprintf("ACTION_TAKEN: tool=%s details=%s", action.Tool, step.Description))
+		a.AddHistory(fmt.Sprintf("OBSERVATION: %s", res.Output))
+		a.AddHistory(formatEffectsForConversation(res.Effects))
 	}
+}
+
+func buildReActPromptFromHistory(history string, stateLine string) string {
+	history = strings.TrimSpace(history)
+	if history == "" {
+		return buildReActPrompt(nil, stateLine)
+	}
+	return buildReActPrompt([]string{history}, stateLine)
 }
 
 func buildReActPrompt(conversation []string, stateLine string) string {

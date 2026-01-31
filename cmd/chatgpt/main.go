@@ -300,13 +300,13 @@ func run(cmd *cobra.Command, args []string) error {
 	if cfg.APIKey == "" {
 		if cfg.APIKeyFile == "" {
 			return errors.New("API key is required. Provide it via --set-api-key, --set-api-key-file, env var, or config file")
-		} else {
-			content, err := os.ReadFile(cfg.APIKeyFile)
-			if err != nil {
-				return err
-			}
-			cfg.APIKey = strings.TrimSpace(string(content))
 		}
+
+		key, err := config.ReadAPIKeyFile(cfg.APIKeyFile)
+		if err != nil {
+			return err
+		}
+		cfg.APIKey = key
 	}
 
 	ctx := context.Background()

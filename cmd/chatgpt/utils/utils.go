@@ -72,7 +72,7 @@ func CreateHistoryFile(history []string) (string, error) {
 	fullPath := filepath.Join(dataHome, InteractiveHistoryFile)
 
 	content := strings.Join(history, "\n") + "\n"
-	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(fullPath, []byte(content), 0o600); err != nil {
 		return "", err
 	}
 

@@ -43,7 +43,7 @@ func New() (*FileIO, error) {
 	fileInfo, err := os.Stat(chatGPTDir)
 	if err == nil {
 		if fileInfo.IsDir() {
-			err = os.MkdirAll(dir, 0755)
+			err = os.MkdirAll(dir, 0o700)
 		}
 	}
 
@@ -79,7 +79,7 @@ func (f *FileIO) Write(historyEntries []History) error {
 		return err
 	}
 
-	return os.WriteFile(f.getPath(f.thread), data, 0644)
+	return os.WriteFile(f.getPath(f.thread), data, 0o600)
 }
 
 func (f *FileIO) getPath(thread string) string {

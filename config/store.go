@@ -184,7 +184,7 @@ func (f *FileIO) Write(config Config) error {
 		return err
 	}
 
-	perm := os.FileMode(0644)
+	perm := os.FileMode(0o600)
 	if st, err := os.Stat(f.configFilePath); err == nil {
 		perm = st.Mode() & 0o777
 	}

@@ -1035,7 +1035,7 @@ func saveConfigWithComments(configPath string, node *yaml.Node) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal YAML: %w", err)
 	}
-	return os.WriteFile(configPath, out, 0644)
+	return os.WriteFile(configPath, out, 0o600)
 }
 
 func saveConfig(changedValues map[string]interface{}) error {

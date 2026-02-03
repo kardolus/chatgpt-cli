@@ -187,14 +187,16 @@ func containsString(xs []string, s string) bool {
 
 // escapesWorkDir returns true if path, when resolved relative to workdir, is outside workdir.
 func escapesWorkDir(workdir, path string) bool {
-	// Resolve workdir to absolute path
 	wd, err := filepath.Abs(workdir)
 	if err != nil {
-		return true // fail closed
+		return true
 	}
 	wd = filepath.Clean(wd)
 
-	// Resolve target path
+	if r, err := filepath.EvalSymlinks(wd); err == nil {
+		wd = r
+	}
+
 	var full string
 	if filepath.IsAbs(path) {
 		full = path
@@ -203,11 +205,14 @@ func escapesWorkDir(workdir, path string) bool {
 	}
 	full, err = filepath.Abs(full)
 	if err != nil {
-		return true // fail closed
+		return true
 	}
 	full = filepath.Clean(full)
 
-	// Allow exactly wd or anything under wd
+	if r, err := filepath.EvalSymlinks(full); err == nil {
+		full = r
+	}
+
 	if full == wd {
 		return false
 	}

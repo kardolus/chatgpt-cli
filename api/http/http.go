@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/config"
@@ -23,6 +24,7 @@ const (
 	errFailedToMakeRequest   = "failed to make request: %w"
 	errHTTP                  = "http status %d: %s"
 	errHTTPStatus            = "http status: %d"
+	defaultHTTPTimeout       = 60 * time.Second
 )
 
 type Caller interface {
@@ -41,16 +43,12 @@ type RestCaller struct {
 var _ Caller = &RestCaller{}
 
 func New(cfg config.Config) *RestCaller {
-	var client *http.Client
+	client := &http.Client{Timeout: defaultHTTPTimeout}
+
 	if cfg.SkipTLSVerify {
-		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client = &http.Client{
-			Transport: transport,
-		}
-	} else {
-		client = &http.Client{}
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		client.Transport = transport
 	}
 
 	return &RestCaller{

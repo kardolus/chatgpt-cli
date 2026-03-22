@@ -32,6 +32,7 @@ type Config struct {
 	AutoShellTitle       bool              `yaml:"auto_shell_title"`
 	TrackTokenUsage      bool              `yaml:"track_token_usage"`
 	SkipTLSVerify        bool              `yaml:"skip_tls_verify"`
+	HTTPTimeout          int               `yaml:"http_timeout"`
 	Multiline            bool              `yaml:"multiline"`
 	Web                  bool              `yaml:"web"`
 	WebContextSize       string            `yaml:"web_context_size"`

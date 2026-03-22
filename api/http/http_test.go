@@ -59,6 +59,38 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 		})
 	})
 
+	when("New()", func() {
+		it("respects the configured HTTP timeout", func() {
+			t.Parallel()
+
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			defer server.Close()
+
+			caller := chatgpthttp.New(config.Config{HTTPTimeout: 5})
+			body, err := caller.Get(server.URL)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(body)).To(Equal(`{"ok":true}`))
+		})
+
+		it("uses the default timeout when HTTPTimeout is not set", func() {
+			t.Parallel()
+
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			defer server.Close()
+
+			caller := chatgpthttp.New(config.Config{})
+			body, err := caller.Get(server.URL)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(body)).To(Equal(`{"ok":true}`))
+		})
+	})
+
 	when("Get()", func() {
 		it("returns the response body on success", func() {
 			t.Parallel()

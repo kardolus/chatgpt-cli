@@ -24,7 +24,6 @@ const (
 	errFailedToMakeRequest   = "failed to make request: %w"
 	errHTTP                  = "http status %d: %s"
 	errHTTPStatus            = "http status: %d"
-	defaultHTTPTimeout       = 60 * time.Second
 )
 
 type Caller interface {
@@ -43,7 +42,7 @@ type RestCaller struct {
 var _ Caller = &RestCaller{}
 
 func New(cfg config.Config) *RestCaller {
-	client := &http.Client{Timeout: defaultHTTPTimeout}
+	client := &http.Client{Timeout: time.Duration(cfg.HTTPTimeout) * time.Second}
 
 	if cfg.SkipTLSVerify {
 		transport := http.DefaultTransport.(*http.Transport).Clone()

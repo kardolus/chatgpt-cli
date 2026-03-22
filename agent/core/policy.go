@@ -14,11 +14,12 @@ type Policy interface {
 }
 
 const (
-	PolicyKindStepType   = "step_type"
-	PolicyKindShell      = "shell"
-	PolicyKindLLM        = "llm"
-	PolicyKindFiles      = "files"
-	PolicyKindPathEscape = "path_escape"
+	PolicyKindStepType       = "step_type"
+	PolicyKindShell          = "shell"
+	PolicyKindLLM            = "llm"
+	PolicyKindFiles          = "files"
+	PolicyKindPathEscape     = "path_escape"
+	PolicyKindShellExpansion = "shell_expansion"
 )
 
 type DefaultPolicy struct {
@@ -66,6 +67,9 @@ func (p *DefaultPolicy) AllowStep(cfg types.Config, step types.Step) error {
 
 		if p.limits.RestrictFilesToWorkDir && cfg.WorkDir != "" {
 			if err := denyShellArgsOutsideWorkDir(cfg.WorkDir, step.Args); err != nil {
+				return err
+			}
+			if err := denyShellExpansionPatterns(step.Args); err != nil {
 				return err
 			}
 		}
@@ -141,6 +145,42 @@ func denyShellArgsOutsideWorkDir(workdir string, args []string) error {
 				return PolicyDeniedError{
 					Kind:   PolicyKindPathEscape,
 					Reason: fmt.Sprintf("shell arg escapes workdir: workdir=%q arg=%q", workdir, s),
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// denyShellExpansionPatterns blocks args containing shell expansion characters
+// ($, backtick, %VAR%) as defense-in-depth when RestrictFilesToWorkDir is enabled.
+func denyShellExpansionPatterns(args []string) error {
+	for _, raw := range args {
+		s := strings.TrimSpace(raw)
+		if s == "" {
+			continue
+		}
+
+		if strings.Contains(s, "$") {
+			return PolicyDeniedError{
+				Kind:   PolicyKindShellExpansion,
+				Reason: fmt.Sprintf("shell arg contains variable/command expansion '$': arg=%q", s),
+			}
+		}
+
+		if strings.Contains(s, "`") {
+			return PolicyDeniedError{
+				Kind:   PolicyKindShellExpansion,
+				Reason: fmt.Sprintf("shell arg contains backtick command substitution: arg=%q", s),
+			}
+		}
+
+		// Block Windows-style %VAR% patterns: two % with non-empty content between.
+		if i := strings.Index(s, "%"); i >= 0 {
+			if j := strings.Index(s[i+1:], "%"); j > 0 {
+				return PolicyDeniedError{
+					Kind:   PolicyKindShellExpansion,
+					Reason: fmt.Sprintf("shell arg contains Windows-style variable expansion: arg=%q", s),
 				}
 			}
 		}

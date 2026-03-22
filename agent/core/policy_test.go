@@ -195,6 +195,90 @@ func testPolicy(t *testing.T, when spec.G, it spec.S) {
 				})
 				Expect(err).NotTo(HaveOccurred())
 			})
+
+			it("denies shell args containing $ (variable expansion) when RestrictFilesToWorkDir is enabled", func() {
+				p := core.NewDefaultPolicy(core.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				cases := []string{"$HOME", "${HOME}", "$(whoami)"}
+				for _, arg := range cases {
+					err := p.AllowStep(types.Config{WorkDir: "/tmp"}, types.Step{
+						Type:    types.ToolShell,
+						Command: "echo",
+						Args:    []string{arg},
+					})
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("shell_expansion"))
+				}
+			})
+
+			it("denies shell args containing backticks when RestrictFilesToWorkDir is enabled", func() {
+				p := core.NewDefaultPolicy(core.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				err := p.AllowStep(types.Config{WorkDir: "/tmp"}, types.Step{
+					Type:    types.ToolShell,
+					Command: "echo",
+					Args:    []string{"`whoami`"},
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("shell_expansion"))
+			})
+
+			it("denies shell args containing Windows-style %VAR% patterns when RestrictFilesToWorkDir is enabled", func() {
+				p := core.NewDefaultPolicy(core.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				cases := []string{"%USERPROFILE%", `%PATH%\system32`}
+				for _, arg := range cases {
+					err := p.AllowStep(types.Config{WorkDir: "/tmp"}, types.Step{
+						Type:    types.ToolShell,
+						Command: "echo",
+						Args:    []string{arg},
+					})
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("shell_expansion"))
+				}
+			})
+
+			it("allows shell args with glob patterns when RestrictFilesToWorkDir is enabled", func() {
+				p := core.NewDefaultPolicy(core.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				tmp := t.TempDir()
+				old, err := os.Getwd()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.Chdir(tmp)).To(Succeed())
+				t.Cleanup(func() { _ = os.Chdir(old) })
+
+				Expect(p.AllowStep(types.Config{WorkDir: "."}, types.Step{
+					Type:    types.ToolShell,
+					Command: "find",
+					Args:    []string{"-name", "*.go"},
+				})).To(Succeed())
+
+				Expect(p.AllowStep(types.Config{WorkDir: "."}, types.Step{
+					Type:    types.ToolShell,
+					Command: "grep",
+					Args:    []string{"pattern*", "file.txt"},
+				})).To(Succeed())
+			})
+
+			it("allows shell args with a single % (not a Windows variable) when RestrictFilesToWorkDir is enabled", func() {
+				p := core.NewDefaultPolicy(core.PolicyLimits{
+					RestrictFilesToWorkDir: true,
+				})
+
+				Expect(p.AllowStep(types.Config{WorkDir: "/tmp"}, types.Step{
+					Type:    types.ToolShell,
+					Command: "echo",
+					Args:    []string{"100%"},
+				})).To(Succeed())
+			})
 		})
 
 		when("llm steps", func() {

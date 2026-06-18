@@ -50,6 +50,7 @@ calls, and an experimental agent mode for multi-step tasks with safety and budge
     - [Azure Configuration](#azure-configuration)
     - [Perplexity Configuration](#perplexity-configuration)
     - [302 AI Configuration](#302ai-configuration)
+    - [Atlas Cloud Configuration](#atlas-cloud-configuration)
     - [Command-Line Autocompletion](#command-line-autocompletion)
         - [Enabling Autocompletion](#enabling-autocompletion)
         - [Persistent Autocompletion](#persistent-autocompletion)
@@ -780,6 +781,27 @@ You can set the API key either in the config.yaml file as shown above or export 
 ```shell
 export AI302_API_KEY=<your_key>
 ```
+
+### Atlas Cloud Configuration
+
+[Atlas Cloud](https://www.atlascloud.ai) exposes an OpenAI-compatible API at `https://api.atlascloud.ai/v1`, giving
+access to 300+ models (DeepSeek, Llama, Qwen, and more) through a single endpoint. Because it speaks the OpenAI
+Chat Completions format, it works with ChatGPT CLI out of the box using the following values:
+
+```yaml
+name: atlascloud
+api_key: <your Atlas Cloud api key>
+model: deepseek-ai/deepseek-v4-pro
+url: https://api.atlascloud.ai/v1
+```
+
+You can set the API key either in the `config.yaml` file as shown above or export it as an environment variable:
+
+```shell
+export ATLASCLOUD_API_KEY=<your_key>
+```
+
+You can browse the full model catalog and create an API key from the [Atlas Cloud dashboard](https://www.atlascloud.ai).
 
 ### Command-Line Autocompletion
 

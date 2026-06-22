@@ -308,6 +308,9 @@ accepted. The ChatGPT CLI automatically manages MCP sessions for HTTP(S) servers
 - Attaches it to subsequent requests
 - Automatically re-initializes the session if the server invalidates it
 
+Stateless servers are also supported: if `initialize` returns no `mcp-session-id` header, the CLI proceeds without one
+(the streamable-HTTP spec makes the session id optional) rather than failing.
+
 You can explicitly pass a session header yourself using `--mcp-header`. If you do, the CLI will respect it and skip
 automatic session handling.
 

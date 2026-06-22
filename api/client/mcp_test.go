@@ -363,7 +363,7 @@ func testSessionTransport(t *testing.T, when spec.G, it spec.S) {
 			Expect(callCount).To(Equal(3))
 		})
 
-		it("errors if initialize succeeds but does not return mcp-session-id header", func() {
+		it("proceeds without a session id for a stateless server (initialize returns no mcp-session-id header)", func() {
 			// no cached session
 			req := api.MCPMessage{JSONRPC: "2.0", ID: "orig", Method: "tools/call", Params: []byte(`{}`)}
 			headers := map[string]string{}
@@ -375,16 +375,22 @@ func testSessionTransport(t *testing.T, when spec.G, it spec.S) {
 					Expect(r.Method).To(Equal("initialize"))
 					return api.MCPResponse{
 						Status:  200,
-						Headers: map[string]string{}, // missing session header
+						Headers: map[string]string{}, // missing session header → stateless
 						Message: api.MCPMessage{JSONRPC: "2.0", ID: r.ID, Result: []byte(`{}`)},
 					}, nil
 				}
-				return api.MCPResponse{}, errors.New("should not reach retry")
+				// the real call must go through WITHOUT a session header
+				Expect(r.Method).To(Equal("tools/call"))
+				_, has := h["Mcp-Session-Id"]
+				Expect(has).To(BeFalse())
+				return api.MCPResponse{Status: 200, Message: api.MCPMessage{JSONRPC: "2.0", ID: r.ID, Result: []byte(`{}`)}}, nil
 			}
 
-			_, err := subject.Call(endpoint, req, headers)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("did not return"))
+			resp, err := subject.Call(endpoint, req, headers)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.Status).To(Equal(200))
+			Expect(callCount).To(Equal(2)) // initialize + the real call
+			Expect(store.sessions).NotTo(HaveKey(endpoint))
 		})
 	})
 }

@@ -148,14 +148,16 @@ func (t *SessionTransport) Call(endpoint string, req api.MCPMessage, headers map
 		}
 	}
 
-	// Initialize session
+	// Initialize session (sid may be empty for a stateless server)
 	sid, err := t.initialize(endpoint, headers)
 	if err != nil {
 		return api.MCPResponse{}, err
 	}
 
 	h := cloneHeaders(headers)
-	h["Mcp-Session-Id"] = sid
+	if strings.TrimSpace(sid) != "" {
+		h["Mcp-Session-Id"] = sid
+	}
 
 	resp, err := t.inner.Call(endpoint, req, h)
 	if err == nil {
@@ -189,7 +191,10 @@ func (t *SessionTransport) initialize(endpoint string, headers map[string]string
 
 	sid, ok := headerGet(resp.Headers, "mcp-session-id")
 	if !ok || strings.TrimSpace(sid) == "" {
-		return "", fmt.Errorf("mcp initialize did not return session id")
+		// Stateless MCP server: the streamable-HTTP spec makes Mcp-Session-Id
+		// optional, so a missing header means "no session". Proceed without one
+		// rather than failing — subsequent calls just omit the header.
+		return "", nil
 	}
 
 	_ = t.store.SetSessionID(endpoint, sid)

@@ -339,8 +339,16 @@ chatgpt \
 You can install chatgpt-cli using Homebrew:
 
 ```shell
-brew tap kardolus/chatgpt-cli && brew install chatgpt-cli
+brew tap kardolus/chatgpt-cli
+brew trust kardolus/chatgpt-cli
+brew install chatgpt-cli
 ```
+
+> **Note:** Homebrew 6.0+ requires you to explicitly trust third-party taps before
+> their formulae will run, so the `brew trust` step above is required (a one-time
+> action per machine). If you're upgrading and see
+> `Refusing to load formula ... from untrusted tap`, run
+> `brew trust kardolus/chatgpt-cli` and then `brew upgrade chatgpt-cli`.
 
 ### Direct Download
 

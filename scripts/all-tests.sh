@@ -30,9 +30,10 @@ if ! golangci-lint run; then
   exit 1
 fi
 
-# Search for TODOs in the codebase, excluding vendor and scripts directories.
+# Search for TODOs in the codebase, excluding vendor, scripts, and Markdown docs
+# (docs legitimately mention "TODO" when describing this very check).
 log "Searching for TODOs..."
-if ag TODO --ignore-dir vendor --ignore scripts --ignore-case | grep -v 'context\.TODO()' ; then
+if ag TODO --ignore-dir vendor --ignore scripts --ignore '*.md' --ignore-case | grep -v 'context\.TODO()' ; then
   log "Error: Found TODOs in the codebase. Please address them before proceeding."
   exit 1
 fi

@@ -33,10 +33,15 @@ jobs:
     needs: format
     steps:
       - uses: actions/checkout@v4
-      - uses: golangci/golangci-lint-action@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 'stable'
+      # v9 installs golangci-lint v2 (built with go1.25). v3 pulled the last v1
+      # (go1.24-built), which refuses to lint this module's go1.25 target. The
+      # action runs golangci-lint itself, so no separate run step is needed.
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: latest
-      - run: golangci-lint run
 
   unit-tests:
     runs-on: ubuntu-latest

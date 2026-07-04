@@ -1,0 +1,23 @@
+# golangci-lint v2 config. The repo moved to Go 1.25 (via a gomega bump), and
+# golangci-lint v1 (built with go1.24) can't lint a go1.25 target — so we run v2.
+#
+# v2 changed two defaults vs the v1 setup this repo linted clean under:
+#   1. it dropped the built-in exclusion list (deferred Close()/Remove() etc.)
+#   2. its unified `staticcheck` now also runs the ST (stylecheck) and QF
+#      (quickfix) checks, which v1's SA-only staticcheck never enforced.
+# Restore the prior behaviour so the existing code stays clean: keep the standard
+# exclusion presets, and limit staticcheck to the SA (real-bug) checks.
+version: "2"
+linters:
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - -ST1*
+        - -QF1*

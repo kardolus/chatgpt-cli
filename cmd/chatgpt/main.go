@@ -1359,6 +1359,8 @@ func createConfigFromViper() config.Config {
 		TrackTokenUsage:      viper.GetBool("track_token_usage"),
 		SkipTLSVerify:        viper.GetBool("skip_tls_verify"),
 		HTTPTimeout:          viper.GetInt("http_timeout"),
+		MaxRetries:           viper.GetInt("max_retries"),
+		RetryBaseDelayMs:     viper.GetInt("retry_base_delay_ms"),
 		Multiline:            viper.GetBool("multiline"),
 		Seed:                 viper.GetInt("seed"),
 		Effort:               viper.GetString("effort"),

@@ -33,6 +33,8 @@ type Config struct {
 	TrackTokenUsage      bool              `yaml:"track_token_usage"`
 	SkipTLSVerify        bool              `yaml:"skip_tls_verify"`
 	HTTPTimeout          int               `yaml:"http_timeout"`
+	MaxRetries           int               `yaml:"max_retries"`
+	RetryBaseDelayMs     int               `yaml:"retry_base_delay_ms"`
 	Multiline            bool              `yaml:"multiline"`
 	Web                  bool              `yaml:"web"`
 	WebContextSize       string            `yaml:"web_context_size"`

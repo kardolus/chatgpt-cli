@@ -12,6 +12,7 @@ import (
 type Manager struct {
 	configStore Store
 	Config      Config
+	envErr      error
 }
 
 func NewManager(cs Store) *Manager {
@@ -25,9 +26,21 @@ func NewManager(cs Store) *Manager {
 	return &Manager{configStore: cs, Config: configuration}
 }
 
+// WithEnvironment applies environment-variable overrides on top of the loaded
+// config. It stays fluent for chaining; any parse error (e.g. a non-numeric
+// value for an int field) is recorded and surfaced via Err() so callers can
+// fail loud at startup instead of silently defaulting to zero.
 func (c *Manager) WithEnvironment() *Manager {
-	c.Config = replaceByEnvironment(c.Config)
+	cfg, err := replaceByEnvironment(c.Config)
+	c.Config = cfg
+	c.envErr = err
 	return c
+}
+
+// Err reports any error recorded while building the configuration (currently
+// environment-variable parse failures from WithEnvironment).
+func (c *Manager) Err() error {
+	return c.envErr
 }
 
 func (c *Manager) APIKeyEnvVarName() string {
@@ -104,7 +117,7 @@ func replaceByConfigFile(defaultConfig, userConfig Config) Config {
 	return defaultConfig
 }
 
-func replaceByEnvironment(configuration Config) Config {
+func replaceByEnvironment(configuration Config) (Config, error) {
 	t := reflect.TypeOf(configuration)
 	v := reflect.ValueOf(&configuration).Elem()
 
@@ -115,24 +128,36 @@ func replaceByEnvironment(configuration Config) Config {
 			continue
 		}
 
-		if value := os.Getenv(prefix + strings.ToUpper(tag)); value != "" {
-			field := v.Field(i)
+		envKey := prefix + strings.ToUpper(tag)
+		value := os.Getenv(envKey)
+		if value == "" {
+			continue
+		}
 
-			switch field.Kind() {
-			case reflect.String:
-				field.SetString(value)
-			case reflect.Int:
-				intValue, _ := strconv.Atoi(value)
-				field.SetInt(int64(intValue))
-			case reflect.Bool:
-				boolValue, _ := strconv.ParseBool(value)
-				field.SetBool(boolValue)
-			case reflect.Float64:
-				floatValue, _ := strconv.ParseFloat(value, 64)
-				field.SetFloat(floatValue)
+		field := v.Field(i)
+		switch field.Kind() {
+		case reflect.String:
+			field.SetString(value)
+		case reflect.Int:
+			intValue, err := strconv.Atoi(value)
+			if err != nil {
+				return configuration, fmt.Errorf("invalid value %q for %s: must be an integer", value, envKey)
 			}
+			field.SetInt(int64(intValue))
+		case reflect.Bool:
+			boolValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return configuration, fmt.Errorf("invalid value %q for %s: must be a boolean", value, envKey)
+			}
+			field.SetBool(boolValue)
+		case reflect.Float64:
+			floatValue, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return configuration, fmt.Errorf("invalid value %q for %s: must be a number", value, envKey)
+			}
+			field.SetFloat(floatValue)
 		}
 	}
 
-	return configuration
+	return configuration, nil
 }

@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +26,11 @@ const (
 	errFailedToMakeRequest   = "failed to make request: %w"
 	errHTTP                  = "http status %d: %s"
 	errHTTPStatus            = "http status: %d"
+	errStreamRead            = "stream read error: %w"
+
+	defaultMaxRetries       = 3
+	defaultRetryBaseDelayMs = 500
+	maxBackoff              = 30 * time.Second
 )
 
 type Caller interface {
@@ -162,14 +169,14 @@ func (r *RestCaller) PostWithHeadersResponse(url string, body []byte, headers ma
 	return out, nil
 }
 
-func (r *RestCaller) ProcessResponse(reader io.Reader, writer io.Writer, endpoint string) []byte {
+func (r *RestCaller) ProcessResponse(reader io.Reader, writer io.Writer, endpoint string) ([]byte, error) {
 	if strings.Contains(endpoint, r.config.ResponsesPath) {
 		return r.processResponsesSSE(reader, writer)
 	}
 	return r.processLegacy(reader, writer)
 }
 
-func (r *RestCaller) processLegacy(reader io.Reader, writer io.Writer) []byte {
+func (r *RestCaller) processLegacy(reader io.Reader, writer io.Writer) ([]byte, error) {
 	var result []byte
 	sugar := zap.S()
 	sugar.Debugln("\nResponse\n")
@@ -206,10 +213,16 @@ func (r *RestCaller) processLegacy(reader io.Reader, writer io.Writer) []byte {
 			}
 		}
 	}
-	return result
+	// A non-nil scanner error means the stream was cut short (e.g. a dropped
+	// connection); surface it so the caller doesn't treat a truncated response
+	// as complete.
+	if err := scanner.Err(); err != nil {
+		return result, fmt.Errorf(errStreamRead, err)
+	}
+	return result, nil
 }
 
-func (r *RestCaller) processResponsesSSE(reader io.Reader, writer io.Writer) []byte {
+func (r *RestCaller) processResponsesSSE(reader io.Reader, writer io.Writer) ([]byte, error) {
 	var (
 		result   []byte
 		curEvent string
@@ -302,18 +315,48 @@ func (r *RestCaller) processResponsesSSE(reader io.Reader, writer io.Writer) []b
 			break
 		}
 	}
-	return result
+	if err := scanner.Err(); err != nil {
+		return result, fmt.Errorf(errStreamRead, err)
+	}
+	return result, nil
 }
 
 func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]byte, error) {
-	req, err := r.newRequest(method, url, body)
-	if err != nil {
-		return nil, fmt.Errorf(errFailedToCreateRequest, err)
+	maxRetries := r.config.MaxRetries
+	if maxRetries == 0 {
+		maxRetries = defaultMaxRetries
+	}
+	if maxRetries < 0 {
+		maxRetries = 0
 	}
 
-	response, err := r.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf(errFailedToMakeRequest, err)
+	var response *http.Response
+	for attempt := 0; ; attempt++ {
+		req, err := r.newRequest(method, url, body)
+		if err != nil {
+			return nil, fmt.Errorf(errFailedToCreateRequest, err)
+		}
+
+		resp, err := r.client.Do(req)
+		if err != nil {
+			// Transient network error — retry with backoff (never mid-stream:
+			// we only start reading the body after a successful establishment).
+			if attempt < maxRetries {
+				r.backoff(attempt, "")
+				continue
+			}
+			return nil, fmt.Errorf(errFailedToMakeRequest, err)
+		}
+
+		if shouldRetryStatus(resp.StatusCode) && attempt < maxRetries {
+			retryAfter := resp.Header.Get("Retry-After")
+			_ = resp.Body.Close()
+			r.backoff(attempt, retryAfter)
+			continue
+		}
+
+		response = resp
+		break
 	}
 	defer response.Body.Close()
 
@@ -332,7 +375,7 @@ func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]
 	}
 
 	if stream {
-		return r.ProcessResponse(response.Body, os.Stdout, url), nil
+		return r.ProcessResponse(response.Body, os.Stdout, url)
 	}
 
 	result, err := io.ReadAll(response.Body)
@@ -341,6 +384,59 @@ func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]
 	}
 
 	return result, nil
+}
+
+// shouldRetryStatus reports whether an HTTP status warrants a retry: rate limits
+// (429) and transient server errors (5xx).
+func shouldRetryStatus(code int) bool {
+	return code == http.StatusTooManyRequests || (code >= 500 && code <= 599)
+}
+
+// backoff waits before the next retry attempt. It honors a Retry-After header
+// (delta-seconds or HTTP-date) when present, otherwise uses exponential backoff
+// with full jitter, capped at maxBackoff.
+func (r *RestCaller) backoff(attempt int, retryAfter string) {
+	// Honor a positive Retry-After (capped at maxBackoff). A zero/past value is
+	// unusable and falls through to jittered exponential backoff so a broken
+	// "Retry-After: 0" can't turn the retry loop into a hot loop.
+	if d, ok := parseRetryAfter(retryAfter); ok && d > 0 {
+		if d > maxBackoff {
+			d = maxBackoff
+		}
+		time.Sleep(d)
+		return
+	}
+	base := r.config.RetryBaseDelayMs
+	if base <= 0 {
+		base = defaultRetryBaseDelayMs
+	}
+	// Cap the shift so a large max_retries can't overflow the duration.
+	shift := attempt
+	if shift > 30 {
+		shift = 30
+	}
+	d := time.Duration(base) * time.Millisecond << uint(shift)
+	if d <= 0 || d > maxBackoff {
+		d = maxBackoff
+	}
+	time.Sleep(rand.N(d)) // full jitter: [0, d)
+}
+
+func parseRetryAfter(s string) (time.Duration, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, false
+	}
+	if secs, err := strconv.Atoi(s); err == nil && secs >= 0 {
+		return time.Duration(secs) * time.Second, true
+	}
+	if t, err := http.ParseTime(s); err == nil {
+		if d := time.Until(t); d > 0 {
+			return d, true
+		}
+		return 0, true
+	}
+	return 0, false
 }
 
 func (r *RestCaller) newRequest(method, url string, body []byte) (*http.Request, error) {

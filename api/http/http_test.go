@@ -2,11 +2,14 @@ package http_test
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	stdhttp "net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/kardolus/chatgpt-cli/api/http"
 	chatgpthttp "github.com/kardolus/chatgpt-cli/api/http"
@@ -15,6 +18,22 @@ import (
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
 )
+
+// errAfterReader yields data once, then fails — simulating a network blip that
+// truncates a stream mid-flight.
+type errAfterReader struct {
+	data []byte
+	done bool
+}
+
+func (e *errAfterReader) Read(p []byte) (int, error) {
+	if e.done {
+		return 0, errors.New("connection reset by peer")
+	}
+	n := copy(p, e.data)
+	e.done = true
+	return n, nil
+}
 
 func TestUnitHTTP(t *testing.T) {
 	spec.Run(t, "Testing the HTTP Client", testHTTP, spec.Report(report.Terminal{}))
@@ -35,14 +54,16 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 			buf := &bytes.Buffer{}
 			// legacy works via both branches; use a non-responses endpoint to
 			// ensure we exercise the original/legacy code path.
-			subject.ProcessResponse(strings.NewReader(legacyStream), buf, "/v1/chat/completions")
+			_, err := subject.ProcessResponse(strings.NewReader(legacyStream), buf, "/v1/chat/completions")
+			Expect(err).NotTo(HaveOccurred())
 			output := buf.String()
 			Expect(output).To(Equal("a b c\n"))
 		})
 
 		it("parses a GPT-5 SSE stream when endpoint is /v1/responses", func() {
 			buf := &bytes.Buffer{}
-			subject.ProcessResponse(strings.NewReader(gpt5Stream), buf, responsesPath)
+			_, err := subject.ProcessResponse(strings.NewReader(gpt5Stream), buf, responsesPath)
+			Expect(err).NotTo(HaveOccurred())
 			output := buf.String()
 			// deltas are "a", " b", " c" then response.completed -> newline
 			Expect(output).To(Equal("a b c\n"))
@@ -53,9 +74,126 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 			expectedOutput := "Error: unexpected end of JSON input\n"
 
 			var buf bytes.Buffer
-			subject.ProcessResponse(strings.NewReader(input), &buf, "/v1/chat/completions")
+			// A malformed JSON chunk is surfaced in the output stream, not as a
+			// returned error (that is reserved for read/transport failures).
+			_, err := subject.ProcessResponse(strings.NewReader(input), &buf, "/v1/chat/completions")
+			Expect(err).NotTo(HaveOccurred())
 			output := buf.String()
 			Expect(output).To(Equal(expectedOutput))
+		})
+
+		it("surfaces a read error when the stream is truncated mid-flight", func() {
+			buf := &bytes.Buffer{}
+			reader := &errAfterReader{data: []byte("data: {\"partial\"")}
+			_, err := subject.ProcessResponse(reader, buf, "/v1/chat/completions")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("stream read error"))
+		})
+	})
+
+	when("retry/backoff", func() {
+		it("retries on 429 then succeeds, honoring the attempt budget", func() {
+			t.Parallel()
+
+			var attempts atomic.Int32
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				if attempts.Add(1) <= 2 {
+					w.WriteHeader(stdhttp.StatusTooManyRequests)
+					_, _ = w.Write([]byte(`{"error":{"message":"slow down"}}`))
+					return
+				}
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			defer server.Close()
+
+			subject := chatgpthttp.New(config.Config{MaxRetries: 3, RetryBaseDelayMs: 1})
+			out, err := subject.Post(server.URL, []byte(`{}`), false)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(out)).To(Equal(`{"ok":true}`))
+			Expect(attempts.Load()).To(Equal(int32(3)))
+		})
+
+		it("retries on 5xx then succeeds", func() {
+			t.Parallel()
+
+			var attempts atomic.Int32
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				if attempts.Add(1) <= 1 {
+					w.WriteHeader(stdhttp.StatusServiceUnavailable)
+					return
+				}
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			defer server.Close()
+
+			subject := chatgpthttp.New(config.Config{MaxRetries: 3, RetryBaseDelayMs: 1})
+			out, err := subject.Post(server.URL, []byte(`{}`), false)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(out)).To(Equal(`{"ok":true}`))
+			Expect(attempts.Load()).To(Equal(int32(2)))
+		})
+
+		it("gives up after MaxRetries and returns the last error", func() {
+			t.Parallel()
+
+			var attempts atomic.Int32
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				attempts.Add(1)
+				w.WriteHeader(stdhttp.StatusTooManyRequests)
+				_, _ = w.Write([]byte(`{"error":{"message":"nope"}}`))
+			}))
+			defer server.Close()
+
+			subject := chatgpthttp.New(config.Config{MaxRetries: 2, RetryBaseDelayMs: 1})
+			out, err := subject.Post(server.URL, []byte(`{}`), false)
+			Expect(err).To(HaveOccurred())
+			Expect(string(out)).To(ContainSubstring("nope"))
+			// 1 initial attempt + 2 retries.
+			Expect(attempts.Load()).To(Equal(int32(3)))
+		})
+
+		it("respects a Retry-After header", func() {
+			t.Parallel()
+
+			var attempts atomic.Int32
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				if attempts.Add(1) <= 1 {
+					w.Header().Set("Retry-After", "1")
+					w.WriteHeader(stdhttp.StatusTooManyRequests)
+					return
+				}
+				w.WriteHeader(stdhttp.StatusOK)
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			defer server.Close()
+
+			// Base delay is tiny; only an honored Retry-After can push elapsed past ~1s.
+			subject := chatgpthttp.New(config.Config{MaxRetries: 3, RetryBaseDelayMs: 1})
+			start := time.Now()
+			out, err := subject.Post(server.URL, []byte(`{}`), false)
+			elapsed := time.Since(start)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(out)).To(Equal(`{"ok":true}`))
+			Expect(elapsed).To(BeNumerically(">=", 900*time.Millisecond))
+		})
+
+		it("does not retry on a 4xx that is not 429", func() {
+			t.Parallel()
+
+			var attempts atomic.Int32
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				attempts.Add(1)
+				w.WriteHeader(stdhttp.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":{"message":"bad"}}`))
+			}))
+			defer server.Close()
+
+			subject := chatgpthttp.New(config.Config{MaxRetries: 3, RetryBaseDelayMs: 1})
+			_, err := subject.Post(server.URL, []byte(`{}`), false)
+			Expect(err).To(HaveOccurred())
+			Expect(attempts.Load()).To(Equal(int32(1)))
 		})
 	})
 

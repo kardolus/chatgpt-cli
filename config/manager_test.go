@@ -299,6 +299,56 @@ func testConfig(t *testing.T, when spec.G, it spec.S) {
 		Expect(subject.Config.OutputPrompt).To(Equal("env-output-prompt"))
 	})
 
+	when("environment variable parsing", func() {
+		it.Before(func() {
+			mockConfigStore.EXPECT().ReadDefaults().Return(defaultConfig).AnyTimes()
+			mockConfigStore.EXPECT().Read().Return(config.Config{}, errors.New("no user config")).AnyTimes()
+		})
+
+		it("records no error for valid values", func() {
+			Expect(os.Setenv(envPrefix+"MAX_TOKENS", "42")).To(Succeed())
+			Expect(os.Setenv(envPrefix+"TEMPERATURE", "0.7")).To(Succeed())
+			Expect(os.Setenv(envPrefix+"OMIT_HISTORY", "true")).To(Succeed())
+
+			subject := config.NewManager(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Err()).NotTo(HaveOccurred())
+			Expect(subject.Config.MaxTokens).To(Equal(42))
+			Expect(subject.Config.Temperature).To(Equal(0.7))
+			Expect(subject.Config.OmitHistory).To(BeTrue())
+		})
+
+		it("fails loud on a non-integer int value", func() {
+			Expect(os.Setenv(envPrefix+"MAX_TOKENS", "not-a-number")).To(Succeed())
+
+			subject := config.NewManager(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Err()).To(HaveOccurred())
+			Expect(subject.Err().Error()).To(ContainSubstring(envPrefix + "MAX_TOKENS"))
+			Expect(subject.Err().Error()).To(ContainSubstring("must be an integer"))
+		})
+
+		it("fails loud on a non-numeric float value", func() {
+			Expect(os.Setenv(envPrefix+"TEMPERATURE", "warm")).To(Succeed())
+
+			subject := config.NewManager(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Err()).To(HaveOccurred())
+			Expect(subject.Err().Error()).To(ContainSubstring(envPrefix + "TEMPERATURE"))
+			Expect(subject.Err().Error()).To(ContainSubstring("must be a number"))
+		})
+
+		it("fails loud on a non-boolean bool value", func() {
+			Expect(os.Setenv(envPrefix+"OMIT_HISTORY", "yesplease")).To(Succeed())
+
+			subject := config.NewManager(mockConfigStore).WithEnvironment()
+
+			Expect(subject.Err()).To(HaveOccurred())
+			Expect(subject.Err().Error()).To(ContainSubstring(envPrefix + "OMIT_HISTORY"))
+			Expect(subject.Err().Error()).To(ContainSubstring("must be a boolean"))
+		})
+	})
+
 	when("DeleteThread()", func() {
 		var subject *config.Manager
 

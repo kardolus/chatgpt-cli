@@ -332,6 +332,12 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 
 					messages = createMessages(hs, query)
 
+					// With exact tiktoken (cl100k) counts for gpt-3.5-turbo the
+					// per-message tokens are [6 3 3 3 3 3 3 2] (total 26). A context
+					// window of 28 (effective 22 after the 20% buffer) leaves a diff
+					// of 4, so truncation drops exactly the two oldest turns.
+					config.ContextWindow = 28
+
 					factory.withHistory(hs)
 					subject := factory.buildClientWithoutConfig()
 

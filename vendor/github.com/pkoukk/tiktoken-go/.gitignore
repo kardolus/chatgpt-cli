@@ -1,0 +1,7 @@
+coverage.out
+.idea/
+vendor/
+.DS_Store
+.vscode
+*.swp
+.go-version

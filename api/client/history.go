@@ -73,7 +73,7 @@ func (c *Client) initHistory() {
 }
 
 func (c *Client) truncateHistory() {
-	tokens, rolling := countTokens(c.History)
+	tokens, rolling := countTokens(c.History, c.Config.Model)
 	effectiveTokenSize := calculateEffectiveContextWindow(c.Config.ContextWindow, MaxTokenBufferPercentage)
 
 	if tokens <= effectiveTokenSize {
@@ -115,25 +115,40 @@ func calculateEffectiveContextWindow(window int, bufferPercentage int) int {
 	return effectiveContextWindow
 }
 
-func countTokens(entries []history.History) (int, []int) {
+// countTokens estimates the token cost of the history. For OpenAI models it
+// uses tiktoken's exact BPE count (see tokenizer.go); for models with no known
+// OpenAI encoding (non-OpenAI providers, or an unrecognized model) it falls
+// back to the char/word heuristic so those providers keep working.
+func countTokens(entries []history.History, model string) (int, []int) {
 	var result int
 	var rolling []int
 
 	for _, entry := range entries {
-		charCount, wordCount := 0, 0
-		words := strings.Fields(entry.Content.(string))
-		wordCount += len(words)
+		content, _ := entry.Content.(string)
 
-		for _, word := range words {
-			charCount += utf8.RuneCountInString(word)
+		tokenCountForMessage, ok := tokenizeCount(model, content)
+		if !ok {
+			tokenCountForMessage = heuristicTokenCount(content)
 		}
 
-		// This is a simple approximation; actual token count may differ.
-		// You can adjust this based on your language and the specific tokenizer used by the model.
-		tokenCountForMessage := (charCount + wordCount) / 2
 		result += tokenCountForMessage
 		rolling = append(rolling, tokenCountForMessage)
 	}
 
 	return result, rolling
+}
+
+// heuristicTokenCount is the provider-agnostic fallback used when we can't map
+// the model to a tiktoken encoding. It is a rough approximation of the token
+// count; actual counts depend on the model's tokenizer.
+func heuristicTokenCount(content string) int {
+	charCount, wordCount := 0, 0
+	words := strings.Fields(content)
+	wordCount += len(words)
+
+	for _, word := range words {
+		charCount += utf8.RuneCountInString(word)
+	}
+
+	return (charCount + wordCount) / 2
 }

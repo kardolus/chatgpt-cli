@@ -547,6 +547,27 @@ environment variables, a config.yaml file, and default values, in that respectiv
 | `url`                    | The base URL for the OpenAI API.                                                                                                                       | 'https://api.openai.com'       |
 | `user_agent`             | The header used for the user agent in API requests.                                                                                                    | 'chatgpt-cli'                  |
 | `voice`                  | The voice to use when generating audio with TTS models like gpt-4o-mini-tts.                                                                           | 'nova'                         |
+| `response_format`        | Structured output for the Chat Completions API: `json_object` for JSON mode, or a JSON Schema string to constrain the output. Empty disables it.        | ''                             |
+| `tools`                  | Enable model-driven function calling. The model can call tools advertised by the `--mcp` endpoint and the CLI feeds results back until it answers.      | `false`                        |
+| `max_tool_calls`         | Maximum number of tool-call rounds per query before giving up (guards against a model that keeps calling tools). `0` uses the built-in default of 10.   | `10`                           |
+
+### Function calling & JSON mode
+
+* **JSON mode / structured output**: pass `--json` for plain JSON output
+  (shorthand for `--response-format json_object`), or `--response-format
+  '<schema>'` / `--response-format @schema.json` to constrain output to a JSON
+  Schema. Also settable persistently via the `response_format` config. Note:
+  OpenAI's `json_object` mode requires your prompt to mention "JSON" somewhere,
+  otherwise the API rejects the request — phrase your request accordingly (a
+  JSON Schema via `--response-format` does not have this constraint).
+* **Function calling**: pass `--tools` together with `--mcp <endpoint>` to let
+  the model call that MCP server's tools autonomously. The CLI lists the
+  server's tools (`tools/list`), advertises them to the model, dispatches each
+  requested call (`tools/call`), and feeds the results back — looping until the
+  model produces a final answer (bounded by `max_tool_calls`). This is a step up
+  from the one-shot `--mcp-tool` context injection. Function calling forces
+  non-streaming (`--query`) mode, since a tool call must be received in full
+  before it can be dispatched.
 
 ### Agent Configuration
 

@@ -42,6 +42,9 @@ type Config struct {
 	Effort               string            `yaml:"effort"`
 	Voice                string            `yaml:"voice"`
 	UserAgent            string            `yaml:"user_agent"`
+	ResponseFormat       string            `yaml:"response_format"`
+	Tools                bool              `yaml:"tools"`
+	MaxToolCalls         int               `yaml:"max_tool_calls"`
 	CustomHeaders        map[string]string `yaml:"custom_headers"`
 	Agent                AgentConfig       `yaml:"agent"`
 }

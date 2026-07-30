@@ -43,6 +43,9 @@ var (
 	modelTarget     string
 	paramsList      []string
 	paramsJSON      string
+	jsonMode        bool
+	responseFormat  string
+	toolsFlag       bool
 	cfg             config.Config
 )
 

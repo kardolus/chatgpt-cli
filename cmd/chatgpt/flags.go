@@ -105,6 +105,9 @@ func setupFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().StringArrayVar(&paramsList, "mcp-param", []string{}, "Key-value pair as key=value. Can be specified multiple times")
 	rootCmd.PersistentFlags().StringVar(&paramsJSON, "mcp-params", "", "Provide parameters as a raw JSON string")
 	rootCmd.PersistentFlags().BoolVar(&agentEnabled, "agent", false, "Run agent (experimental)")
+	rootCmd.PersistentFlags().BoolVar(&jsonMode, "json", false, "Request JSON output (shorthand for --response-format json_object)")
+	rootCmd.PersistentFlags().StringVar(&responseFormat, "response-format", "", "Structured output: 'json_object', a JSON schema, or @file with a schema")
+	rootCmd.PersistentFlags().BoolVar(&toolsFlag, "tools", false, "Let the model call tools from the --mcp endpoint (function calling)")
 }
 
 func setupConfigFlags(rootCmd *cobra.Command, meta ConfigMetadata) {

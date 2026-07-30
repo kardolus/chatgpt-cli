@@ -492,6 +492,17 @@ func testIntegration(t *testing.T, when spec.G, it spec.S) {
 			Expect(output).To(ContainSubstring("flag needs an argument: --set-thread"))
 		})
 
+		it("should require an --mcp endpoint when --tools is set", func() {
+			command := exec.Command(binaryPath, "--tools", "--query", "hi")
+			session, err := gexec.Start(command, io.Discard, io.Discard)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(session).Should(gexec.Exit(exitFailure))
+
+			output := string(session.Err.Contents())
+			Expect(output).To(ContainSubstring("--tools requires an --mcp endpoint"))
+		})
+
 		it("should require an argument for the --set-max-tokens flag", func() {
 			command := exec.Command(binaryPath, "--set-max-tokens")
 			session, err := gexec.Start(command, io.Discard, io.Discard)

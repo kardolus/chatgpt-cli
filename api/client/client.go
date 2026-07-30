@@ -34,6 +34,7 @@ type Client struct {
 	timer        Timer
 	reader       fsio.Reader
 	writer       fsio.Writer
+	toolExecutor ToolExecutor
 }
 
 func New(callerFactory http.CallerFactory, hs history.Store, t Timer, r fsio.Reader, w fsio.Writer, cfg config.Config) *Client {

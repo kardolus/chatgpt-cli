@@ -192,6 +192,28 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Structured-output (JSON mode) + function-calling flags override config.
+	if jsonMode {
+		cfg.ResponseFormat = "json_object"
+	}
+	if cmd.Flag("response-format").Changed {
+		rf := responseFormat
+		if strings.HasPrefix(rf, "@") {
+			data, err := os.ReadFile(rf[1:])
+			if err != nil {
+				return fmt.Errorf("failed to read response-format schema: %w", err)
+			}
+			rf = string(data)
+		}
+		cfg.ResponseFormat = rf
+	}
+	if toolsFlag {
+		cfg.Tools = true
+		// Tool round-trips need the full response before dispatching, so force
+		// non-streaming when function calling is enabled.
+		queryMode = true
+	}
+
 	c := client.New(http.RealCallerFactory, hs, &client.RealTime{}, fsio.NewRealReader(fsio.DefaultBufferSize), &fsio.RealWriter{}, cfg)
 
 	if ServiceURL != "" {
@@ -266,7 +288,28 @@ func run(cmd *cobra.Command, args []string) error {
 		queryMode = true
 	}
 
-	if cmd.Flag("mcp").Changed {
+	// Function-calling: expose the MCP endpoint's tools to the model so it can
+	// call them autonomously (distinct from the one-shot --mcp-tool injection).
+	if toolsFlag {
+		if mcpEndpoint == "" {
+			return errors.New("--tools requires an --mcp endpoint to source tools from")
+		}
+
+		headers, err := utils.ParseMCPHeaders(mcpHeaders)
+		if err != nil {
+			return err
+		}
+
+		transport, err := buildMCPSessionTransport(c.Caller, mcpEndpoint, headers)
+		if err != nil {
+			return err
+		}
+
+		c = c.WithTransport(transport).
+			WithToolExecutor(client.NewMCPToolExecutor(transport, mcpEndpoint, headers))
+	}
+
+	if cmd.Flag("mcp").Changed && !toolsFlag {
 		if mcpEndpoint == "" {
 			return errors.New("--mcp is required")
 		}
@@ -305,22 +348,10 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		base, err := client.NewMCPTransport(mcp.Endpoint, c.Caller, mcp.Headers)
+		transport, err := buildMCPSessionTransport(c.Caller, mcp.Endpoint, mcp.Headers)
 		if err != nil {
 			return err
 		}
-
-		cacheHome, err := internal.GetCacheHome()
-		if err != nil {
-			return err
-		}
-
-		sessionsDir := filepath.Join(cacheHome, "mcp", "sessions")
-
-		store := cache.NewFileStore(sessionsDir)
-		sessionStore := cache.New(store)
-
-		transport := client.NewSessionTransport(base, sessionStore)
 
 		c = c.WithTransport(transport)
 
@@ -565,4 +596,21 @@ func setShellTitle(title string) error {
 	}
 
 	return nil
+}
+
+// buildMCPSessionTransport wires the HTTP MCP transport behind the session
+// cache. Shared by the one-shot --mcp-tool injection and the --tools bridge.
+func buildMCPSessionTransport(caller http.Caller, endpoint string, headers map[string]string) (client.MCPTransport, error) {
+	base, err := client.NewMCPTransport(endpoint, caller, headers)
+	if err != nil {
+		return nil, err
+	}
+
+	cacheHome, err := internal.GetCacheHome()
+	if err != nil {
+		return nil, err
+	}
+
+	sessionStore := cache.New(cache.NewFileStore(filepath.Join(cacheHome, "mcp", "sessions")))
+	return client.NewSessionTransport(base, sessionStore), nil
 }

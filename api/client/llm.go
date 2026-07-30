@@ -86,70 +86,65 @@ func (c *Client) ListModels() ([]string, error) {
 func (c *Client) Query(ctx context.Context, input string) (string, int, error) {
 	c.prepareQuery(input)
 
+	var (
+		response   string
+		tokensUsed int
+		err        error
+	)
+
+	if GetCapabilities(c.Config.Model).UsesResponsesAPI {
+		response, tokensUsed, err = c.queryResponses(ctx)
+	} else {
+		// The Completions path also handles model-driven tool calls (looping
+		// when tools are enabled); with tools off it is a single request.
+		response, tokensUsed, err = c.queryCompletions(ctx)
+	}
+	if err != nil {
+		return "", tokensUsed, err
+	}
+
+	c.updateHistory(response)
+
+	return response, tokensUsed, nil
+}
+
+func (c *Client) queryResponses(ctx context.Context) (string, int, error) {
 	body, err := c.createBody(ctx, false)
 	if err != nil {
 		return "", 0, err
 	}
 
 	endpoint := c.getChatEndpoint()
-
 	c.printRequestDebugInfo(endpoint, body, nil)
 
 	raw, err := c.Caller.Post(endpoint, body, false)
 	c.printResponseDebugInfo(raw)
-
 	if err != nil {
 		return "", 0, err
 	}
 
-	var (
-		response   string
-		tokensUsed int
-	)
+	var res api.ResponsesResponse
+	if err := c.processResponse(raw, &res); err != nil {
+		return "", 0, err
+	}
+	tokensUsed := res.Usage.TotalTokens
 
-	caps := GetCapabilities(c.Config.Model)
-
-	if caps.UsesResponsesAPI {
-		var res api.ResponsesResponse
-		if err := c.processResponse(raw, &res); err != nil {
-			return "", 0, err
+	var response string
+	for _, output := range res.Output {
+		if output.Type != messageType {
+			continue
 		}
-		tokensUsed = res.Usage.TotalTokens
-
-		for _, output := range res.Output {
-			if output.Type != messageType {
-				continue
+		for _, content := range output.Content {
+			if content.Type == outputTextType {
+				response = content.Text
+				break
 			}
-			for _, content := range output.Content {
-				if content.Type == outputTextType {
-					response = content.Text
-					break
-				}
-			}
-		}
-
-		if response == "" {
-			return "", tokensUsed, errors.New("no response returned")
-		}
-	} else {
-		var res api.CompletionsResponse
-		if err := c.processResponse(raw, &res); err != nil {
-			return "", 0, err
-		}
-		tokensUsed = res.Usage.TotalTokens
-
-		if len(res.Choices) == 0 {
-			return "", tokensUsed, errors.New("no responses returned")
-		}
-
-		var ok bool
-		response, ok = res.Choices[0].Message.Content.(string)
-		if !ok {
-			return "", tokensUsed, errors.New("response cannot be converted to a string")
 		}
 	}
 
-	c.updateHistory(response)
+	if response == "" {
+		return "", tokensUsed, errors.New("no response returned")
+	}
 
 	return response, tokensUsed, nil
 }
@@ -262,7 +257,54 @@ func (c *Client) createCompletionsRequest(ctx context.Context, stream bool) (*ap
 		req.TopP = c.Config.TopP
 	}
 
+	rf, err := buildResponseFormat(c.Config.ResponseFormat)
+	if err != nil {
+		return nil, err
+	}
+	req.ResponseFormat = rf
+
+	if c.toolsEnabled() {
+		defs, err := c.toolExecutor.Definitions(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load tool definitions: %w", err)
+		}
+		if len(defs) > 0 {
+			req.Tools = defs
+			req.ToolChoice = "auto"
+		}
+	}
+
 	return req, nil
+}
+
+// buildResponseFormat maps the response_format config into an API value:
+//   - ""            -> nil (no structured output)
+//   - "json_object" -> plain JSON mode
+//   - anything else -> treated as a JSON Schema and wrapped as json_schema
+func buildResponseFormat(spec string) (*api.ResponseFormat, error) {
+	spec = strings.TrimSpace(spec)
+	switch spec {
+	case "":
+		return nil, nil
+	case "json_object":
+		return &api.ResponseFormat{Type: "json_object"}, nil
+	default:
+		if !json.Valid([]byte(spec)) {
+			return nil, fmt.Errorf("response_format must be \"json_object\" or a valid JSON schema")
+		}
+		// strict:false is the safe default — OpenAI strict mode only accepts a
+		// subset of JSON Schema (objects with additionalProperties:false, all
+		// fields required, ...), so forcing it would 400 on many valid schemas.
+		wrapped, err := json.Marshal(map[string]interface{}{
+			"name":   "response",
+			"strict": false,
+			"schema": json.RawMessage(spec),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &api.ResponseFormat{Type: "json_schema", JSONSchema: wrapped}, nil
+	}
 }
 
 func (c *Client) createResponsesRequest(ctx context.Context, stream bool) (*api.ResponsesRequest, error) {

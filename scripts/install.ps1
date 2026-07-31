@@ -41,12 +41,12 @@ Get-ChildItem -Directory "cmd" | ForEach-Object {
       $gitVersion = git describe --tags $gitTag
       $env:GOOS = $os
       $env:GOARCH = $arch
-      & go build -mod=vendor -ldflags="-s -w -X main.GitCommit=$gitCommit -X main.GitVersion=$gitVersion" -o "bin/$binaryName" -a "cmd/$b/main.go"
+      & go build -mod=vendor -ldflags="-s -w -X main.GitCommit=$gitCommit -X main.GitVersion=$gitVersion" -o "bin/$binaryName" -a "./cmd/$b"
     }
     else {
       $env:GOOS = $os
       $env:GOARCH = $arch
-      & go build -mod=vendor -ldflags="-s -w -X main.GitCommit=$gitCommit" -o "bin/$binaryName" -a "cmd/$b/main.go"
+      & go build -mod=vendor -ldflags="-s -w -X main.GitCommit=$gitCommit" -o "bin/$binaryName" -a "./cmd/$b"
     }
 
     Write-Host "done"

@@ -3,6 +3,7 @@ package http
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -34,10 +35,10 @@ const (
 )
 
 type Caller interface {
-	Post(url string, body []byte, stream bool) ([]byte, error)
-	PostWithHeaders(url string, body []byte, headers map[string]string) ([]byte, error)
-	Get(url string) ([]byte, error)
-	PostWithHeadersResponse(url string, body []byte, headers map[string]string) (api.HTTPResponse, error)
+	Post(ctx context.Context, url string, body []byte, stream bool) ([]byte, error)
+	PostWithHeaders(ctx context.Context, url string, body []byte, headers map[string]string) ([]byte, error)
+	Get(ctx context.Context, url string) ([]byte, error)
+	PostWithHeadersResponse(ctx context.Context, url string, body []byte, headers map[string]string) (api.HTTPResponse, error)
 }
 
 type RestCaller struct {
@@ -69,16 +70,16 @@ func RealCallerFactory(cfg config.Config) Caller {
 	return New(cfg)
 }
 
-func (r *RestCaller) Get(url string) ([]byte, error) {
-	return r.doRequest(http.MethodGet, url, nil, false)
+func (r *RestCaller) Get(ctx context.Context, url string) ([]byte, error) {
+	return r.doRequest(ctx, http.MethodGet, url, nil, false)
 }
 
-func (r *RestCaller) Post(url string, body []byte, stream bool) ([]byte, error) {
-	return r.doRequest(http.MethodPost, url, body, stream)
+func (r *RestCaller) Post(ctx context.Context, url string, body []byte, stream bool) ([]byte, error) {
+	return r.doRequest(ctx, http.MethodPost, url, body, stream)
 }
 
-func (r *RestCaller) PostWithHeaders(url string, body []byte, headers map[string]string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
+func (r *RestCaller) PostWithHeaders(ctx context.Context, url string, body []byte, headers map[string]string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf(errFailedToCreateRequest, err)
 	}
@@ -111,13 +112,13 @@ func (r *RestCaller) PostWithHeaders(url string, body []byte, headers map[string
 	return io.ReadAll(resp.Body)
 }
 
-func (r *RestCaller) PostWithHeadersResponse(url string, body []byte, headers map[string]string) (api.HTTPResponse, error) {
+func (r *RestCaller) PostWithHeadersResponse(ctx context.Context, url string, body []byte, headers map[string]string) (api.HTTPResponse, error) {
 	// tests construct RestCaller{} (nil client) — avoid panic
 	if r.client == nil {
 		r.client = http.DefaultClient
 	}
 
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return api.HTTPResponse{}, fmt.Errorf(errFailedToCreateRequest, err)
 	}
@@ -321,7 +322,7 @@ func (r *RestCaller) processResponsesSSE(reader io.Reader, writer io.Writer) ([]
 	return result, nil
 }
 
-func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]byte, error) {
+func (r *RestCaller) doRequest(ctx context.Context, method, url string, body []byte, stream bool) ([]byte, error) {
 	maxRetries := r.config.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = defaultMaxRetries
@@ -332,17 +333,27 @@ func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]
 
 	var response *http.Response
 	for attempt := 0; ; attempt++ {
-		req, err := r.newRequest(method, url, body)
+		// Terminal if the context is already cancelled (e.g. Ctrl-C during a
+		// prior backoff) — bail before spending another attempt.
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		req, err := r.newRequest(ctx, method, url, body)
 		if err != nil {
 			return nil, fmt.Errorf(errFailedToCreateRequest, err)
 		}
 
 		resp, err := r.client.Do(req)
 		if err != nil {
+			// A cancelled/expired context is terminal — don't waste retries.
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			// Transient network error — retry with backoff (never mid-stream:
 			// we only start reading the body after a successful establishment).
 			if attempt < maxRetries {
-				r.backoff(attempt, "")
+				r.backoff(ctx, attempt, "")
 				continue
 			}
 			return nil, fmt.Errorf(errFailedToMakeRequest, err)
@@ -351,7 +362,7 @@ func (r *RestCaller) doRequest(method, url string, body []byte, stream bool) ([]
 		if shouldRetryStatus(resp.StatusCode) && attempt < maxRetries {
 			retryAfter := resp.Header.Get("Retry-After")
 			_ = resp.Body.Close()
-			r.backoff(attempt, retryAfter)
+			r.backoff(ctx, attempt, retryAfter)
 			continue
 		}
 
@@ -395,31 +406,42 @@ func shouldRetryStatus(code int) bool {
 // backoff waits before the next retry attempt. It honors a Retry-After header
 // (delta-seconds or HTTP-date) when present, otherwise uses exponential backoff
 // with full jitter, capped at maxBackoff.
-func (r *RestCaller) backoff(attempt int, retryAfter string) {
+func (r *RestCaller) backoff(ctx context.Context, attempt int, retryAfter string) {
+	var d time.Duration
+
 	// Honor a positive Retry-After (capped at maxBackoff). A zero/past value is
 	// unusable and falls through to jittered exponential backoff so a broken
 	// "Retry-After: 0" can't turn the retry loop into a hot loop.
-	if d, ok := parseRetryAfter(retryAfter); ok && d > 0 {
+	if ra, ok := parseRetryAfter(retryAfter); ok && ra > 0 {
+		d = ra
 		if d > maxBackoff {
 			d = maxBackoff
 		}
-		time.Sleep(d)
-		return
+	} else {
+		base := r.config.RetryBaseDelayMs
+		if base <= 0 {
+			base = defaultRetryBaseDelayMs
+		}
+		// Cap the shift so a large max_retries can't overflow the duration.
+		shift := attempt
+		if shift > 30 {
+			shift = 30
+		}
+		full := time.Duration(base) * time.Millisecond << uint(shift)
+		if full <= 0 || full > maxBackoff {
+			full = maxBackoff
+		}
+		d = rand.N(full) // full jitter: [0, full)
 	}
-	base := r.config.RetryBaseDelayMs
-	if base <= 0 {
-		base = defaultRetryBaseDelayMs
+
+	// Interruptible sleep — a cancelled context (Ctrl-C) returns immediately
+	// instead of waiting out a multi-second backoff.
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
 	}
-	// Cap the shift so a large max_retries can't overflow the duration.
-	shift := attempt
-	if shift > 30 {
-		shift = 30
-	}
-	d := time.Duration(base) * time.Millisecond << uint(shift)
-	if d <= 0 || d > maxBackoff {
-		d = maxBackoff
-	}
-	time.Sleep(rand.N(d)) // full jitter: [0, d)
 }
 
 func parseRetryAfter(s string) (time.Duration, bool) {
@@ -439,8 +461,8 @@ func parseRetryAfter(s string) (time.Duration, bool) {
 	return 0, false
 }
 
-func (r *RestCaller) newRequest(method, url string, body []byte) (*http.Request, error) {
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
+func (r *RestCaller) newRequest(ctx context.Context, method, url string, body []byte) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}

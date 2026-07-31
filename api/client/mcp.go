@@ -3,6 +3,7 @@ package client
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -271,7 +272,7 @@ func (t *MCPHTTPTransport) Call(endpoint string, req api.MCPMessage, extra map[s
 		merged[k] = v
 	}
 
-	httpResp, postErr := t.caller.PostWithHeadersResponse(endpoint, body, buildMCPHeaders(merged))
+	httpResp, postErr := t.caller.PostWithHeadersResponse(context.Background(), endpoint, body, buildMCPHeaders(merged))
 
 	out := api.MCPResponse{
 		Headers: httpResp.Headers,

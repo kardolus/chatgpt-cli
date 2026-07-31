@@ -67,7 +67,7 @@ func (c *Client) queryCompletions(ctx context.Context) (string, int, error) {
 		endpoint := c.getChatEndpoint()
 		c.printRequestDebugInfo(endpoint, body, nil)
 
-		raw, err := c.Caller.Post(endpoint, body, false)
+		raw, err := c.Caller.Post(ctx, endpoint, body, false)
 		c.printResponseDebugInfo(raw)
 		if err != nil {
 			return "", total, err

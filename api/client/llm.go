@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/api"
-	"github.com/kardolus/chatgpt-cli/history"
 	"sort"
 	"strings"
+
+	"github.com/kardolus/chatgpt-cli/api"
+	"github.com/kardolus/chatgpt-cli/history"
 )
 
 const (
@@ -38,7 +39,7 @@ func (c *Client) ListModels() ([]string, error) {
 
 	c.printRequestDebugInfo(endpoint, nil, nil)
 
-	raw, err := c.Caller.Get(c.getEndpoint(c.Config.ModelsPath))
+	raw, err := c.Caller.Get(context.Background(), c.getEndpoint(c.Config.ModelsPath))
 	c.printResponseDebugInfo(raw)
 
 	if err != nil {
@@ -117,7 +118,7 @@ func (c *Client) queryResponses(ctx context.Context) (string, int, error) {
 	endpoint := c.getChatEndpoint()
 	c.printRequestDebugInfo(endpoint, body, nil)
 
-	raw, err := c.Caller.Post(endpoint, body, false)
+	raw, err := c.Caller.Post(ctx, endpoint, body, false)
 	c.printResponseDebugInfo(raw)
 	if err != nil {
 		return "", 0, err
@@ -175,7 +176,7 @@ func (c *Client) Stream(ctx context.Context, input string) error {
 
 	c.printRequestDebugInfo(endpoint, body, nil)
 
-	result, err := c.Caller.Post(endpoint, body, true)
+	result, err := c.Caller.Post(ctx, endpoint, body, true)
 	if err != nil {
 		return err
 	}

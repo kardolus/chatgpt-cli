@@ -117,7 +117,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 					Expect(err).NotTo(HaveOccurred())
 
 					mockCaller.EXPECT().
-						Post(subject.Config.URL+subject.Config.CompletionsPath, body, false).
+						Post(gomock.Any(), subject.Config.URL+subject.Config.CompletionsPath, body, false).
 						Return(respBytes, tt.postError)
 
 					mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
@@ -137,7 +137,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 				config.Model = realtimeModel
 
 				mockCaller.EXPECT().
-					Post(gomock.Any(), gomock.Any(), gomock.Any()).
+					Post(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Times(0)
 
 				mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
@@ -156,7 +156,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 				subject.Config.Web = true
 
 				mockCaller.EXPECT().
-					Post(gomock.Any(), gomock.Any(), gomock.Any()).
+					Post(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Times(0)
 
 				mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
@@ -174,7 +174,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 				subject.Config.Web = true
 
 				mockCaller.EXPECT().
-					Post(gomock.Any(), gomock.Any(), gomock.Any()).
+					Post(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Times(0)
 
 				mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
@@ -216,7 +216,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 					Expect(err).NotTo(HaveOccurred())
 
 					mockCaller.EXPECT().
-						Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).
+						Post(gomock.Any(), subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).
 						Return(respBytes, nil)
 
 					var request api.CompletionsRequest
@@ -299,8 +299,8 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 					mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
 
 					mockCaller.EXPECT().
-						Post(gomock.Any(), gomock.Any(), gomock.Any()).
-						DoAndReturn(func(endpoint string, body []byte, stream bool) ([]byte, error) {
+						Post(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+						DoAndReturn(func(_ context.Context, endpoint string, body []byte, stream bool) ([]byte, error) {
 							capturedBody = body
 							return validHTTPResponseBytes, nil
 						})
@@ -370,7 +370,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 
 					mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
 					mockCaller.EXPECT().
-						Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).
+						Post(gomock.Any(), subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).
 						Return(nil, nil)
 
 					_, _, _ = subject.Query(context.Background(), "test query")
@@ -400,7 +400,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 
 					mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
 					mockCaller.EXPECT().
-						Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).
+						Post(gomock.Any(), subject.Config.URL+subject.Config.CompletionsPath, expectedBody, false).
 						Return(nil, nil)
 
 					_, _, _ = subject.Query(context.Background(), "test query")
@@ -421,8 +421,8 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 					mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
 
 					mockCaller.EXPECT().
-						Post(gomock.Any(), gomock.Any(), false).
-						DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+						Post(gomock.Any(), gomock.Any(), gomock.Any(), false).
+						DoAndReturn(func(_ context.Context, _ string, body []byte, _ bool) ([]byte, error) {
 							var req map[string]interface{}
 							Expect(json.Unmarshal(body, &req)).To(Succeed())
 							Expect(req).NotTo(HaveKey("temperature"))
@@ -448,8 +448,8 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 					mockTimer.EXPECT().Now().Return(time.Now()).AnyTimes()
 
 					mockCaller.EXPECT().
-						Post(gomock.Any(), gomock.Any(), false).
-						DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+						Post(gomock.Any(), gomock.Any(), gomock.Any(), false).
+						DoAndReturn(func(_ context.Context, _ string, body []byte, _ bool) ([]byte, error) {
 							var req map[string]interface{}
 							Expect(json.Unmarshal(body, &req)).To(Succeed())
 
@@ -482,8 +482,8 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 					raw, _ := json.Marshal(response)
 
 					mockCaller.EXPECT().
-						Post(subject.Config.URL+"/v1/responses", gomock.Any(), false).
-						DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+						Post(gomock.Any(), subject.Config.URL+"/v1/responses", gomock.Any(), false).
+						DoAndReturn(func(_ context.Context, _ string, body []byte, _ bool) ([]byte, error) {
 							var req map[string]any
 							Expect(json.Unmarshal(body, &req)).To(Succeed())
 							Expect(req).To(HaveKey("tools"))
@@ -515,8 +515,8 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 					raw, _ := json.Marshal(response)
 
 					mockCaller.EXPECT().
-						Post(subject.Config.URL+"/v1/responses", gomock.Any(), false).
-						DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+						Post(gomock.Any(), subject.Config.URL+"/v1/responses", gomock.Any(), false).
+						DoAndReturn(func(_ context.Context, _ string, body []byte, _ bool) ([]byte, error) {
 							var req map[string]any
 							Expect(json.Unmarshal(body, &req)).To(Succeed())
 
@@ -619,8 +619,8 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 							raw, _ := json.Marshal(response)
 
 							mockCaller.EXPECT().
-								Post(subject.Config.URL+"/v1/responses", gomock.Any(), false).
-								DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+								Post(gomock.Any(), subject.Config.URL+"/v1/responses", gomock.Any(), false).
+								DoAndReturn(func(_ context.Context, _ string, body []byte, _ bool) ([]byte, error) {
 									assertResponsesRequest(body)
 									return raw, nil
 								})
@@ -645,8 +645,8 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 							raw, _ := json.Marshal(response)
 
 							mockCaller.EXPECT().
-								Post(subject.Config.URL+"/v1/responses", gomock.Any(), false).
-								DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+								Post(gomock.Any(), subject.Config.URL+"/v1/responses", gomock.Any(), false).
+								DoAndReturn(func(_ context.Context, _ string, body []byte, _ bool) ([]byte, error) {
 									assertResponsesRequest(body)
 									return raw, nil
 								})
@@ -673,8 +673,8 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 							raw, _ := json.Marshal(response)
 
 							mockCaller.EXPECT().
-								Post(subject.Config.URL+"/v1/responses", gomock.Any(), false).
-								DoAndReturn(func(_ string, body []byte, _ bool) ([]byte, error) {
+								Post(gomock.Any(), subject.Config.URL+"/v1/responses", gomock.Any(), false).
+								DoAndReturn(func(_ context.Context, _ string, body []byte, _ bool) ([]byte, error) {
 									assertResponsesRequest(body)
 									return raw, nil
 								})
@@ -705,7 +705,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 
 				errorMsg := "error message"
 				mockCaller.EXPECT().
-					Post(subject.Config.URL+subject.Config.CompletionsPath, body, true).
+					Post(gomock.Any(), subject.Config.URL+subject.Config.CompletionsPath, body, true).
 					Return(nil, errors.New(errorMsg))
 
 				mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
@@ -724,7 +724,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 				config.Model = realtimeModel
 
 				mockCaller.EXPECT().
-					Post(gomock.Any(), gomock.Any(), gomock.Any()).
+					Post(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Times(0)
 
 				mockTimer.EXPECT().Now().Return(time.Time{}).Times(2)
@@ -743,7 +743,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 					Expect(err).NotTo(HaveOccurred())
 
 					mockCaller.EXPECT().
-						Post(subject.Config.URL+subject.Config.CompletionsPath, expectedBody, true).
+						Post(gomock.Any(), subject.Config.URL+subject.Config.CompletionsPath, expectedBody, true).
 						Return([]byte(answer), nil)
 
 					mockTimer.EXPECT().Now().Return(time.Time{}).AnyTimes()
@@ -800,7 +800,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 				subject := factory.buildClientWithoutConfig()
 
 				errorMsg := "error message"
-				mockCaller.EXPECT().Get(subject.Config.URL+subject.Config.ModelsPath).
+				mockCaller.EXPECT().Get(gomock.Any(), subject.Config.URL+subject.Config.ModelsPath).
 					Return(nil, errors.New(errorMsg))
 
 				_, err := subject.ListModels()
@@ -811,7 +811,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 			it("throws an error when the response is empty", func() {
 				subject := factory.buildClientWithoutConfig()
 
-				mockCaller.EXPECT().Get(subject.Config.URL+subject.Config.ModelsPath).Return(nil, nil)
+				mockCaller.EXPECT().Get(gomock.Any(), subject.Config.URL+subject.Config.ModelsPath).Return(nil, nil)
 
 				_, err := subject.ListModels()
 				Expect(err).To(HaveOccurred())
@@ -822,7 +822,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 				subject := factory.buildClientWithoutConfig()
 
 				malformed := `{"invalid":"json"` // missing closing brace
-				mockCaller.EXPECT().Get(subject.Config.URL+subject.Config.ModelsPath).
+				mockCaller.EXPECT().Get(gomock.Any(), subject.Config.URL+subject.Config.ModelsPath).
 					Return([]byte(malformed), nil)
 
 				_, err := subject.ListModels()
@@ -836,7 +836,7 @@ func testLLM(t *testing.T, when spec.G, it spec.S) {
 				response, err := test.FileToBytes("models.json")
 				Expect(err).NotTo(HaveOccurred())
 
-				mockCaller.EXPECT().Get(subject.Config.URL+subject.Config.ModelsPath).
+				mockCaller.EXPECT().Get(gomock.Any(), subject.Config.URL+subject.Config.ModelsPath).
 					Return(response, nil)
 
 				result, err := subject.ListModels()

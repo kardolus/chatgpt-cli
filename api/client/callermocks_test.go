@@ -5,6 +5,7 @@
 package client_test
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -35,61 +36,61 @@ func (m *MockCaller) EXPECT() *MockCallerMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockCaller) Get(arg0 string) ([]byte, error) {
+func (m *MockCaller) Get(arg0 context.Context, arg1 string) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", arg0)
+	ret := m.ctrl.Call(m, "Get", arg0, arg1)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockCallerMockRecorder) Get(arg0 interface{}) *gomock.Call {
+func (mr *MockCallerMockRecorder) Get(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockCaller)(nil).Get), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockCaller)(nil).Get), arg0, arg1)
 }
 
 // Post mocks base method.
-func (m *MockCaller) Post(arg0 string, arg1 []byte, arg2 bool) ([]byte, error) {
+func (m *MockCaller) Post(arg0 context.Context, arg1 string, arg2 []byte, arg3 bool) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Post", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "Post", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Post indicates an expected call of Post.
-func (mr *MockCallerMockRecorder) Post(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockCallerMockRecorder) Post(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Post", reflect.TypeOf((*MockCaller)(nil).Post), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Post", reflect.TypeOf((*MockCaller)(nil).Post), arg0, arg1, arg2, arg3)
 }
 
 // PostWithHeaders mocks base method.
-func (m *MockCaller) PostWithHeaders(arg0 string, arg1 []byte, arg2 map[string]string) ([]byte, error) {
+func (m *MockCaller) PostWithHeaders(arg0 context.Context, arg1 string, arg2 []byte, arg3 map[string]string) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PostWithHeaders", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "PostWithHeaders", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PostWithHeaders indicates an expected call of PostWithHeaders.
-func (mr *MockCallerMockRecorder) PostWithHeaders(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockCallerMockRecorder) PostWithHeaders(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostWithHeaders", reflect.TypeOf((*MockCaller)(nil).PostWithHeaders), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostWithHeaders", reflect.TypeOf((*MockCaller)(nil).PostWithHeaders), arg0, arg1, arg2, arg3)
 }
 
 // PostWithHeadersResponse mocks base method.
-func (m *MockCaller) PostWithHeadersResponse(arg0 string, arg1 []byte, arg2 map[string]string) (api.HTTPResponse, error) {
+func (m *MockCaller) PostWithHeadersResponse(arg0 context.Context, arg1 string, arg2 []byte, arg3 map[string]string) (api.HTTPResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PostWithHeadersResponse", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "PostWithHeadersResponse", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(api.HTTPResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PostWithHeadersResponse indicates an expected call of PostWithHeadersResponse.
-func (mr *MockCallerMockRecorder) PostWithHeadersResponse(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockCallerMockRecorder) PostWithHeadersResponse(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostWithHeadersResponse", reflect.TypeOf((*MockCaller)(nil).PostWithHeadersResponse), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostWithHeadersResponse", reflect.TypeOf((*MockCaller)(nil).PostWithHeadersResponse), arg0, arg1, arg2, arg3)
 }

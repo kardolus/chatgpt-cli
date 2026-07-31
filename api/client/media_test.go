@@ -54,7 +54,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 			})
 
 			it("throws an error when the http call fails", func() {
-				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.SpeechPath, body, false).
+				mockCaller.EXPECT().Post(gomock.Any(), subject.Config.URL+subject.Config.SpeechPath, body, false).
 					Return(nil, errors.New(errorText))
 
 				err := subject.SynthesizeSpeech(inputText, fileName)
@@ -63,7 +63,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 			})
 
 			it("throws an error when a file cannot be created", func() {
-				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.SpeechPath, body, false).
+				mockCaller.EXPECT().Post(gomock.Any(), subject.Config.URL+subject.Config.SpeechPath, body, false).
 					Return(response, nil)
 				mockWriter.EXPECT().Create(fileName).Return(nil, errors.New(errorText))
 
@@ -77,7 +77,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 				Expect(err).NotTo(HaveOccurred())
 				defer file.Close()
 
-				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.SpeechPath, body, false).
+				mockCaller.EXPECT().Post(gomock.Any(), subject.Config.URL+subject.Config.SpeechPath, body, false).
 					Return(response, nil)
 				mockWriter.EXPECT().Create(fileName).Return(file, nil)
 				mockWriter.EXPECT().Write(file, response).Return(errors.New(errorText))
@@ -92,7 +92,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 				Expect(err).NotTo(HaveOccurred())
 				defer file.Close()
 
-				mockCaller.EXPECT().Post(subject.Config.URL+subject.Config.SpeechPath, body, false).
+				mockCaller.EXPECT().Post(gomock.Any(), subject.Config.URL+subject.Config.SpeechPath, body, false).
 					Return(response, nil)
 				mockWriter.EXPECT().Create(fileName).Return(file, nil)
 				mockWriter.EXPECT().Write(file, response).Return(nil)
@@ -127,7 +127,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 
 			it("throws an error when the http call fails", func() {
 				mockCaller.EXPECT().
-					Post(subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
+					Post(gomock.Any(), subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
 					Return(nil, errors.New(errorText))
 
 				err := subject.GenerateImage(inputText, outputFile)
@@ -137,7 +137,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 
 			it("throws an error when no image data is returned", func() {
 				mockCaller.EXPECT().
-					Post(subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
+					Post(gomock.Any(), subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
 					Return([]byte(`{"data":[]}`), nil)
 
 				err := subject.GenerateImage(inputText, outputFile)
@@ -147,7 +147,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 
 			it("throws an error when base64 is invalid", func() {
 				mockCaller.EXPECT().
-					Post(subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
+					Post(gomock.Any(), subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
 					Return([]byte(`{"data":[{"b64_json":"!!notbase64!!"}]}`), nil)
 
 				err := subject.GenerateImage(inputText, outputFile)
@@ -159,7 +159,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 				valid := base64.StdEncoding.EncodeToString([]byte("image-bytes"))
 
 				mockCaller.EXPECT().
-					Post(subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
+					Post(gomock.Any(), subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
 					Return([]byte(fmt.Sprintf(`{"data":[{"b64_json":"%s"}]}`, valid)), nil)
 
 				mockWriter.EXPECT().Create(outputFile).Return(nil, errors.New(errorText))
@@ -176,7 +176,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 				defer file.Close()
 
 				mockCaller.EXPECT().
-					Post(subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
+					Post(gomock.Any(), subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
 					Return([]byte(fmt.Sprintf(`{"data":[{"b64_json":"%s"}]}`, valid)), nil)
 
 				mockWriter.EXPECT().Create(outputFile).Return(file, nil)
@@ -194,7 +194,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 				defer file.Close()
 
 				mockCaller.EXPECT().
-					Post(subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
+					Post(gomock.Any(), subject.Config.URL+subject.Config.ImageGenerationsPath, body, false).
 					Return([]byte(fmt.Sprintf(`{"data":[{"b64_json":"%s"}]}`, valid)), nil)
 
 				mockWriter.EXPECT().Create(outputFile).Return(file, nil)
@@ -254,7 +254,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 					Return([]byte("\x89PNG\r\n\x1a\n"), nil)
 
 				mockCaller.EXPECT().
-					PostWithHeaders(gomock.Any(), gomock.Any(), gomock.Any()).
+					PostWithHeaders(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, errors.New(errorText))
 
 				err := subject.EditImage(inputText, inputFile, outputFile)
@@ -274,7 +274,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 					Return([]byte("\x89PNG\r\n\x1a\n"), nil)
 
 				mockCaller.EXPECT().
-					PostWithHeaders(gomock.Any(), gomock.Any(), gomock.Any()).
+					PostWithHeaders(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(invalidResp, nil)
 
 				err := subject.EditImage(inputText, inputFile, outputFile)
@@ -293,7 +293,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 					Return([]byte("\x89PNG\r\n\x1a\n"), nil)
 
 				mockCaller.EXPECT().
-					PostWithHeaders(gomock.Any(), gomock.Any(), gomock.Any()).
+					PostWithHeaders(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(respBytes, nil)
 
 				mockWriter.EXPECT().Create(outputFile).Return(file, nil)
@@ -334,7 +334,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 				mockReader.EXPECT().Open(audioPath).Return(reader, nil)
 
 				mockCaller.EXPECT().
-					PostWithHeaders(subject.Config.URL+subject.Config.TranscriptionsPath, gomock.Any(), gomock.Any())
+					PostWithHeaders(gomock.Any(), subject.Config.URL+subject.Config.TranscriptionsPath, gomock.Any(), gomock.Any())
 
 				_, err = subject.Transcribe(audioPath)
 				Expect(err).To(HaveOccurred())
@@ -354,7 +354,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 				mockReader.EXPECT().Open(audioPath).Return(file, nil)
 
 				mockCaller.EXPECT().
-					PostWithHeaders(subject.Config.URL+subject.Config.TranscriptionsPath, gomock.Any(), gomock.Any()).
+					PostWithHeaders(gomock.Any(), subject.Config.URL+subject.Config.TranscriptionsPath, gomock.Any(), gomock.Any()).
 					Return(nil, errors.New("network error"))
 
 				_, err = subject.Transcribe(audioPath)
@@ -378,7 +378,7 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 
 				resp := []byte(`{"text": "Hello, this is a test."}`)
 				mockCaller.EXPECT().
-					PostWithHeaders(subject.Config.URL+subject.Config.TranscriptionsPath, gomock.Any(), gomock.Any()).
+					PostWithHeaders(gomock.Any(), subject.Config.URL+subject.Config.TranscriptionsPath, gomock.Any(), gomock.Any()).
 					Return(resp, nil)
 
 				expectedHistory := []history.History{

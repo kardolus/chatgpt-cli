@@ -2,6 +2,7 @@ package http_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	stdhttp "net/http"
@@ -108,7 +109,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 			defer server.Close()
 
 			subject := chatgpthttp.New(config.Config{MaxRetries: 3, RetryBaseDelayMs: 1})
-			out, err := subject.Post(server.URL, []byte(`{}`), false)
+			out, err := subject.Post(context.Background(), server.URL, []byte(`{}`), false)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(out)).To(Equal(`{"ok":true}`))
 			Expect(attempts.Load()).To(Equal(int32(3)))
@@ -129,7 +130,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 			defer server.Close()
 
 			subject := chatgpthttp.New(config.Config{MaxRetries: 3, RetryBaseDelayMs: 1})
-			out, err := subject.Post(server.URL, []byte(`{}`), false)
+			out, err := subject.Post(context.Background(), server.URL, []byte(`{}`), false)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(out)).To(Equal(`{"ok":true}`))
 			Expect(attempts.Load()).To(Equal(int32(2)))
@@ -147,7 +148,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 			defer server.Close()
 
 			subject := chatgpthttp.New(config.Config{MaxRetries: 2, RetryBaseDelayMs: 1})
-			out, err := subject.Post(server.URL, []byte(`{}`), false)
+			out, err := subject.Post(context.Background(), server.URL, []byte(`{}`), false)
 			Expect(err).To(HaveOccurred())
 			Expect(string(out)).To(ContainSubstring("nope"))
 			// 1 initial attempt + 2 retries.
@@ -172,7 +173,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 			// Base delay is tiny; only an honored Retry-After can push elapsed past ~1s.
 			subject := chatgpthttp.New(config.Config{MaxRetries: 3, RetryBaseDelayMs: 1})
 			start := time.Now()
-			out, err := subject.Post(server.URL, []byte(`{}`), false)
+			out, err := subject.Post(context.Background(), server.URL, []byte(`{}`), false)
 			elapsed := time.Since(start)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(out)).To(Equal(`{"ok":true}`))
@@ -191,9 +192,41 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 			defer server.Close()
 
 			subject := chatgpthttp.New(config.Config{MaxRetries: 3, RetryBaseDelayMs: 1})
-			_, err := subject.Post(server.URL, []byte(`{}`), false)
+			_, err := subject.Post(context.Background(), server.URL, []byte(`{}`), false)
 			Expect(err).To(HaveOccurred())
 			Expect(attempts.Load()).To(Equal(int32(1)))
+		})
+
+		it("aborts immediately when the context is cancelled, without retrying", func() {
+			t.Parallel()
+
+			var attempts atomic.Int32
+			server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+				attempts.Add(1)
+				// Stay slow so the client cancels first; capped so server.Close
+				// can't hang if the cancellation isn't observed server-side.
+				select {
+				case <-r.Context().Done():
+				case <-time.After(2 * time.Second):
+				}
+			}))
+			defer server.Close()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			go func() {
+				time.Sleep(50 * time.Millisecond)
+				cancel()
+			}()
+
+			subject := chatgpthttp.New(config.Config{MaxRetries: 5, RetryBaseDelayMs: 1})
+			start := time.Now()
+			_, err := subject.Post(ctx, server.URL, []byte(`{}`), false)
+			elapsed := time.Since(start)
+
+			Expect(err).To(MatchError(context.Canceled))
+			// A cancelled context is terminal: exactly one attempt, returns fast.
+			Expect(attempts.Load()).To(Equal(int32(1)))
+			Expect(elapsed).To(BeNumerically("<", 2*time.Second))
 		})
 	})
 
@@ -208,7 +241,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 			defer server.Close()
 
 			caller := chatgpthttp.New(config.Config{HTTPTimeout: 5})
-			body, err := caller.Get(server.URL)
+			body, err := caller.Get(context.Background(), server.URL)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(body)).To(Equal(`{"ok":true}`))
 		})
@@ -223,7 +256,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 			defer server.Close()
 
 			caller := chatgpthttp.New(config.Config{})
-			body, err := caller.Get(server.URL)
+			body, err := caller.Get(context.Background(), server.URL)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(body)).To(Equal(`{"ok":true}`))
 		})
@@ -242,7 +275,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 
 			subject := chatgpthttp.New(config.Config{})
 
-			body, err := subject.Get(server.URL)
+			body, err := subject.Get(context.Background(), server.URL)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(body)).To(Equal(`{"ok":true}`))
 		})
@@ -266,7 +299,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 
 			subject := chatgpthttp.New(config.Config{})
 
-			out, err := subject.Post(server.URL, []byte(`{"hello":"world"}`), false)
+			out, err := subject.Post(context.Background(), server.URL, []byte(`{"hello":"world"}`), false)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(out)).To(Equal(`{"ok":true}`))
 		})
@@ -287,7 +320,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 
 			subject := chatgpthttp.New(config.Config{})
 
-			out, err := subject.PostWithHeaders(server.URL, []byte(`{}`), map[string]string{
+			out, err := subject.PostWithHeaders(context.Background(), server.URL, []byte(`{}`), map[string]string{
 				"X-Test": "abc",
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -305,7 +338,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 
 			subject := chatgpthttp.New(config.Config{})
 
-			out, err := subject.PostWithHeaders(server.URL, []byte(`{}`), nil)
+			out, err := subject.PostWithHeaders(context.Background(), server.URL, []byte(`{}`), nil)
 			Expect(err).To(HaveOccurred())
 			Expect(string(out)).To(ContainSubstring(`"nope"`))
 		})
@@ -327,7 +360,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 
 			rc := http.RestCaller{} // ✅ no NewRestCaller
 
-			resp, err := rc.PostWithHeadersResponse(server.URL, []byte(`{"hello":"world"}`), map[string]string{
+			resp, err := rc.PostWithHeadersResponse(context.Background(), server.URL, []byte(`{"hello":"world"}`), map[string]string{
 				"X-Test": "abc",
 			})
 
@@ -354,7 +387,7 @@ func testHTTP(t *testing.T, when spec.G, it spec.S) {
 
 			rc := http.RestCaller{}
 
-			resp, err := rc.PostWithHeadersResponse(server.URL, []byte(`{}`), nil)
+			resp, err := rc.PostWithHeadersResponse(context.Background(), server.URL, []byte(`{}`), nil)
 
 			Expect(err).To(HaveOccurred())
 
@@ -436,7 +469,7 @@ func testCustomHeaders(t *testing.T, when spec.G, it spec.S) {
 			}
 
 			subject := chatgpthttp.New(cfg)
-			_, err := subject.Post(server.URL, []byte(`{"test": "data"}`), false)
+			_, err := subject.Post(context.Background(), server.URL, []byte(`{"test": "data"}`), false)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(receivedHeaders.Get("X-Custom-Header")).To(Equal("custom-value"))
@@ -462,7 +495,7 @@ func testCustomHeaders(t *testing.T, when spec.G, it spec.S) {
 			}
 
 			subject := chatgpthttp.New(cfg)
-			_, err := subject.Get(server.URL)
+			_, err := subject.Get(context.Background(), server.URL)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(receivedHeaders.Get("X-API-Version")).To(Equal("v2"))
@@ -485,7 +518,7 @@ func testCustomHeaders(t *testing.T, when spec.G, it spec.S) {
 			}
 
 			subject := chatgpthttp.New(cfg)
-			_, err := subject.Post(server.URL, []byte(`{"test": "data"}`), false)
+			_, err := subject.Post(context.Background(), server.URL, []byte(`{"test": "data"}`), false)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(receivedHeaders).ToNot(BeNil())
@@ -507,7 +540,7 @@ func testCustomHeaders(t *testing.T, when spec.G, it spec.S) {
 			}
 
 			subject := chatgpthttp.New(cfg)
-			_, err := subject.Post(server.URL, []byte(`{"test": "data"}`), false)
+			_, err := subject.Post(context.Background(), server.URL, []byte(`{"test": "data"}`), false)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(receivedHeaders).ToNot(BeNil())
@@ -535,7 +568,7 @@ func testCustomHeaders(t *testing.T, when spec.G, it spec.S) {
 			}
 
 			subject := chatgpthttp.New(cfg)
-			_, err := subject.Post(server.URL, []byte(`{"test": "data"}`), false)
+			_, err := subject.Post(context.Background(), server.URL, []byte(`{"test": "data"}`), false)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(receivedHeaders.Get("Authorization")).To(Equal("Bearer test-key"))

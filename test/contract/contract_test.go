@@ -2,7 +2,15 @@ package contract_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"io"
+	"mime/multipart"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
 	"github.com/kardolus/chatgpt-cli/api"
 	"github.com/kardolus/chatgpt-cli/api/client"
 	"github.com/kardolus/chatgpt-cli/api/http"
@@ -10,12 +18,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
-	"io"
-	"mime/multipart"
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
 )
 
 func TestContract(t *testing.T) {
@@ -55,7 +57,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			bytes, err := json.Marshal(body)
 			Expect(err).NotTo(HaveOccurred())
 
-			resp, err := restCaller.Post(cfg.URL+cfg.CompletionsPath, bytes, false)
+			resp, err := restCaller.Post(context.Background(), cfg.URL+cfg.CompletionsPath, bytes, false)
 			Expect(err).NotTo(HaveOccurred())
 
 			var data api.CompletionsResponse
@@ -83,7 +85,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			bytes, err := json.Marshal(body)
 			Expect(err).NotTo(HaveOccurred())
 
-			resp, err := restCaller.Post(cfg.URL+cfg.CompletionsPath, bytes, false)
+			resp, err := restCaller.Post(context.Background(), cfg.URL+cfg.CompletionsPath, bytes, false)
 			Expect(err).To(HaveOccurred())
 
 			var errorData api.ErrorResponse
@@ -98,7 +100,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 
 	when("accessing the models endpoint", func() {
 		it("should have the expected keys in the response", func() {
-			resp, err := restCaller.Get(cfg.URL + cfg.ModelsPath)
+			resp, err := restCaller.Get(context.Background(), cfg.URL+cfg.ModelsPath)
 			Expect(err).NotTo(HaveOccurred())
 
 			var data api.ListModelsResponse
@@ -135,7 +137,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			bytes, err := json.Marshal(body)
 			Expect(err).NotTo(HaveOccurred())
 
-			resp, err := restCaller.Post(cfg.URL+cfg.ResponsesPath, bytes, false)
+			resp, err := restCaller.Post(context.Background(), cfg.URL+cfg.ResponsesPath, bytes, false)
 			Expect(err).NotTo(HaveOccurred())
 
 			var data api.ResponsesResponse
@@ -182,7 +184,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			bytes, err := json.Marshal(body)
 			Expect(err).NotTo(HaveOccurred())
 
-			resp, err := restCaller.Post(cfg.URL+cfg.SpeechPath, bytes, false)
+			resp, err := restCaller.Post(context.Background(), cfg.URL+cfg.SpeechPath, bytes, false)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp).NotTo(BeEmpty())
 
@@ -223,7 +225,7 @@ func testContract(t *testing.T, when spec.G, it spec.S) {
 			err = writer.Close()
 			Expect(err).NotTo(HaveOccurred())
 
-			resp, err := restCaller.PostWithHeaders(cfg.URL+cfg.TranscriptionsPath, buf.Bytes(), map[string]string{
+			resp, err := restCaller.PostWithHeaders(context.Background(), cfg.URL+cfg.TranscriptionsPath, buf.Bytes(), map[string]string{
 				"Content-Type":  writer.FormDataContentType(),
 				"Authorization": "Bearer " + cfg.APIKey,
 			})

@@ -6,9 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/kardolus/chatgpt-cli/api"
-	"github.com/kardolus/chatgpt-cli/history"
-	"github.com/kardolus/chatgpt-cli/internal"
 	"io"
 	"mime/multipart"
 	stdhttp "net/http"
@@ -16,6 +13,10 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+
+	"github.com/kardolus/chatgpt-cli/api"
+	"github.com/kardolus/chatgpt-cli/history"
+	"github.com/kardolus/chatgpt-cli/internal"
 )
 
 const (
@@ -98,7 +99,7 @@ func (c *Client) EditImage(inputText, inputPath, outputPath string) error {
 		"Content-Type": writer.FormDataContentType(),
 	})
 
-	respBytes, err := c.Caller.PostWithHeaders(endpoint, buf.Bytes(), map[string]string{
+	respBytes, err := c.Caller.PostWithHeaders(context.Background(), endpoint, buf.Bytes(), map[string]string{
 		c.Config.AuthHeader:           fmt.Sprintf("%s %s", c.Config.AuthTokenPrefix, c.Config.APIKey),
 		internal.HeaderContentTypeKey: writer.FormDataContentType(),
 	})
@@ -254,7 +255,7 @@ func (c *Client) Transcribe(audioPath string) (string, error) {
 
 	c.printRequestDebugInfo(endpoint, buf.Bytes(), headers)
 
-	raw, err := c.Caller.PostWithHeaders(endpoint, buf.Bytes(), headers)
+	raw, err := c.Caller.PostWithHeaders(context.Background(), endpoint, buf.Bytes(), headers)
 	if err != nil {
 		return "", err
 	}
@@ -478,7 +479,7 @@ func (c *Client) postAndWriteBinaryOutput(endpoint string, requestBody interface
 
 	c.printRequestDebugInfo(endpoint, body, nil)
 
-	respBytes, err := c.Caller.Post(endpoint, body, false)
+	respBytes, err := c.Caller.Post(context.Background(), endpoint, body, false)
 	if err != nil {
 		return fmt.Errorf("API request failed: %w", err)
 	}

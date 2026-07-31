@@ -28,7 +28,7 @@ type scriptCaller struct {
 	calls     int
 }
 
-func (s *scriptCaller) Post(_ string, body []byte, _ bool) ([]byte, error) {
+func (s *scriptCaller) Post(_ context.Context, _ string, body []byte, _ bool) ([]byte, error) {
 	s.bodies = append(s.bodies, body)
 	i := s.calls
 	s.calls++
@@ -41,11 +41,11 @@ func (s *scriptCaller) Post(_ string, body []byte, _ bool) ([]byte, error) {
 	}
 	return nil, err
 }
-func (s *scriptCaller) PostWithHeaders(_ string, _ []byte, _ map[string]string) ([]byte, error) {
+func (s *scriptCaller) PostWithHeaders(_ context.Context, _ string, _ []byte, _ map[string]string) ([]byte, error) {
 	return nil, nil
 }
-func (s *scriptCaller) Get(_ string) ([]byte, error) { return nil, nil }
-func (s *scriptCaller) PostWithHeadersResponse(_ string, _ []byte, _ map[string]string) (api.HTTPResponse, error) {
+func (s *scriptCaller) Get(_ context.Context, _ string) ([]byte, error) { return nil, nil }
+func (s *scriptCaller) PostWithHeadersResponse(_ context.Context, _ string, _ []byte, _ map[string]string) (api.HTTPResponse, error) {
 	return api.HTTPResponse{}, nil
 }
 

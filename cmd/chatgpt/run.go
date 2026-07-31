@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/chzyer/readline"
@@ -170,6 +172,10 @@ func run(cmd *cobra.Command, args []string) error {
 		cfg.APIKey = key
 	}
 
+	// Base context carries request-scoped values (image/audio/pipe). Ctrl-C
+	// cancellation is layered on per-operation below (withCancelOnSignal) so a
+	// Ctrl-C aborts a single request/turn without poisoning an interactive
+	// session — signal.NotifyContext cancels permanently on the first signal.
 	ctx := context.Background()
 
 	hs, _ := history.New() // do not error out
@@ -376,7 +382,10 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		answer, err := runAgent(ctx, c, cfg, mode, goal)
+		agentCtx, stop := withCancelOnSignal(ctx)
+		defer stop()
+
+		answer, err := runAgent(agentCtx, c, cfg, mode, goal)
 		if err != nil {
 			return err
 		}
@@ -457,25 +466,39 @@ func run(cmd *cobra.Command, args []string) error {
 
 			fmtOutputPrompt := utils.FormatPrompt(c.Config.OutputPrompt, qNum, usage, time.Now())
 
+			// Fresh per-turn cancellation: Ctrl-C aborts THIS response and the
+			// loop keeps going (a run-wide signal context would cancel forever
+			// and poison every later prompt).
+			turnCtx, turnStop := withCancelOnSignal(ctx)
+
 			if queryMode {
-				result, qUsage, err := c.Query(ctx, input)
-				if err != nil {
+				result, qUsage, err := c.Query(turnCtx, input)
+				switch {
+				case errors.Is(err, context.Canceled):
+					sugar.Infoln("\n[cancelled]")
+				case err != nil:
 					sugar.Infoln("Error:", err)
-				} else {
+				default:
 					sugar.Infof("%s%s%s\n\n", outputColor, fmtOutputPrompt+result, outPutReset)
 					usage += qUsage
 					qNum++
 				}
 			} else {
 				fmt.Print(outputColor + fmtOutputPrompt)
-				if err := c.Stream(ctx, input); err != nil {
+				err := c.Stream(turnCtx, input)
+				switch {
+				case errors.Is(err, context.Canceled):
+					_, _ = fmt.Fprintln(os.Stderr, "\n[cancelled]")
+				case err != nil:
 					_, _ = fmt.Fprintln(os.Stderr, "Error:", err)
-				} else {
+				default:
 					sugar.Infoln()
 					qNum++
 				}
 				fmt.Print(outPutReset)
 			}
+
+			turnStop()
 		}
 	} else {
 		if len(args) == 0 && !hasPipe {
@@ -493,8 +516,11 @@ func run(cmd *cobra.Command, args []string) error {
 			return c.GenerateImage(chatContext+strings.Join(args, " "), outputFile)
 		}
 
+		oneShotCtx, stop := withCancelOnSignal(ctx)
+		defer stop()
+
 		if queryMode {
-			result, usage, err := c.Query(ctx, strings.Join(args, " "))
+			result, usage, err := c.Query(oneShotCtx, strings.Join(args, " "))
 			if err != nil {
 				return err
 			}
@@ -503,11 +529,19 @@ func run(cmd *cobra.Command, args []string) error {
 			if c.Config.TrackTokenUsage {
 				sugar.Infof("\n[Token Usage: %d]\n", usage)
 			}
-		} else if err := c.Stream(ctx, strings.Join(args, " ")); err != nil {
+		} else if err := c.Stream(oneShotCtx, strings.Join(args, " ")); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// withCancelOnSignal derives a context cancelled on the next Ctrl-C / SIGTERM.
+// The returned stop() must be called when the operation completes to release
+// the signal handler; in the interactive loop each turn gets a fresh one so a
+// Ctrl-C aborts only the current turn rather than the whole session.
+func withCancelOnSignal(parent context.Context) (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
 }
 
 func readInput(rl *readline.Instance, multiline *bool) (string, error) {

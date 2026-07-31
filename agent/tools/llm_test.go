@@ -24,14 +24,14 @@ type fakeCaller struct {
 	postErr  error
 }
 
-func (f *fakeCaller) Post(_ string, _ []byte, _ bool) ([]byte, error) {
+func (f *fakeCaller) Post(_ context.Context, _ string, _ []byte, _ bool) ([]byte, error) {
 	return f.postResp, f.postErr
 }
-func (f *fakeCaller) PostWithHeaders(_ string, _ []byte, _ map[string]string) ([]byte, error) {
+func (f *fakeCaller) PostWithHeaders(_ context.Context, _ string, _ []byte, _ map[string]string) ([]byte, error) {
 	return f.postResp, f.postErr
 }
-func (f *fakeCaller) Get(_ string) ([]byte, error) { return nil, nil }
-func (f *fakeCaller) PostWithHeadersResponse(_ string, _ []byte, _ map[string]string) (api.HTTPResponse, error) {
+func (f *fakeCaller) Get(_ context.Context, _ string) ([]byte, error) { return nil, nil }
+func (f *fakeCaller) PostWithHeadersResponse(_ context.Context, _ string, _ []byte, _ map[string]string) (api.HTTPResponse, error) {
 	return api.HTTPResponse{}, nil
 }
 

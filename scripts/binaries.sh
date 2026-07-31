@@ -32,9 +32,9 @@ for b in $(ls cmd); do
 
     if [ ! -z "$GIT_TAGS" ]; then
       GIT_VERSION=$(git describe --tags $GIT_TAGS)
-      GOOS=$os GOARCH=$arch go build -mod=vendor -ldflags="-s -w -X main.GitCommit=$GIT_COMMIT -X main.GitVersion=$GIT_VERSION" -o "bin/$binary_name" -a cmd/$b/main.go
+      GOOS=$os GOARCH=$arch go build -mod=vendor -ldflags="-s -w -X main.GitCommit=$GIT_COMMIT -X main.GitVersion=$GIT_VERSION" -o "bin/$binary_name" -a ./cmd/$b
     else
-      GOOS=$os GOARCH=$arch go build -mod=vendor -ldflags="-s -w -X main.GitCommit=$GIT_COMMIT" -o "bin/$binary_name" -a cmd/$b/main.go
+      GOOS=$os GOARCH=$arch go build -mod=vendor -ldflags="-s -w -X main.GitCommit=$GIT_COMMIT" -o "bin/$binary_name" -a ./cmd/$b
     fi
 
     echo "done"

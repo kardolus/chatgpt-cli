@@ -1,6 +1,6 @@
 module github.com/kardolus/chatgpt-cli
 
-go 1.25.0
+go 1.19
 
 require (
 	github.com/chzyer/readline v1.5.1

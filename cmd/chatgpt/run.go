@@ -42,7 +42,7 @@ func run(cmd *cobra.Command, args []string) error {
 		changedFlags[f.Name] = true
 	})
 
-	if err := utils.ValidateFlags(cfg.Model, changedFlags); err != nil {
+	if err := utils.ValidateFlagsForProvider(cfg.Model, cfg.Name, changedFlags); err != nil {
 		return err
 	}
 

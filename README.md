@@ -221,8 +221,12 @@ This is especially useful when:
 ### MCP Support
 
 ChatGPT CLI supports the Model Context Protocol (MCP) over HTTP(S). This allows the CLI to call an MCP tool, inject the
-tool’s result into the current thread as context, and then run your prompt — all in one command. The integration is
+tool's result into the current thread as context, and then run your prompt — all in one command. The integration is
 provider-agnostic.
+
+**Built-in You.com MCP integration**: Use `--mcp you` as a shorthand for You.com's MCP server at `https://api.you.com/mcp`. 
+The CLI automatically handles authentication using the `YDC_API_KEY` environment variable when available, or falls back 
+to keyless mode for basic functionality.
 
 You provide:
 
@@ -242,6 +246,39 @@ When `--mcp` is set, the CLI will:
 5. Submit your query to the model (if you provided one)
 
 #### Examples
+
+**You.com MCP integration** (built-in support):
+
+```bash
+# Web search with You.com (using API key for enhanced features)
+export YDC_API_KEY=your_api_key_here
+chatgpt \
+  --mcp you \
+  --mcp-tool you-search \
+  --mcp-param query="latest developments in AI" \
+  "Analyze these search results"
+
+# Web search without API key (keyless mode)  
+chatgpt \
+  --mcp you \
+  --mcp-tool you-search \
+  --mcp-param query="current news technology" \
+  "Summarize the key trends"
+
+# Get content from specific URLs
+chatgpt \
+  --mcp you \
+  --mcp-tool you-contents \
+  --mcp-param urls='["https://example.com/article"]' \
+  "Extract the main points from this content"
+
+# Research synthesis with citations
+chatgpt \
+  --mcp you \
+  --mcp-tool you-research \
+  --mcp-param query="climate change impacts 2024" \
+  "What are the latest findings?"
+```
 
 Local FastMCP echo server (minimal MCP HTTP example):
 

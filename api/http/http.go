@@ -472,6 +472,9 @@ func (r *RestCaller) newRequest(ctx context.Context, method, url string, body []
 	}
 	req.Header.Set(internal.HeaderContentTypeKey, internal.HeaderContentTypeValue)
 	req.Header.Set(internal.HeaderUserAgentKey, r.config.UserAgent)
+	if strings.EqualFold(req.URL.Hostname(), "api.perplexity.ai") {
+		req.Header.Set("X-Pplx-Integration", "chatgpt-cli")
+	}
 
 	for key, value := range r.config.CustomHeaders {
 		req.Header.Set(key, value)

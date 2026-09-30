@@ -301,18 +301,26 @@ func run(cmd *cobra.Command, args []string) error {
 			return errors.New("--tools requires an --mcp endpoint to source tools from")
 		}
 
+		// Resolve MCP endpoint and prepare headers
+		resolvedEndpoint := utils.ResolveMCPEndpoint(mcpEndpoint)
 		headers, err := utils.ParseMCPHeaders(mcpHeaders)
 		if err != nil {
 			return err
 		}
 
-		transport, err := buildMCPSessionTransport(c.Caller, mcpEndpoint, headers)
+		// Add You.com authentication if using You.com MCP server
+		if utils.IsYouComEndpoint(resolvedEndpoint) {
+			youHeaders := utils.BuildYouComHeaders()
+			utils.MergeMaps(headers, youHeaders)
+		}
+
+		transport, err := buildMCPSessionTransport(c.Caller, resolvedEndpoint, headers)
 		if err != nil {
 			return err
 		}
 
 		c = c.WithTransport(transport).
-			WithToolExecutor(client.NewMCPToolExecutor(transport, mcpEndpoint, headers))
+			WithToolExecutor(client.NewMCPToolExecutor(transport, resolvedEndpoint, headers))
 	}
 
 	if cmd.Flag("mcp").Changed && !toolsFlag {
@@ -323,13 +331,21 @@ func run(cmd *cobra.Command, args []string) error {
 			return errors.New("--mcp-tool is required when using --mcp")
 		}
 
+		// Resolve MCP endpoint and prepare headers
+		resolvedEndpoint := utils.ResolveMCPEndpoint(mcpEndpoint)
 		headers, err := utils.ParseMCPHeaders(mcpHeaders)
 		if err != nil {
 			return err
 		}
 
+		// Add You.com authentication if using You.com MCP server
+		if utils.IsYouComEndpoint(resolvedEndpoint) {
+			youHeaders := utils.BuildYouComHeaders()
+			utils.MergeMaps(headers, youHeaders)
+		}
+
 		mcp := api.MCPRequest{
-			Endpoint: mcpEndpoint,
+			Endpoint: resolvedEndpoint,
 			Headers:  headers,
 			Tool:     mcpTool,
 			Params:   map[string]interface{}{},

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -198,6 +199,30 @@ func (c *Client) GenerateImage(inputText, outputPath string) error {
 //
 // Returns an error if the request fails, the response cannot be written, or the file cannot be created.
 func (c *Client) SynthesizeSpeech(inputText, outputPath string) error {
+	if strings.EqualFold(c.Config.Name, "minimax") {
+		format := strings.ToLower(getExtension(outputPath))
+		if !isMiniMaxSpeechFormat(format) {
+			return fmt.Errorf("unsupported MiniMax speech format: %s", format)
+		}
+
+		req := api.MiniMaxSpeech{
+			Model:        c.Config.Model,
+			Text:         inputText,
+			Stream:       false,
+			OutputFormat: "hex",
+			VoiceSetting: api.MiniMaxVoiceSetting{VoiceID: c.Config.Voice},
+			AudioSetting: api.MiniMaxAudioSetting{Format: format},
+		}
+
+		return c.postAndWriteBinaryOutput(
+			c.getEndpoint(c.Config.SpeechPath),
+			req,
+			outputPath,
+			"binary",
+			decodeMiniMaxSpeechResponse,
+		)
+	}
+
 	req := api.Speech{
 		Model:          c.Config.Model,
 		Voice:          c.Config.Voice,
@@ -205,6 +230,47 @@ func (c *Client) SynthesizeSpeech(inputText, outputPath string) error {
 		ResponseFormat: getExtension(outputPath),
 	}
 	return c.postAndWriteBinaryOutput(c.getEndpoint(c.Config.SpeechPath), req, outputPath, "binary", nil)
+}
+
+func isMiniMaxSpeechFormat(format string) bool {
+	switch format {
+	case "mp3", "wav", "flac", "pcm":
+		return true
+	default:
+		return false
+	}
+}
+
+func decodeMiniMaxSpeechResponse(respBytes []byte) ([]byte, error) {
+	var response struct {
+		Data *struct {
+			Audio  string `json:"audio"`
+			Status int    `json:"status"`
+		} `json:"data"`
+		BaseResponse struct {
+			StatusCode int    `json:"status_code"`
+			StatusMsg  string `json:"status_msg"`
+		} `json:"base_resp"`
+	}
+
+	if err := json.Unmarshal(respBytes, &response); err != nil {
+		return nil, fmt.Errorf("failed to decode MiniMax speech response: %w", err)
+	}
+	if response.BaseResponse.StatusCode != 0 {
+		return nil, fmt.Errorf("MiniMax speech request failed with status %d: %s", response.BaseResponse.StatusCode, response.BaseResponse.StatusMsg)
+	}
+	if response.Data == nil || response.Data.Audio == "" {
+		return nil, fmt.Errorf("MiniMax speech response did not contain audio data")
+	}
+	if response.Data.Status != 2 {
+		return nil, fmt.Errorf("MiniMax speech response was incomplete with status %d", response.Data.Status)
+	}
+
+	audio, err := hex.DecodeString(response.Data.Audio)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode MiniMax speech audio: %w", err)
+	}
+	return audio, nil
 }
 
 // Transcribe uploads an audio file to the OpenAI transcription endpoint and returns the transcribed text.

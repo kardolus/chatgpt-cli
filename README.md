@@ -49,6 +49,7 @@ calls, and an experimental agent mode for multi-step tasks with safety and budge
     - [Switching Between Configurations with --target](#switching-between-configurations-with---target)
     - [Azure Configuration](#azure-configuration)
     - [Perplexity Configuration](#perplexity-configuration)
+    - [MiniMax Text-to-Speech Configuration](#minimax-text-to-speech-configuration)
     - [302 AI Configuration](#302ai-configuration)
     - [Atlas Cloud Configuration](#atlas-cloud-configuration)
     - [Command-Line Autocompletion](#command-line-autocompletion)
@@ -794,6 +795,26 @@ You can set the API key either in the config.yaml file as shown above or export 
 export PERPLEXITY_API_KEY=<your_key>
 ```
 
+### MiniMax Text-to-Speech Configuration
+
+Create a target configuration for MiniMax text-to-speech requests:
+
+```yaml
+name: minimax
+api_key: <your MiniMax API key>
+model: speech-2.8-hd
+url: https://api.minimax.io
+speech_path: /v1/t2a_v2
+voice: <your MiniMax voice ID>
+```
+
+For the China endpoint, use `https://api.minimaxi.com` as `url`. MiniMax speech output supports `mp3`, `wav`, `flac`,
+and `pcm` file extensions. For example:
+
+```shell
+chatgpt --target minimax --speak "Read this text" --output speech.mp3
+```
+
 You can set the API key either in the `config.yaml` file as shown above or export it as an environment variable:
 
 ```shell
@@ -1027,4 +1048,3 @@ Thank you for using ChatGPT CLI!
         <img src="https://img.shields.io/badge/Back%20to%20Top-000000?style=for-the-badge&logo=github&logoColor=white" alt="Back to Top">
     </a>
 </div>
-

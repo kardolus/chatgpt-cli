@@ -162,6 +162,12 @@ func IsBinary(data []byte) bool {
 }
 
 func ValidateFlags(model string, flags map[string]bool) error {
+	return ValidateFlagsForProvider(model, "", flags)
+}
+
+func ValidateFlagsForProvider(model, provider string, flags map[string]bool) error {
+	ttsCompatible := strings.Contains(model, TTSPattern) || strings.EqualFold(provider, "minimax")
+
 	if flags["new-thread"] && (flags["set-thread"] || flags["thread"]) {
 		return errors.New("the --new-thread flag cannot be used with the --set-thread or --thread flags")
 	}
@@ -189,13 +195,13 @@ func ValidateFlags(model string, flags map[string]bool) error {
 	if flags["transcribe"] && !strings.Contains(model, TranscribePattern) {
 		return errors.New("the --transcribe flag cannot be used without a compatible model, ie gpt-4o-transcribe (see --list-models)")
 	}
-	if flags["speak"] && flags["output"] && !strings.Contains(model, TTSPattern) {
+	if flags["speak"] && flags["output"] && !ttsCompatible {
 		return errors.New("the --speak and --output flags cannot be used without a compatible model, ie gpt-4o-mini-tts (see --list-models)")
 	}
 	if flags["draw"] && flags["output"] && !strings.Contains(model, ImagePattern) {
 		return errors.New("the --draw and --output flags cannot be used without a compatible model, ie gpt-image-1 (see --list-models)")
 	}
-	if flags["voice"] && !strings.Contains(model, TTSPattern) {
+	if flags["voice"] && !ttsCompatible {
 		return errors.New("the --voice flag cannot be used without a compatible model, ie gpt-4o-mini-tts (see --list-models)")
 	}
 	if flags["effort"] && !(strings.Contains(model, O1ProPattern) || strings.Contains(model, GPT5Pattern)) {

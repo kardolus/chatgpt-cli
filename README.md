@@ -297,8 +297,8 @@ chatgpt \
 ```
 
 With no query, these calls store context and exit without calling your LLM. Inspect it
-with `chatgpt --show-history parallel-research`, then ask a question using the same
-thread, for example `chatgpt --thread parallel-research "How do I start fuzz testing?"`.
+with `chatgpt --show-history parallel-research`. The normal context-window limit applies;
+long results can trim earlier messages.
 
 Using `--mcp-params` (raw JSON) instead of multiple `--mcp-param` flags:
 

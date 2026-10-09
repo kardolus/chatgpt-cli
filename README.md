@@ -268,6 +268,38 @@ chatgpt \
   "what should I wear today"
 ```
 
+Parallel Search MCP example (free web search and page fetch, no Parallel API key):
+
+These commands use your normal [CLI API-key setup](#getting-started). Parallel's
+[anonymous MCP endpoint](https://docs.parallel.ai/integrations/mcp/search-mcp) needs no
+additional key and has lower rate limits than authenticated access. Keep history enabled.
+
+Search for sources and store the excerpts in a dedicated thread:
+
+```shell
+chatgpt \
+  --thread parallel-research \
+  --mcp "https://search.parallel.ai/mcp" \
+  --mcp-header "User-Agent: chatgpt-cli" \
+  --mcp-tool web_search \
+  --mcp-params '{"objective":"Find the official Go documentation for fuzz testing","search_queries":["Go fuzz testing official documentation"]}'
+```
+
+Fetch a page into the same thread:
+
+```shell
+chatgpt \
+  --thread parallel-research \
+  --mcp "https://search.parallel.ai/mcp" \
+  --mcp-header "User-Agent: chatgpt-cli" \
+  --mcp-tool web_fetch \
+  --mcp-params '{"urls":["https://go.dev/doc/security/fuzz/"],"objective":"Explain how to run a Go fuzz test"}'
+```
+
+With no query, these calls store context and exit without calling your LLM. Inspect it
+with `chatgpt --show-history parallel-research`, then ask a question using the same
+thread, for example `chatgpt --thread parallel-research "How do I start fuzz testing?"`.
+
 Using `--mcp-params` (raw JSON) instead of multiple `--mcp-param` flags:
 
 ```shell

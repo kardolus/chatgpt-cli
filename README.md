@@ -51,6 +51,7 @@ calls, and an experimental agent mode for multi-step tasks with safety and budge
     - [Perplexity Configuration](#perplexity-configuration)
     - [302 AI Configuration](#302ai-configuration)
     - [Atlas Cloud Configuration](#atlas-cloud-configuration)
+    - [Demon Route Configuration](#demon-route-configuration)
     - [Command-Line Autocompletion](#command-line-autocompletion)
         - [Enabling Autocompletion](#enabling-autocompletion)
         - [Persistent Autocompletion](#persistent-autocompletion)
@@ -836,6 +837,31 @@ export ATLASCLOUD_API_KEY=<your_key>
 ```
 
 You can browse the full model catalog and create an API key from the [Atlas Cloud dashboard](https://www.atlascloud.ai).
+
+### Demon Route Configuration
+
+[Demon Route](https://demonroute.com) is a prepaid, OpenAI-compatible gateway for open-weight models, including
+uncensored and roleplay fine-tunes. It works with ChatGPT CLI using the following values:
+
+```yaml
+name: demonroute
+api_key: <your Demon Route api key>
+model: mlabonne/Hermes-3-Llama-3.1-70B-lorablated
+url: https://api.demonroute.com
+context_window: 131072
+```
+
+Keep `url` origin-only: the default `completions_path` (`/v1/chat/completions`) and `models_path` (`/v1/models`) are
+appended to it, so `chatgpt --list-models` returns the Demon Route catalog.
+
+You can set the API key either in the `config.yaml` file as shown above or export it as an environment variable:
+
+```shell
+export DEMONROUTE_API_KEY=<your_key>
+```
+
+Model IDs and context windows are listed in the [Demon Route catalog](https://demonroute.com/models). Set
+`context_window` to match the model you pick.
 
 ### Command-Line Autocompletion
 

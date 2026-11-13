@@ -286,6 +286,13 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			err := utils.ValidateFlags(defaultModel+utils.TTSPattern, flags)
 			Expect(err).NotTo(HaveOccurred())
 		})
+		it("should NOT return an error when --speak and --output flags use the MiniMax provider", func() {
+			flags["speak"] = true
+			flags["output"] = true
+
+			err := utils.ValidateFlagsForProvider(defaultModel, "minimax", flags)
+			Expect(err).NotTo(HaveOccurred())
+		})
 		it("should return an error when --draw and --output flags are used with an incompatible model", func() {
 			flags["draw"] = true
 			flags["output"] = true
@@ -318,6 +325,12 @@ func testUtils(t *testing.T, when spec.G, it spec.S) {
 			flags["voice"] = true
 
 			err := utils.ValidateFlags(defaultModel+utils.TTSPattern, flags)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		it("should NOT return an error when --voice uses the MiniMax provider", func() {
+			flags["voice"] = true
+
+			err := utils.ValidateFlagsForProvider(defaultModel, "minimax", flags)
 			Expect(err).NotTo(HaveOccurred())
 		})
 		it("should return an error when --effort is used with an incompatible model", func() {

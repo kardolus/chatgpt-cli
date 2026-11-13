@@ -100,6 +100,62 @@ func testMedia(t *testing.T, when spec.G, it spec.S) {
 				err = subject.SynthesizeSpeech(inputText, fileName)
 				Expect(err).NotTo(HaveOccurred())
 			})
+
+			it("decodes a successful MiniMax speech response", func() {
+				subject.Config.Name = "minimax"
+				subject.Config.Model = "speech-2.8-hd"
+				subject.Config.Voice = "mock-minimax-voice"
+
+				request := api.MiniMaxSpeech{
+					Model:        subject.Config.Model,
+					Text:         inputText,
+					Stream:       false,
+					OutputFormat: "hex",
+					VoiceSetting: api.MiniMaxVoiceSetting{VoiceID: subject.Config.Voice},
+					AudioSetting: api.MiniMaxAudioSetting{Format: outputFileType},
+				}
+				miniMaxBody, err := json.Marshal(request)
+				Expect(err).NotTo(HaveOccurred())
+
+				audio := []byte("mock MiniMax audio")
+				miniMaxResponse := []byte(fmt.Sprintf(
+					`{"data":{"audio":"%x","status":2},"base_resp":{"status_code":0}}`,
+					audio,
+				))
+				file, err := os.Open(os.DevNull)
+				Expect(err).NotTo(HaveOccurred())
+				defer file.Close()
+
+				mockCaller.EXPECT().Post(gomock.Any(), subject.Config.URL+subject.Config.SpeechPath, miniMaxBody, false).
+					Return(miniMaxResponse, nil)
+				mockWriter.EXPECT().Create(fileName).Return(file, nil)
+				mockWriter.EXPECT().Write(file, audio).Return(nil)
+
+				Expect(subject.SynthesizeSpeech(inputText, fileName)).To(Succeed())
+			})
+
+			it("returns a MiniMax status error without creating an output file", func() {
+				subject.Config.Name = "minimax"
+				miniMaxResponse := []byte(`{"base_resp":{"status_code":1001,"status_msg":"request rejected"}}`)
+
+				mockCaller.EXPECT().Post(gomock.Any(), subject.Config.URL+subject.Config.SpeechPath, gomock.Any(), false).
+					Return(miniMaxResponse, nil)
+
+				err := subject.SynthesizeSpeech(inputText, fileName)
+				Expect(err).To(MatchError("MiniMax speech request failed with status 1001: request rejected"))
+			})
+
+			it("returns an error for invalid MiniMax hexadecimal audio", func() {
+				subject.Config.Name = "minimax"
+				miniMaxResponse := []byte(`{"data":{"audio":"not-hex","status":2},"base_resp":{"status_code":0}}`)
+
+				mockCaller.EXPECT().Post(gomock.Any(), subject.Config.URL+subject.Config.SpeechPath, gomock.Any(), false).
+					Return(miniMaxResponse, nil)
+
+				err := subject.SynthesizeSpeech(inputText, fileName)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to decode MiniMax speech audio"))
+			})
 		})
 
 		when("GenerateImage()", func() {
